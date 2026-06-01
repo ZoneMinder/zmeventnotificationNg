@@ -157,6 +157,12 @@ ensure_venv() {
     PIP="${ZM_VENV}/bin/pip"
     PY_SUDO=""
 
+    # python3 -m venv can finish without putting pip in the venv when the
+    # distro ships the bundled pip wheel separately (Debian/Ubuntu: python3-venv).
+    # Detect the pip-less venv and bootstrap pip ourselves rather than failing
+    # cryptically at the first pip call.
+    ensure_venv_pip
+
     # Upgrade pip inside the venv
     run_dimmed "${PIP}" install --upgrade pip setuptools wheel -q
 
@@ -165,6 +171,38 @@ ensure_venv() {
     shim_opencv
 
     print_success "Using venv Python: ${PYTHON}"
+}
+
+# Make sure pip exists inside the venv. `python3 -m venv` can succeed without
+# bootstrapping pip when the OS split the bundled pip wheel into a separate
+# package (Debian/Ubuntu: python3-venv). The bin/ dir then has python but no
+# pip. Recover via ensurepip, installing the bootstrap package first if needed.
+ensure_venv_pip() {
+    [[ -x "${ZM_VENV}/bin/pip" ]] && return 0
+
+    print_warning "pip was not bootstrapped into the venv — fixing..."
+
+    # First try ensurepip directly; it works when the bundled wheel is present.
+    if ! "${PYTHON}" -m ensurepip --upgrade &>/dev/null; then
+        # ensurepip's wheel is missing — install the distro package that ships it.
+        if command -v apt-get &>/dev/null; then
+            run_dimmed apt-get update -qq && run_dimmed apt-get install -y -qq python3-venv python3-pip
+        elif command -v dnf &>/dev/null; then
+            run_dimmed dnf install -y python3-pip
+        elif command -v yum &>/dev/null; then
+            run_dimmed yum install -y python3-pip
+        fi
+        "${PYTHON}" -m ensurepip --upgrade &>/dev/null || true
+    fi
+
+    if [[ ! -x "${ZM_VENV}/bin/pip" ]]; then
+        print_error "Could not bootstrap pip into ${ZM_VENV}."
+        print_error "Install the pip bootstrap package, then re-run install.sh:"
+        print_error "  Debian/Ubuntu: sudo apt install python3-venv python3-pip"
+        print_error "  Fedora/RHEL:   sudo dnf install python3-pip"
+        exit 1
+    fi
+    print_success "pip bootstrapped into venv"
 }
 
 # Shim opencv-python if cv2 is already available via system-site-packages

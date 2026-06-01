@@ -6,6 +6,24 @@ invokes the ML hooks, and handles push notifications, WebSockets, MQTT, rules, a
 
 If you only want ML detection without the ES, see :doc:`install_path1` instead.
 
+.. important:: **Prerequisites**
+
+   The installer needs ``pip3`` and — on Debian/Ubuntu — the ``python3-venv``
+   package to build the shared virtual environment. Install them **before**
+   running ``install.sh``:
+
+   - Debian/Ubuntu: ``sudo apt install python3-pip python3-venv``
+   - Fedora/RHEL: ``sudo dnf install python3-pip``
+   - openSUSE: ``sudo zypper install python3-pip``
+   - Arch: ``sudo pacman -S python-pip``
+
+   Without ``python3-venv``, ``python3 -m venv`` still creates the directory but
+   never bootstraps ``pip`` into it — you'll end up with ``python``/``python3`` in
+   ``/opt/zoneminder/venv/bin`` but **no** ``pip``. If that already happened,
+   install the package above and run
+   ``sudo /opt/zoneminder/venv/bin/python -m ensurepip --upgrade`` (or delete the
+   venv and re-run the installer).
+
 Step 1: Install ML dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
