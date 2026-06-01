@@ -25,6 +25,13 @@ notifications), Path 1 is simpler to set up.
 If you need WebSocket notifications, MQTT, notification rules, or the ES control
 interface, you need Path 2.
 
+.. note::
+
+   Both paths require ``pip3`` (and ``python3-venv`` on Debian/Ubuntu). Install
+   with ``sudo apt install python3-pip python3-venv`` (Debian/Ubuntu),
+   ``sudo dnf install python3-pip`` (Fedora/RHEL), ``sudo zypper install python3-pip``
+   (openSUSE), or ``sudo pacman -S python-pip`` (Arch).
+
 .. toctree::
 
    install_path1
