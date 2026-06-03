@@ -161,3 +161,111 @@ echo "  Done."
 
 echo
 echo "=== Release v${VER} complete ==="
+
+# Verify the running system actually reflects this release. install.sh is
+# lenient (prints ERROR but keeps going), so we check artifacts, versions and
+# run the entry points as the web user — the uid that matters at runtime.
+# Hard failures (missing files, version mismatch, broken imports) flip the
+# gate to FAIL; config-dependent issues (Perl deps, Version.pm) are warnings.
+validate_install() {
+    local venv="${ZM_VENV:-/opt/zoneminder/venv}"
+    local web_owner="${WEB_OWNER:-www-data}"
+    local bin_es="${TARGET_BIN_ES:-/usr/bin}"
+    local bin_hook="${TARGET_BIN_HOOK:-/var/lib/zmeventnotification/bin}"
+    local perl_lib="${TARGET_PERL_LIB:-/usr/share/perl5}"
+    local py="${venv}/bin/python"
+    local pm="${perl_lib}/ZmEventNotification/Version.pm"
+    local fail=0
+
+    echo
+    echo "──── Validating install (v${VER}) ────"
+
+    # 1. Required artifacts present
+    for f in \
+        "${bin_es}/zmeventnotification.pl" \
+        "${bin_hook}/zm_detect.py" "${bin_hook}/zm_train_faces.py" \
+        "${bin_hook}/zm_event_start.sh" "${bin_hook}/zm_event_end.sh" \
+        "$pm"; do
+        if [ -f "$f" ]; then echo "  OK   present: $f"
+        else echo "  FAIL missing: $f"; fail=1; fi
+    done
+
+    if [ -x "$py" ]; then
+        # 2. Hook package version matches the release
+        local hookver
+        hookver=$(sudo -u "$web_owner" "$py" -c "import zmes_hook_helpers as z; print(z.__version__)" 2>/dev/null || true)
+        if [ "$hookver" == "$VER" ]; then echo "  OK   hook package version: ${hookver}"
+        else echo "  FAIL hook package version: got '${hookver}', expected '${VER}'"; fail=1; fi
+
+        # 3. pyzm importable and satisfies the setup.py pin
+        local pyzmver pin lowest
+        pyzmver=$(sudo -u "$web_owner" "$py" -c "from importlib.metadata import version; print(version('pyzm'))" 2>/dev/null || true)
+        pin=$(grep -oP "pyzm>=\K[0-9][0-9.]*" "$SETUP_PY" || true)
+        if [ -z "$pyzmver" ]; then
+            echo "  FAIL pyzm not importable"; fail=1
+        elif [ -n "$pin" ]; then
+            lowest=$(printf '%s\n%s\n' "$pin" "$pyzmver" | sort -V | head -1)
+            if [ "$lowest" == "$pin" ]; then echo "  OK   pyzm ${pyzmver} satisfies pin >=${pin}"
+            else echo "  FAIL pyzm ${pyzmver} is older than pin >=${pin}"; fail=1; fi
+        else
+            echo "  OK   pyzm version: ${pyzmver}"
+        fi
+
+        # 4. OpenCV still importable and >= 4.13 (default ONNX models need it)
+        local cvver
+        cvver=$(sudo -u "$web_owner" "$py" -c "import cv2; print(cv2.__version__)" 2>/dev/null || true)
+        if [ -z "$cvver" ]; then echo "  FAIL cv2 not importable"; fail=1
+        else echo "  OK   cv2 version: ${cvver}"; fi
+
+        # 5. End-to-end: zm_detect.py runs via its patched venv shebang
+        if sudo -u "$web_owner" "${bin_hook}/zm_detect.py" --bareversion >/dev/null 2>&1; then
+            echo "  OK   zm_detect.py runs (--bareversion)"
+        else
+            echo "  FAIL zm_detect.py failed to run"; fail=1
+        fi
+    else
+        echo "  FAIL venv python not found at ${py}"; fail=1
+    fi
+
+    # 6. Version.pm fallback matches (advisory)
+    if [ -f "$pm" ]; then
+        local pmver
+        pmver=$(grep -oP "FALLBACK_VERSION = '\K[^']+" "$pm" || true)
+        if [ "$pmver" == "$VER" ]; then echo "  OK   Version.pm fallback: ${pmver}"
+        else echo "  WARN Version.pm fallback: got '${pmver}', expected '${VER}'"; fi
+    fi
+
+    # 7. ES Perl script compiles against installed modules (advisory)
+    if perl -c "${bin_es}/zmeventnotification.pl" >/dev/null 2>&1; then
+        echo "  OK   zmeventnotification.pl compiles"
+    else
+        echo "  WARN zmeventnotification.pl did not compile (check Perl deps)"
+    fi
+
+    echo
+    if [ "$fail" -eq 0 ]; then
+        echo "Validation PASSED for v${VER}."
+    else
+        echo "Validation FAILED — see FAIL lines above."
+        return 1
+    fi
+}
+
+# --- Step 6: Optionally update this local system ---
+# Same path a user follows: run install.sh with all components enabled,
+# non-interactively. We deliberately do NOT pass --install-opencv: cv2 is
+# typically a source/system build here, and apt's python3-opencv would
+# downgrade it and break the ONNX (YOLOv11/26) models installed by default.
+echo
+INSTALL_CMD="sudo ./install.sh --install-es --install-hook --install-config --no-interactive"
+read -p "Update this local system to v${VER} now (runs: ${INSTALL_CMD})? [y/N] " do_install
+if [[ "$do_install" =~ ^[Yy]$ ]]; then
+    echo
+    eval "$INSTALL_CMD"
+    # install.sh runs tools/install_doctor.py as its final step (config-level
+    # diagnostics); validate_install confirms the release itself landed.
+    validate_install || true
+else
+    echo "Skipped. To update later, run from the repo root:"
+    echo "  ${INSTALL_CMD}"
+fi
