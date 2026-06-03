@@ -211,6 +211,13 @@ validate_install() {
             echo "  OK   pyzm version: ${pyzmver}"
         fi
 
+        # 3b. pyzm[full] extras present (this maintainer box runs the full pyzm)
+        if sudo -u "$web_owner" "$py" -c "import fastapi, uvicorn, ultralytics, streamlit" >/dev/null 2>&1; then
+            echo "  OK   pyzm[full] extras import (fastapi/uvicorn/ultralytics/streamlit)"
+        else
+            echo "  FAIL pyzm[full] extras missing — run: ${py%/python}/pip install 'pyzm[full]'"; fail=1
+        fi
+
         # 4. OpenCV still importable and >= 4.13 (default ONNX models need it)
         local cvver
         cvver=$(sudo -u "$web_owner" "$py" -c "import cv2; print(cv2.__version__)" 2>/dev/null || true)
@@ -262,6 +269,20 @@ read -p "Update this local system to v${VER} now (runs: ${INSTALL_CMD})? [y/N] "
 if [[ "$do_install" =~ ^[Yy]$ ]]; then
     echo
     eval "$INSTALL_CMD"
+
+    # install.sh installs only core pyzm (all most users need). On this
+    # maintainer box we want the full pyzm — remote ML server + training UI
+    # extras — so pull pyzm[full] at the pinned version into the same venv.
+    PYZM_VENV="${ZM_VENV:-/opt/zoneminder/venv}"
+    PYZM_PIN=$(grep -oP "pyzm>=\K[0-9][0-9.]*" "$SETUP_PY" || true)
+    if [ -x "${PYZM_VENV}/bin/pip" ]; then
+        echo
+        echo "Installing pyzm[full]${PYZM_PIN:+>=$PYZM_PIN} into ${PYZM_VENV} ..."
+        sudo -H "${PYZM_VENV}/bin/pip" install "pyzm[full]${PYZM_PIN:+>=$PYZM_PIN}"
+    else
+        echo "WARNING: ${PYZM_VENV}/bin/pip not found; skipping pyzm[full] install."
+    fi
+
     # install.sh runs tools/install_doctor.py as its final step (config-level
     # diagnostics); validate_install confirms the release itself landed.
     validate_install || true
