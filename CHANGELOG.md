@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.21] - 2026-06-03
+
+### Miscellaneous
+
+- bump version to v7.0.21 ([9a920a4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9a920a44606f2a215de66072de1a8a7d323cfef5))
+- install pyzm[full] on local update + verify in gate ([6a97fcb](https://github.com/ZoneMinder/zmeventnotificationNg/commit/6a97fcbc6a96e6377f7426c54b066a0eca9b2ee7))
+- offer local install + validation gate after release ([404c8d8](https://github.com/ZoneMinder/zmeventnotificationNg/commit/404c8d857d849100a3a70ca1cefa2f24edde664f))
+- auto-sync pyzm pin in hook/setup.py to latest PyPI ([8c6b239](https://github.com/ZoneMinder/zmeventnotificationNg/commit/8c6b23982dd4f238d207cf3e73ef7490f4084ae2))
+
 ## [7.0.20] - 2026-06-01
 
 ### Bug Fixes
@@ -11,6 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.20 ([25d7c81](https://github.com/ZoneMinder/zmeventnotificationNg/commit/25d7c81056b4f8bc9b1466898c8e6f9747c618a6))
 - note pip3/python3-venv prerequisite for both paths ([3beda52](https://github.com/ZoneMinder/zmeventnotificationNg/commit/3beda52b2008e9c93f5a7d0b27ea8d8d9397c381))
 - point repo references to ZoneMinder/zmeventnotificationNg ([3b9d381](https://github.com/ZoneMinder/zmeventnotificationNg/commit/3b9d3819da9b626767d63610f8d8601459c5823e))
 
