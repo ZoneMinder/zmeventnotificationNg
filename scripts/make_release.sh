@@ -16,6 +16,7 @@ VER=$(cat ./VERSION | tr -d '[:space:]')
 
 # Keep hook package version in sync with VERSION file
 INIT_PY="hook/zmes_hook_helpers/__init__.py"
+SETUP_PY="hook/setup.py"
 sed -i "s/^__version__ = \".*\"/__version__ = \"${VER}\"/" "$INIT_PY"
 
 echo "=== Release v${VER} ==="
@@ -31,6 +32,33 @@ if ! command -v gh &>/dev/null; then
     exit 1
 fi
 export GITHUB_TOKEN=$(gh auth token)
+
+# --- Keep pyzm dependency pin in sync with latest PyPI release ---
+if command -v curl &>/dev/null && command -v python3 &>/dev/null; then
+    CURRENT_PYZM=$(grep -oP "pyzm>=\K[0-9][0-9.]*" "$SETUP_PY" || true)
+    LATEST_PYZM=$(curl -fsSL https://pypi.org/pypi/pyzm/json 2>/dev/null \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])" 2>/dev/null || true)
+    if [ -z "$CURRENT_PYZM" ]; then
+        echo "WARNING: could not find a 'pyzm>=' pin in $SETUP_PY; skipping pyzm sync."
+        echo
+    elif [ -z "$LATEST_PYZM" ]; then
+        echo "WARNING: could not fetch latest pyzm version from PyPI; skipping pyzm sync."
+        echo
+    elif [ "$CURRENT_PYZM" != "$LATEST_PYZM" ]; then
+        echo "pyzm pin in $SETUP_PY is 'pyzm>=${CURRENT_PYZM}', latest on PyPI is ${LATEST_PYZM}."
+        read -p "Bump pin to 'pyzm>=${LATEST_PYZM}'? [y/N] " bump_pyzm
+        if [[ "$bump_pyzm" =~ ^[Yy]$ ]]; then
+            sed -i "s/pyzm>=${CURRENT_PYZM}/pyzm>=${LATEST_PYZM}/" "$SETUP_PY"
+            echo "  Updated $SETUP_PY: pyzm>=${LATEST_PYZM}"
+        else
+            echo "  Leaving pyzm pin unchanged."
+        fi
+        echo
+    fi
+else
+    echo "WARNING: curl/python3 not available; skipping pyzm version sync."
+    echo
+fi
 
 # --- Step 1: Check if tag already exists ---
 if git rev-parse "v${VER}" &>/dev/null; then
@@ -56,7 +84,7 @@ if git rev-parse "v${VER}" &>/dev/null; then
             VER="$BUMPED"
             echo "$VER" > VERSION
             sed -i "s/^__version__ = \".*\"/__version__ = \"${VER}\"/" "$INIT_PY"
-            git add VERSION "$INIT_PY"
+            git add VERSION "$INIT_PY" "$SETUP_PY"
             git commit -m "chore: bump version to v${VER}"
             git push origin master
             echo "  Done."
@@ -72,15 +100,15 @@ fi
 # --- Step 2: Check for uncommitted files ---
 DIRTY_FILES=$(git status --porcelain)
 if [ -n "$DIRTY_FILES" ]; then
-    # Check if the only dirty files are VERSION and __init__.py
-    NON_VERSION=$(echo "$DIRTY_FILES" | grep -v ' VERSION$' | grep -v "$INIT_PY" || true)
+    # Check if the only dirty files are VERSION, __init__.py and setup.py
+    NON_VERSION=$(echo "$DIRTY_FILES" | grep -v ' VERSION$' | grep -v "$INIT_PY" | grep -v "$SETUP_PY" || true)
     if [ -n "$NON_VERSION" ]; then
-        echo "ERROR: Uncommitted files besides VERSION and $INIT_PY:"
+        echo "ERROR: Uncommitted files besides VERSION, $INIT_PY and $SETUP_PY:"
         echo "$NON_VERSION"
         exit 1
     fi
     echo "Committing version files ..."
-    git add VERSION "$INIT_PY"
+    git add VERSION "$INIT_PY" "$SETUP_PY"
     git commit -m "chore: bump version to v${VER}"
     git push origin master
     echo "  Done."
