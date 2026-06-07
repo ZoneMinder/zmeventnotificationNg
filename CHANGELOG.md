@@ -3,7 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.22] - 2026-06-07
+
+### Bug Fixes
+
+- bootstrap venv pip reliably when a system pip is present ([0bab251](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0bab25179ff74650fdcbc3c3bd83c8cdd43a1f6b))
+
+### Miscellaneous
+
+- bump version to v7.0.22 ([bff4a39](https://github.com/ZoneMinder/zmeventnotificationNg/commit/bff4a39f43c5fef820f7cc6024fdd5c76a5fa059))
+
 ## [7.0.21] - 2026-06-03
+
+### Documentation
+
+- update CHANGELOG for v7.0.21 ([9ec87b6](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9ec87b6abc556d77d1269c880bdee596973237df))
 
 ### Miscellaneous
 
