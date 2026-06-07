@@ -127,41 +127,23 @@ ensure_venv() {
 
     print_section "Setting up Python virtual environment"
 
-    # Check if venv already exists and is usable
-    if [[ -d "${ZM_VENV}" && -x "${ZM_VENV}/bin/python" ]]; then
+    # A usable venv must have BOTH python and pip. A venv with python but no
+    # pip is broken (e.g. created before the bootstrap package was installed) —
+    # recreate it from scratch rather than skipping and failing later.
+    if [[ -d "${ZM_VENV}" && -x "${ZM_VENV}/bin/python" && -x "${ZM_VENV}/bin/pip" ]]; then
         print_success "Venv already exists at ${ZM_VENV}"
     else
-        # Make sure python3 -m venv works
-        if ! ${PYTHON} -m venv --help &>/dev/null; then
-            echo "python3-venv not available — installing..."
-            if command -v apt-get &>/dev/null; then
-                run_dimmed apt-get update -qq && run_dimmed apt-get install -y -qq python3-venv
-            elif command -v dnf &>/dev/null; then
-                run_dimmed dnf install -y python3-libs
-            elif command -v yum &>/dev/null; then
-                run_dimmed yum install -y python3-libs
-            else
-                print_error "Cannot auto-install python3-venv. Install it manually, then re-run."
-                exit 1
-            fi
+        if [[ -d "${ZM_VENV}" ]]; then
+            print_warning "Existing venv at ${ZM_VENV} has no pip — recreating"
+            rm -rf "${ZM_VENV}"
         fi
-
-        echo "Creating venv at ${ZM_VENV} ..."
-        mkdir -p "$(dirname "${ZM_VENV}")"
-        ${PYTHON} -m venv --system-site-packages "${ZM_VENV}"
-        print_success "Venv created (Python: $(${ZM_VENV}/bin/python --version))"
+        create_venv
     fi
 
     # Point PYTHON and PIP at the venv — no sudo needed for venv installs
     PYTHON="${ZM_VENV}/bin/python"
     PIP="${ZM_VENV}/bin/pip"
     PY_SUDO=""
-
-    # python3 -m venv can finish without putting pip in the venv when the
-    # distro ships the bundled pip wheel separately (Debian/Ubuntu: python3-venv).
-    # Detect the pip-less venv and bootstrap pip ourselves rather than failing
-    # cryptically at the first pip call.
-    ensure_venv_pip
 
     # Upgrade pip inside the venv
     run_dimmed "${PIP}" install --upgrade pip setuptools wheel -q
@@ -173,36 +155,74 @@ ensure_venv() {
     print_success "Using venv Python: ${PYTHON}"
 }
 
-# Make sure pip exists inside the venv. `python3 -m venv` can succeed without
-# bootstrapping pip when the OS split the bundled pip wheel into a separate
-# package (Debian/Ubuntu: python3-venv). The bin/ dir then has python but no
-# pip. Recover via ensurepip, installing the bootstrap package first if needed.
-ensure_venv_pip() {
-    [[ -x "${ZM_VENV}/bin/pip" ]] && return 0
+# Create the shared venv with pip bootstrapped. Works around two distro gotchas:
+#
+#  1. Debian/Ubuntu ship pip's bootstrap wheels in a separate package
+#     (python3-venv / python3.12-venv). Without it `python3 -m venv` makes a
+#     venv with no pip. `python3 -m venv --help` does NOT detect this (it always
+#     exits 0), so we install the package up front instead of trusting that.
+#
+#  2. With --system-site-packages, a system-wide pip (python3-pip) is importable
+#     from inside the venv, so `ensurepip --upgrade` reports "already satisfied"
+#     and never writes venv/bin/pip. We therefore create the venv WITHOUT
+#     --system-site-packages (pip bootstraps cleanly), then enable system
+#     site-packages via pyvenv.cfg so system OpenCV etc. stay importable.
+create_venv() {
+    ensure_venv_bootstrap_pkgs
 
-    print_warning "pip was not bootstrapped into the venv — fixing..."
+    echo "Creating venv at ${ZM_VENV} ..."
+    mkdir -p "$(dirname "${ZM_VENV}")"
+    ${PYTHON} -m venv "${ZM_VENV}"
 
-    # First try ensurepip directly; it works when the bundled wheel is present.
-    if ! "${PYTHON}" -m ensurepip --upgrade &>/dev/null; then
-        # ensurepip's wheel is missing — install the distro package that ships it.
-        if command -v apt-get &>/dev/null; then
-            run_dimmed apt-get update -qq && run_dimmed apt-get install -y -qq python3-venv python3-pip
-        elif command -v dnf &>/dev/null; then
-            run_dimmed dnf install -y python3-pip
-        elif command -v yum &>/dev/null; then
-            run_dimmed yum install -y python3-pip
-        fi
-        "${PYTHON}" -m ensurepip --upgrade &>/dev/null || true
+    # Bootstrap pip ourselves if the distro still didn't. Safe here because the
+    # venv can't yet see a system pip (no --system-site-packages above).
+    if [[ ! -x "${ZM_VENV}/bin/pip" ]]; then
+        print_warning "pip was not bootstrapped into the venv — fixing..."
+        "${ZM_VENV}/bin/python" -m ensurepip --upgrade &>/dev/null || true
     fi
 
     if [[ ! -x "${ZM_VENV}/bin/pip" ]]; then
         print_error "Could not bootstrap pip into ${ZM_VENV}."
         print_error "Install the pip bootstrap package, then re-run install.sh:"
-        print_error "  Debian/Ubuntu: sudo apt install python3-venv python3-pip"
+        print_error "  Debian/Ubuntu: sudo apt install python3-venv"
         print_error "  Fedora/RHEL:   sudo dnf install python3-pip"
+        rm -rf "${ZM_VENV}"
         exit 1
     fi
-    print_success "pip bootstrapped into venv"
+
+    # Now that pip lives in venv/bin, let the venv see system site-packages
+    # (system OpenCV, etc.) without shadowing the venv's own pip.
+    enable_system_site_packages
+
+    print_success "Venv created (Python: $(${ZM_VENV}/bin/python --version))"
+}
+
+# Install the OS package that lets `python3 -m venv` bootstrap pip. `venv --help`
+# always succeeds even when it's missing, so install it up front rather than
+# trusting that check. python3-venv pulls in python3-pip-whl/python3-setuptools-whl.
+ensure_venv_bootstrap_pkgs() {
+    if command -v apt-get &>/dev/null; then
+        if ! dpkg -s python3-venv &>/dev/null; then
+            echo "Installing python3-venv (pip bootstrap for venv)..."
+            run_dimmed apt-get update -qq && run_dimmed apt-get install -y -qq python3-venv
+        fi
+    elif command -v dnf &>/dev/null; then
+        run_dimmed dnf install -y python3-pip &>/dev/null || true
+    elif command -v yum &>/dev/null; then
+        run_dimmed yum install -y python3-pip &>/dev/null || true
+    fi
+}
+
+# Flip include-system-site-packages on so the venv can import system-installed
+# modules (e.g. a source-built OpenCV) while keeping its own pip.
+enable_system_site_packages() {
+    local cfg="${ZM_VENV}/pyvenv.cfg"
+    [[ -f "${cfg}" ]] || return 0
+    if grep -q '^include-system-site-packages' "${cfg}"; then
+        sed -i 's/^include-system-site-packages = false/include-system-site-packages = true/' "${cfg}"
+    else
+        echo "include-system-site-packages = true" >> "${cfg}"
+    fi
 }
 
 # Shim opencv-python if cv2 is already available via system-site-packages

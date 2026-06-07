@@ -45,9 +45,8 @@ Step 1: Run the installer
    Without ``python3-venv``, ``python3 -m venv`` still creates the directory but
    never bootstraps ``pip`` into it — you'll end up with ``python``/``python3`` in
    ``/opt/zoneminder/venv/bin`` but **no** ``pip``, and Step 2 will fail. If that
-   already happened, install the package above and run
-   ``sudo /opt/zoneminder/venv/bin/python -m ensurepip --upgrade`` (or delete the
-   venv and re-run the installer).
+   already happened, just re-run the installer: it detects a pip-less venv and
+   recreates it automatically (or ``sudo rm -rf /opt/zoneminder/venv`` first).
 
 .. code:: bash
 
