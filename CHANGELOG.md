@@ -3,11 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.23] - 2026-07-14
+
+### Bug Fixes
+
+- carry event id in Android notification tag, stack by default ([5d815f5](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5d815f53e802209434d100917d0d9995fc7424d1))
+
+### Miscellaneous
+
+- bump version to v7.0.23 ([ab311fb](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ab311fb92bdeccee62411114f4a3bbcca9310ab1))
+
 ## [7.0.22] - 2026-06-07
 
 ### Bug Fixes
 
 - bootstrap venv pip reliably when a system pip is present ([0bab251](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0bab25179ff74650fdcbc3c3bd83c8cdd43a1f6b))
+
+### Documentation
+
+- update CHANGELOG for v7.0.22 ([8f2846e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/8f2846e2d5707db47af7f9226d7297e7e8780a4a))
 
 ### Miscellaneous
 
