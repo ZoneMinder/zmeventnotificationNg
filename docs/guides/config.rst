@@ -193,7 +193,7 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - Use FCM V1 protocol (recommended)
    * - ``replace_push_messages``
      - ``no``
-     - Replace previous push for same monitor (collapses notifications)
+     - ``no`` (default): notifications stack and the event id is carried in the Android notification tag so the app can recover it. ``yes``: collapse to a single notification (each push replaces the previous)
    * - ``token_file``
      - ``${base_data_path}/push/tokens.txt``
      - File to persist registered FCM tokens
@@ -582,8 +582,8 @@ See :ref:`push_config` above for setup steps.
      - *(managed zmNinjaNG key)*
      - Authorization key for the cloud function proxy. Replace only if you run your own.
    * - ``replace_push_messages``
-     - ``yes``
-     - Collapse notifications per monitor (replaces previous push)
+     - ``no``
+     - ``no`` (default): notifications stack and the event id is carried in the Android notification tag so the app can recover it. ``yes``: collapse to a single notification (each push replaces the previous)
    * - ``include_picture``
      - ``yes``
      - Include event image URL in the notification

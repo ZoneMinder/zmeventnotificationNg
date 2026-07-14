@@ -281,7 +281,13 @@ sub sendOverFCMV1 {
           }
         };
         $message_v2->{message}->{android}->{ttl} = $fcm_config{android_ttl} . 's' if defined($fcm_config{android_ttl});
-        $message_v2->{message}->{android}->{notification}->{tag} = 'zmninjapush' if $fcm_config{replace_push_messages};
+        # Replace mode: a constant tag makes Android collapse to one notification.
+        # Stacked mode (default): a unique per-event tag stops Android from
+        # replacing, and carries the eid. getDeliveredNotifications drops the FCM
+        # data payload on Android, so the tag is how the app recovers the event id
+        # when the user opens the app without tapping the notification (issue #30).
+        $message_v2->{message}->{android}->{notification}->{tag} =
+          $fcm_config{replace_push_messages} ? 'zmninjapush' : "zmninja_${eid}_${event_type}";
         if (defined ($obj->{appversion}) && ($obj->{appversion} ne 'unknown')) {
           main::Debug(2, 'fcmv1: setting android channel to zmninja');
           $message_v2->{message}->{android}->{notification}->{channel_id} = 'zmninja';
@@ -345,7 +351,10 @@ sub sendOverFCMV1 {
           priority => $fcm_config{android_priority}
         };
         $message_v2->{android}->{ttl} = $fcm_config{android_ttl} if defined($fcm_config{android_ttl});
-        $message_v2->{android}->{tag} = 'zmninjapush' if $fcm_config{replace_push_messages};
+        # See the direct-mode branch above: constant tag collapses, unique
+        # per-event tag stacks and carries the eid past Android's data drop (issue #30).
+        $message_v2->{android}->{tag} =
+          $fcm_config{replace_push_messages} ? 'zmninjapush' : "zmninja_${eid}_${event_type}";
         if (defined ($obj->{appversion}) && ($obj->{appversion} ne 'unknown')) {
           main::Debug(2, 'setting channel to zmninja');
           $message_v2->{android}->{channel} = 'zmninja';

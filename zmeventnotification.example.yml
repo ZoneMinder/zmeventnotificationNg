@@ -72,9 +72,11 @@ fcm:
   # Use the new FCM V1 protocol (recommended)
   use_fcmv1: "yes"
 
-  # if yes, will replace notifications with the latest one
+  # if yes, replaces notifications with the latest one (collapse to a single
+  # notification). if no (default), notifications stack and the event id is
+  # carried in the Android notification tag so the app can recover it.
   # default: no
-  replace_push_messages: "yes"
+  replace_push_messages: "no"
 
   # Custom FCM API key. Uncomment if you are using
   # your own API key (most people will not need to uncomment)
