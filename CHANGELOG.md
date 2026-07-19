@@ -3,11 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.24] - 2026-07-19
+
+### Features
+
+- add zm_conf_path to locate zm.conf for DB tagging ([a086a1e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/a086a1ecf89593e6427435849deabbd634251103))
+
+### Miscellaneous
+
+- bump version to v7.0.24 ([9c75eeb](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9c75eebc3fcc2636b83b178f507f85b60ef25030))
+
 ## [7.0.23] - 2026-07-14
 
 ### Bug Fixes
 
 - carry event id in Android notification tag, stack by default ([5d815f5](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5d815f53e802209434d100917d0d9995fc7424d1))
+
+### Documentation
+
+- update CHANGELOG for v7.0.23 ([de06c79](https://github.com/ZoneMinder/zmeventnotificationNg/commit/de06c79c077b29f5e05610f0beb013ebaaf2bf9a))
 
 ### Miscellaneous
 
