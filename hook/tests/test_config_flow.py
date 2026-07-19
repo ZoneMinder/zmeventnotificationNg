@@ -483,3 +483,41 @@ class TestConfigVariantCombinations:
         assert push["use_fcm"] == "yes"
         assert push["fcm_tokens"] == ["token_a", "token_b"]
         assert push["channels"]["default"]["title"] == "Alert"
+
+
+# ===========================================================================
+# 6. TestZmConfPath
+# ===========================================================================
+
+class TestZmConfPath:
+    """Test that zm_conf_path is recognized and flows into g.config.
+
+    zm_detect.py passes g.config['zm_conf_path'] to ZMClient(conf_path=...),
+    which pyzmNg uses to locate zm.conf for DB-based tagging. See issue #32.
+    """
+
+    def test_zm_conf_path_recognized(self, tmp_path, ctx):
+        """A zm_conf_path under general is stored in g.config."""
+        cfg = {
+            "general": _minimal_general(zm_conf_path="/config"),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path}, ctx)
+        assert g.config["zm_conf_path"] == "/config"
+
+    def test_zm_conf_path_defaults_to_none(self, tmp_path, ctx):
+        """When unset, zm_conf_path defaults to None so pyzm uses its default."""
+        cfg = {
+            "general": _minimal_general(),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path}, ctx)
+        assert g.config["zm_conf_path"] is None

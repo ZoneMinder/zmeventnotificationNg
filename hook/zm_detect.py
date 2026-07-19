@@ -93,7 +93,8 @@ def main_handler():
 
     # Connect to ZM via pyzm v2
     zm = ZMClient(api_url=g.config['api_portal'], user=g.config['user'], password=g.config['password'],
-                  portal_url=g.config['portal'], verify_ssl=(g.config['allow_self_signed'] != 'yes'))
+                  portal_url=g.config['portal'], verify_ssl=(g.config['allow_self_signed'] != 'yes'),
+                  conf_path=g.config.get('zm_conf_path'))
 
     # Import ZM zones via pyzm client (ref: ZoneMinder/zmeventnotificationNg#18)
     if g.config.get('import_zm_zones') == 'yes':

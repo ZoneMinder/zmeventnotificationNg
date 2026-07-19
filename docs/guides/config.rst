@@ -544,6 +544,9 @@ Consumed by ``zm_detect.py`` / ``utils.py``:
    * - ``tag_detected_objects``
      - ``no``
      - Write detected labels as ZM Tags (requires ZM >= 1.37.44)
+   * - ``zm_conf_path``
+     - *none* (pyzm auto-discovers)
+     - Directory holding ZoneMinder's ``zm.conf`` (and ``conf.d/*.conf``), used by ``tag_detected_objects`` for DB access. pyzm auto-discovers common locations (``/etc/zm``, ``/config``, ``/etc/zoneminder``), so most installs — including containers using ``/config`` — need nothing here. Set this only to force a non-standard path
    * - ``poly_color``
      - ``(255,255,255)``
      - RGB color for polygon overlays on annotated images
