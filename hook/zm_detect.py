@@ -187,6 +187,28 @@ def main_handler():
     g.logger.Info('Prediction string:{}'.format(pred)); print(output)
 
     # --- Write images ---
+    # In gateway/URL mode the server does not return the image, only bounding
+    # box coordinates and labels.  Fetch the matched frame from ZoneMinder so
+    # we can annotate it locally and write the objdetect artefact as usual.
+    if (matched_data.get('image') is None and matched_data.get('frame_id')
+            and (g.config['write_image_to_zm'] == 'yes' or g.config['write_debug_image'] == 'yes')):
+        try:
+            import requests as _req
+            fid = matched_data['frame_id']
+            img_url = '{}/index.php?view=image&eid={}&fid={}'.format(
+                g.config['portal'], stream, fid)
+            auth_str = zm.api.auth.get_auth_string()
+            sep = '&' if '?' in img_url else '?'
+            img_url = '{}{}{}'.format(img_url, sep, auth_str)
+            verify = (g.config.get('allow_self_signed') != 'yes')
+            resp = _req.get(img_url, timeout=10, verify=verify)
+            if resp.status_code == 200:
+                import numpy as np
+                arr = np.frombuffer(resp.content, dtype=np.uint8)
+                matched_data['image'] = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                result.image = matched_data['image']
+        except Exception as e:
+            g.logger.Error('Error fetching frame image for annotation: {}'.format(e))
     if matched_data.get('image') is not None and (g.config['write_image_to_zm'] == 'yes' or g.config['write_debug_image'] == 'yes'):
         draw_errors = g.config['write_debug_image'] == 'yes'
         debug_image = result.annotate(
