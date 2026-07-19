@@ -3,7 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.25] - 2026-07-19
+
+### Bug Fixes
+
+- make --debug actually emit DBG logs ([6abdfbc](https://github.com/ZoneMinder/zmeventnotificationNg/commit/6abdfbc729a213ab03e87badd99590228181df8c))
+
+### Documentation
+
+- make Path 2 Step 8 self-contained for ML hook setup ([9e78f88](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9e78f888692691482ddac4867cb6df5b9e53dcd3))
+
+### Miscellaneous
+
+- bump version to v7.0.25 ([022c25a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/022c25a3573e5cb01dd588643e3d7b8e81ae9d52))
+
 ## [7.0.24] - 2026-07-19
+
+### Documentation
+
+- update CHANGELOG for v7.0.24 ([0065ee1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0065ee1000e35f5d6ff7d678037c9ef40f102cec))
 
 ### Features
 
