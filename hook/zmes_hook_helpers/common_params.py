@@ -24,6 +24,11 @@ config_vals = {
             'type': 'dict',
 
         },
+        'zm_conf_path': {
+            'section': 'general',
+            'default': None,
+            'type': 'string'
+        },
         'portal':{
             'section': 'general',
             'default': '',

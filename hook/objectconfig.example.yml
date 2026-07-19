@@ -10,11 +10,17 @@
 # general.base_data_path wherever it appears.
 
 general:
-  # Override pyzm settings (e.g. database host, debug level).
-  # If ZM uses a UNIX socket (ZM_DB_HOST=localhost:/var/run/mysqld/mysqld.sock),
-  # set dbhost: "localhost:3306" here.
+  # Override pyzm settings (e.g. debug level).
   pyzm_overrides:
     log_level_debug: 5
+
+  # Directory holding ZoneMinder's zm.conf (and conf.d/*.conf). Only needed
+  # by the ZM Tags feature (tag_detected_objects), which reads ZM's DB
+  # credentials from these files. pyzm auto-discovers common locations
+  # (/etc/zm, /config, /etc/zoneminder), so most installs — including
+  # containers using /config — need nothing here. Set this only to force a
+  # non-standard path.
+  #zm_conf_path: /some/custom/path
 
   # Secrets file for credential tokens (!TOKEN_NAME syntax)
   secrets: /etc/zm/secrets.yml
