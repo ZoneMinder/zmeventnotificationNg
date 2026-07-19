@@ -163,13 +163,41 @@ In the ZoneMinder web interface, go to **Options -> Systems** and enable
 Step 8: Set up ML hooks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Follow **Steps 4–6** from :doc:`install_path1` to configure ``objectconfig.yml``,
-verify versions, and test detection.
+The ES invokes the ML hooks for you, as long as ``use_hooks: "yes"`` is set in the
+``customize`` section of ``zmeventnotification.yml`` (see Step 5). You just need to
+configure the hook settings and confirm detection works.
+
+**Configure detection** — edit ``/etc/zm/objectconfig.yml`` and, at minimum, fill in the
+``general`` section with your ZM portal URL, username, and password (or point them to
+``secrets.yml``).
+
+**Verify versions:**
+
+.. code:: bash
+
+   sudo -u www-data /var/lib/zmeventnotification/bin/zm_detect.py --version
+
+You should see **app:7.0.0** (or above) and **pyzm:2.0.0** (or above). If either version
+is lower, re-run the installer to update before continuing.
+
+**Test detection** (``--config`` defaults to ``/etc/zm/objectconfig.yml``):
+
+.. code:: bash
+
+   # Test with a real ZM event
+   sudo -u www-data /var/lib/zmeventnotification/bin/zm_detect.py \
+       --eventid <eid> --monitorid <mid> --debug
+
+   # Or test with a local image (no ZM event needed)
+   wget https://upload.wikimedia.org/wikipedia/commons/c/c4/Anna%27s_hummingbird.jpg -O /tmp/bird.jpg
+   sudo -u www-data /var/lib/zmeventnotification/bin/zm_detect.py \
+       --file /tmp/bird.jpg --debug
 
 .. note::
 
    With the ES, you do **not** set ``EventStartCommand`` in ZoneMinder — the ES handles
-   event detection itself. Don't configure both or you'll run detection twice.
+   event detection itself. Don't configure both or you'll run detection twice. (This is
+   why you skip Path 1's "Wire up ZoneMinder" step here.)
 
 Logging
 ~~~~~~~
