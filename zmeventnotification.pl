@@ -249,7 +249,9 @@ sub shutdown_sig_handler {
 exit(print_config()) if $check_config;
 print_config() if $debug;
 if ($debug) {
-  $ENV{LOG_PRINT} = 1;
+  # logLevel() recomputes effectiveLevel (the master gate in logPrint); without
+  # it, logTermLevel() alone leaves effectiveLevel at INFO and Debug() is filtered.
+  ZoneMinder::Logger::logLevel(DEBUG1);
   ZoneMinder::Logger::logTermLevel(DEBUG1);
 }
 
