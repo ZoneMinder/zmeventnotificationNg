@@ -193,20 +193,21 @@ def main_handler():
     if (matched_data.get('image') is None and matched_data.get('frame_id')
             and (g.config['write_image_to_zm'] == 'yes' or g.config['write_debug_image'] == 'yes')):
         try:
-            import requests as _req
+            import numpy as np
             fid = matched_data['frame_id']
+            # Route through pyzm's ZMAPI so auth injection, token refresh,
+            # 401-relogin retry, SSL verify and BAD_IMAGE handling are reused.
             img_url = '{}/index.php?view=image&eid={}&fid={}'.format(
-                g.config['portal'], stream, fid)
-            auth_str = zm.api.auth.get_auth_string()
-            sep = '&' if '?' in img_url else '?'
-            img_url = '{}{}{}'.format(img_url, sep, auth_str)
-            verify = (g.config.get('allow_self_signed') != 'yes')
-            resp = _req.get(img_url, timeout=10, verify=verify)
-            if resp.status_code == 200:
-                import numpy as np
-                arr = np.frombuffer(resp.content, dtype=np.uint8)
-                matched_data['image'] = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-                result.image = matched_data['image']
+                zm.api.portal_url, stream, fid)
+            resp = zm.api.request(img_url)
+            if resp is not None and hasattr(resp, 'content'):
+                arr = np.asarray(bytearray(resp.content), dtype='uint8')
+                img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                if img is not None:
+                    matched_data['image'] = img
+                    result.image = img
+                else:
+                    g.logger.Error('Fetched frame image could not be decoded (eid={} fid={})'.format(stream, fid))
         except Exception as e:
             g.logger.Error('Error fetching frame image for annotation: {}'.format(e))
     if matched_data.get('image') is not None and (g.config['write_image_to_zm'] == 'yes' or g.config['write_debug_image'] == 'yes'):
