@@ -45,17 +45,88 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+# Populated during collection; consumed by the _e2e_prereq_guard fixture so
+# that missing prerequisites can be turned into hard failures under
+# ZM_E2E_REQUIRE=1 (see below).
+_PREREQ_REASONS: list[str] = []
+
+
+def _real_pyzm_importable() -> bool:
+    """Return True if the *real* pyzm package can be imported.
+
+    The parent (unit-test) conftest installs mock ``pyzm`` modules into
+    ``sys.modules``.  During collection those mocks may still be present, so
+    strip them, attempt a genuine import, then restore whatever was there.
+    Doing this here (rather than letting an import blow up mid-test) lets us
+    report a clean skip/fail reason instead of an error traceback.
+    """
+    import importlib
+
+    saved = {}
+    for key in list(sys.modules.keys()):
+        if key == "pyzm" or key.startswith("pyzm."):
+            saved[key] = sys.modules.pop(key)
+    try:
+        importlib.import_module("pyzm")
+        return True
+    except Exception:
+        return False
+    finally:
+        for key in list(sys.modules.keys()):
+            if key == "pyzm" or key.startswith("pyzm."):
+                del sys.modules[key]
+        sys.modules.update(saved)
+
+
+def _collect_prereq_reasons() -> list[str]:
+    reasons = []
+    if not os.path.isdir(MODELS_DIR):
+        reasons.append(f"model dir {MODELS_DIR} not found")
+    if not os.path.isfile(BIRD_IMAGE):
+        reasons.append(f"test image {BIRD_IMAGE} not found")
+    if not _real_pyzm_importable():
+        reasons.append("real pyzm cannot be imported")
+    return reasons
+
+
 def pytest_collection_modifyitems(config, items):
-    """Auto-skip e2e tests when models or test image are missing."""
-    skip_models = pytest.mark.skip(reason=f"Model dir {MODELS_DIR} not found")
-    skip_image = pytest.mark.skip(reason=f"Test image {BIRD_IMAGE} not found")
+    """Gate e2e tests on real models, the test image, and importable pyzm.
+
+    Default (local dev): missing prerequisites -> friendly *skip*.
+    Strict mode (env ``ZM_E2E_REQUIRE=1``, e.g. CI): missing prerequisites ->
+    hard *failure*, so a misconfigured environment can never masquerade as a
+    green run that actually covered nothing.
+    """
+    reasons = _collect_prereq_reasons()
+    _PREREQ_REASONS[:] = reasons
+    require = os.environ.get("ZM_E2E_REQUIRE") == "1"
+
+    skip_marker = None
+    if reasons and not require:
+        skip_marker = pytest.mark.skip(
+            reason="e2e prerequisites missing: " + "; ".join(reasons)
+        )
+
     for item in items:
-        if "test_e2e" in str(item.fspath):
-            item.add_marker(pytest.mark.e2e)
-            if not os.path.isdir(MODELS_DIR):
-                item.add_marker(skip_models)
-            if not os.path.isfile(BIRD_IMAGE):
-                item.add_marker(skip_image)
+        if "test_e2e" not in str(item.fspath):
+            continue
+        item.add_marker(pytest.mark.e2e)
+        if skip_marker is not None:
+            item.add_marker(skip_marker)
+
+
+@pytest.fixture(autouse=True)
+def _e2e_prereq_guard():
+    """Fail (not skip) each e2e test when prerequisites are missing under
+    ZM_E2E_REQUIRE=1.  Under the default (unset) mode the tests are already
+    skipped during collection, so this is a no-op there."""
+    if _PREREQ_REASONS and os.environ.get("ZM_E2E_REQUIRE") == "1":
+        pytest.fail(
+            "e2e prerequisites missing (ZM_E2E_REQUIRE=1): "
+            + "; ".join(_PREREQ_REASONS),
+            pytrace=False,
+        )
+    yield
 
 
 # ---------------------------------------------------------------------------

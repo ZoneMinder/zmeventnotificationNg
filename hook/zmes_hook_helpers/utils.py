@@ -249,16 +249,14 @@ def apply_cli_overrides(overrides):
                     continue
                 obj[last] = value
             elif isinstance(obj, list):
-                # name-based lookup for final segment on a list
-                target = _find_by_name(obj, last)
-                if target is None:
-                    g.logger.Warning('Override: no entry with name "{}" in {}'.format(last, path_str))
-                    continue
-                # name-based final segment replaces the entire matched dict — unlikely,
-                # but setting a scalar on a list entry by name doesn't make sense.
-                # This path shouldn't normally be hit; included for safety.
-                idx = obj.index(target)
-                obj[idx] = value
+                # A name as the FINAL segment on a list would overwrite the
+                # entire matched entry with a scalar, which is never meaningful
+                # (the caller almost certainly meant '...[name].some_key=value').
+                # Refuse and warn rather than silently clobbering the entry.
+                g.logger.Warning(
+                    'Override targets named list entry "{}" without a trailing '
+                    'key; refusing to overwrite the entry: {}'.format(last, path_str))
+                continue
             else:
                 if last not in obj:
                     g.logger.Warning('Override key not found in config: {}'.format(path_str))

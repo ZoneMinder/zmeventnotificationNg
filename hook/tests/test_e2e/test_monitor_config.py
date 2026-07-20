@@ -70,15 +70,31 @@ class TestMonitorConfig:
         }
         config_path, _ = make_config(ml_seq, monitors=monitors)
         try:
-            # Note: --file mode clears g.polygons at the end of process_config.
-            # So we can't test zone injection through process_config with --file.
-            # Instead, we verify process_config ran without error by checking detection works.
-            matched_data, _, g_config = run_detect_chain(
-                config_path, monitor_id="3"
-            )
-            # The detection should succeed regardless of zone clearing
-            # The main thing we verify is the config parsed correctly
-            assert g_config.get("ml_sequence") is not None
+            # process_config parses per-monitor zone definitions into
+            # g.polygons (str2tuple on 'coords', plus optional patterns).
+            # run_detect_chain does NOT inject polygons here, so g.polygons
+            # reflects exactly what config parsing produced.
+            run_detect_chain(config_path, monitor_id="3")
+
+            polygons = {p["name"]: p for p in g.polygons}
+            assert set(polygons) == {"front_yard", "driveway"}, \
+                f"Expected both monitor zones parsed, got {sorted(polygons)}"
+
+            # front_yard: full-frame quad with a detection pattern
+            fy = polygons["front_yard"]
+            assert fy["value"] == [
+                (0.0, 0.0), (640.0, 0.0), (640.0, 480.0), (0.0, 480.0)
+            ], f"front_yard coords mismatch: {fy['value']}"
+            assert fy["pattern"] == "person", \
+                f"front_yard detection_pattern mismatch: {fy['pattern']}"
+
+            # driveway: inner quad, no detection pattern supplied
+            dw = polygons["driveway"]
+            assert dw["value"] == [
+                (100.0, 100.0), (500.0, 100.0), (500.0, 400.0), (100.0, 400.0)
+            ], f"driveway coords mismatch: {dw['value']}"
+            assert dw["pattern"] is None, \
+                f"driveway should have no pattern, got {dw['pattern']}"
         finally:
             os.unlink(config_path)
 
