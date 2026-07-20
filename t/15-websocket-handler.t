@@ -525,6 +525,103 @@ subtest 'processIncomingMessage - push token without profile passes undef' => su
     ok(!defined $last_call->[7], 'profile is undef when not provided');
 };
 
+# ===== validateAuth REAL password comparison tests =====
+# The subtests above always disabled auth (returning 1 at the early guard) or
+# hit the user-not-found branch, so the real hash comparison at
+# WebSocketHandler.pm:204-229 never executed. These enable auth and drive the
+# actual bcrypt / mysql-password41 / -ZM- guard code paths.
+
+subtest 'validateAuth - bcrypt comparison, $2y$ normalized to $2a$' => sub {
+    reset_state();
+    local $auth_config{enabled} = 1;
+    $mock_db_user_exists = 1;
+    # ZM stores a $2y$ bcrypt hash; the code must rewrite the prefix to $2a$
+    # before calling into the perl bcrypt lib.
+    local $mock_db_password = '$2y$10$abcdefghijklmnopqrstuv';
+
+    # pretend Crypt::Eksblowfish::Bcrypt loaded successfully
+    no warnings 'redefine';
+    local *main::try_use = sub { 1 };
+
+    my @bcrypt_calls;
+    local *Crypt::Eksblowfish::Bcrypt::bcrypt = sub {
+        my ($plain, $settings) = @_;
+        push @bcrypt_calls, { plain => $plain, settings => $settings };
+        # a real bcrypt returns the full hash string when the password matches
+        return $plain eq 'correctpw' ? $settings : $settings . 'MISMATCH';
+    };
+
+    ok(validateAuth('bob', 'correctpw', 'normal'), 'correct bcrypt password authenticates');
+    is($bcrypt_calls[-1]{settings}, '$2a$10$abcdefghijklmnopqrstuv',
+        'stored $2y$ hash normalized to $2a$ before bcrypt()');
+    unlike($bcrypt_calls[-1]{settings}, qr/^\$2y\$/, 'no $2y$ prefix survives normalization');
+    is($bcrypt_calls[-1]{plain}, 'correctpw', 'plaintext password handed to bcrypt()');
+
+    ok(!validateAuth('bob', 'wrongpw', 'normal'), 'wrong bcrypt password rejected');
+};
+
+subtest 'validateAuth - bcrypt comparison, $2b$ normalized to $2a$' => sub {
+    reset_state();
+    local $auth_config{enabled} = 1;
+    $mock_db_user_exists = 1;
+    local $mock_db_password = '$2b$12$ABCDEFGHIJKLMNOPQRSTUV';
+
+    no warnings 'redefine';
+    local *main::try_use = sub { 1 };
+
+    my @bcrypt_calls;
+    local *Crypt::Eksblowfish::Bcrypt::bcrypt = sub {
+        my ($plain, $settings) = @_;
+        push @bcrypt_calls, { plain => $plain, settings => $settings };
+        return $plain eq 'secret' ? $settings : $settings . 'NO';
+    };
+
+    ok(validateAuth('alice', 'secret', 'normal'), 'correct $2b$ bcrypt password authenticates');
+    is($bcrypt_calls[-1]{settings}, '$2a$12$ABCDEFGHIJKLMNOPQRSTUV',
+        'stored $2b$ hash normalized to $2a$ before bcrypt()');
+    ok(!validateAuth('alice', 'nope', 'normal'), 'wrong $2b$ bcrypt password rejected');
+};
+
+subtest 'validateAuth - mysql password41 comparison' => sub {
+    reset_state();
+    local $auth_config{enabled} = 1;
+    $mock_db_user_exists = 1;
+    # mysql-style hashes begin with '*'
+    local $mock_db_password = '*ABCDEF0123456789ABCDEF0123456789ABCDEF01';
+
+    no warnings 'redefine';
+    local *main::try_use = sub { 1 };
+
+    my @p41_calls;
+    local *ZmEventNotification::WebSocketHandler::password41 = sub {
+        my $p = shift;
+        push @p41_calls, $p;
+        return $p eq 'mysqlcorrect'
+            ? '*ABCDEF0123456789ABCDEF0123456789ABCDEF01'
+            : '*DIFFERENTHASH';
+    };
+
+    ok(validateAuth('joe', 'mysqlcorrect', 'normal'), 'correct mysql password authenticates');
+    is($p41_calls[-1], 'mysqlcorrect', 'plaintext password handed to password41()');
+    ok(!validateAuth('joe', 'wrongpw', 'normal'), 'wrong mysql password rejected');
+};
+
+subtest 'validateAuth - unmigrated -ZM- password rejected' => sub {
+    reset_state();
+    local $auth_config{enabled} = 1;
+    $mock_db_user_exists = 1;
+    local $mock_db_password = '-ZM-somehashthatwasnotmigrated';
+
+    no warnings 'redefine';
+    local *main::try_use = sub { 1 };
+    # if the guard is ever removed, execution would fall through to bcrypt;
+    # make bcrypt "succeed" so the test only passes because the guard rejects.
+    local *Crypt::Eksblowfish::Bcrypt::bcrypt = sub { $_[1] };
+
+    is(validateAuth('carol', 'anything', 'normal'), 0,
+        'unmigrated -ZM- password returns 0 regardless of supplied password');
+};
+
 done_testing();
 
 # Mock connection class

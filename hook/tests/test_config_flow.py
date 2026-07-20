@@ -183,24 +183,18 @@ class TestMonitorOverrides:
 # ===========================================================================
 
 class TestMonitorIdInjection:
-    """Test that zm_detect.py injects monitor_id and image_path into ml_options."""
+    """Verify process_config loads image_path correctly.
 
-    def test_monitor_id_and_image_path_injected(self, patched_config, ctx):
-        """Simulate zm_detect.py's injection of monitor_id and image_path."""
-        process_config({"config": patched_config, "monitorid": "5"}, ctx)
+    NOTE: the actual injection of monitor_id / image_path into
+    ml_options['general'] happens in zm_detect.main_handler and is covered by
+    the real end-to-end tests in test_main_handler.py
+    (test_monitor_id_injected_into_ml_options, test_image_path_injected).
+    Here we only assert the genuine process_config behaviour those tests build
+    on: path-token substitution of image_path.
+    """
 
-        # Simulate what zm_detect.py does after process_config
-        ml_options = g.config["ml_sequence"]
-        ml_options.setdefault("general", {})["monitor_id"] = "5"
-        ml_options.setdefault("general", {})["image_path"] = g.config.get(
-            "image_path", "/var/lib/zmeventnotification/images"
-        )
-
-        assert ml_options["general"]["monitor_id"] == "5"
-        assert ml_options["general"]["image_path"] == "/var/lib/zmeventnotification/images"
-
-    def test_image_path_uses_config_value(self, tmp_path, ctx):
-        """image_path comes from g.config after path substitution."""
+    def test_image_path_substitution(self, tmp_path, ctx):
+        """image_path in g.config is resolved via ${base_data_path} substitution."""
         cfg = {
             "general": _minimal_general(image_path="${base_data_path}/custom_images"),
             "ml": {
@@ -211,14 +205,7 @@ class TestMonitorIdInjection:
         cfg_path = _make_config_file(tmp_path, cfg)
         process_config({"config": cfg_path, "monitorid": "7"}, ctx)
 
-        ml_options = g.config["ml_sequence"]
-        ml_options.setdefault("general", {})["monitor_id"] = "7"
-        ml_options.setdefault("general", {})["image_path"] = g.config.get(
-            "image_path", "/var/lib/zmeventnotification/images"
-        )
-
-        assert ml_options["general"]["monitor_id"] == "7"
-        assert ml_options["general"]["image_path"] == "/var/lib/zmeventnotification/custom_images"
+        assert g.config["image_path"] == "/var/lib/zmeventnotification/custom_images"
 
 
 # ===========================================================================
@@ -226,10 +213,15 @@ class TestMonitorIdInjection:
 # ===========================================================================
 
 class TestRemoteConfigInjection:
-    """Test that remote gateway settings are injected into ml_options."""
+    """Verify process_config loads the ``remote`` section into g.config.
 
-    def test_gateway_settings_injected(self, tmp_path, ctx):
-        """Simulate zm_detect.py's gateway injection into ml_options."""
+    NOTE: injecting these values into ml_options['general'] is done by
+    zm_detect.main_handler and is covered end-to-end in test_main_handler.py
+    (test_gateway_settings_injected_into_ml_options). Here we assert only that
+    process_config surfaces the remote keys, which that injection depends on.
+    """
+
+    def test_gateway_settings_loaded(self, tmp_path, ctx):
         cfg = {
             "general": _minimal_general(),
             "remote": {
@@ -245,27 +237,13 @@ class TestRemoteConfigInjection:
         cfg_path = _make_config_file(tmp_path, cfg)
         process_config({"config": cfg_path}, ctx)
 
-        # Verify remote config was loaded
         assert g.config["ml_gateway"] == "http://gpu:5000"
         assert g.config["ml_user"] == "admin"
         assert g.config["ml_password"] == "secret"
 
-        # Simulate what zm_detect.py does for gateway injection
-        ml_options = g.config["ml_sequence"]
-        if g.config.get("ml_gateway"):
-            ml_options.setdefault("general", {})["ml_gateway"] = g.config["ml_gateway"]
-            ml_options["general"]["ml_user"] = g.config.get("ml_user")
-            ml_options["general"]["ml_password"] = g.config.get("ml_password")
-            ml_options["general"]["ml_timeout"] = g.config.get("ml_timeout", 60)
-            ml_options["general"]["ml_gateway_mode"] = g.config.get("ml_gateway_mode", "url")
-
-        assert ml_options["general"]["ml_gateway"] == "http://gpu:5000"
-        assert ml_options["general"]["ml_user"] == "admin"
-        assert ml_options["general"]["ml_password"] == "secret"
-        assert ml_options["general"]["ml_gateway_mode"] == "url"
-
-    def test_no_gateway_no_injection(self, tmp_path, ctx):
-        """Without ml_gateway, no gateway keys are injected."""
+    def test_no_gateway_is_falsy(self, tmp_path, ctx):
+        """Without a configured gateway, g.config['ml_gateway'] is falsy so
+        main_handler's ``if g.config.get('ml_gateway')`` guard skips injection."""
         cfg = {
             "general": _minimal_general(),
             "remote": {
@@ -279,12 +257,7 @@ class TestRemoteConfigInjection:
         cfg_path = _make_config_file(tmp_path, cfg)
         process_config({"config": cfg_path}, ctx)
 
-        ml_options = g.config["ml_sequence"]
-        if g.config.get("ml_gateway"):
-            ml_options.setdefault("general", {})["ml_gateway"] = g.config["ml_gateway"]
-
-        # No gateway injection should have happened
-        assert "ml_gateway" not in ml_options.get("general", {})
+        assert not g.config.get("ml_gateway")
 
 
 # ===========================================================================

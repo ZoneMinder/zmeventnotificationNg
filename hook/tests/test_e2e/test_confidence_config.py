@@ -16,17 +16,32 @@ from tests.test_e2e.conftest import (
 class TestConfidenceConfig:
 
     def test_high_min_confidence_filters_all(self):
-        """A min_confidence of 0.99 should filter out most/all detections."""
-        ml_seq = basic_ml_sequence(min_confidence=0.99)
-        config_path, _ = make_config(ml_seq)
+        """A high min_confidence (0.99) demonstrably drops detections vs a low one."""
+        low_seq = basic_ml_sequence(min_confidence=0.2)
+        high_seq = basic_ml_sequence(min_confidence=0.99)
+        low_path, _ = make_config(low_seq)
+        high_path, _ = make_config(high_seq)
         try:
-            matched_data, _, _ = run_detect_chain(config_path)
-            # With 0.99 threshold, very few (if any) detections survive
-            # We can't guarantee zero, but we can verify the chain doesn't crash
-            for conf in matched_data.get("confidences", []):
+            low_data, _, _ = run_detect_chain(low_path)
+            high_data, _, _ = run_detect_chain(high_path)
+
+            # Baseline: the low threshold must actually detect the bird.
+            assert len(low_data["labels"]) > 0, \
+                "low threshold should yield detections (bird.jpg)"
+
+            # Any survivor of the high threshold respects it.
+            for conf in high_data.get("confidences", []):
                 assert conf >= 0.99
+
+            # The high threshold must strictly drop detections relative to low,
+            # proving the filter is real and not a tautology.
+            assert len(high_data["labels"]) < len(low_data["labels"]), (
+                "0.99 threshold should drop detections vs 0.2: "
+                f"high={len(high_data['labels'])} low={len(low_data['labels'])}"
+            )
         finally:
-            os.unlink(config_path)
+            os.unlink(low_path)
+            os.unlink(high_path)
 
     def test_low_min_confidence_keeps_detections(self):
         """A min_confidence of 0.01 keeps all detections."""

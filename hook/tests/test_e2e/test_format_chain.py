@@ -22,8 +22,7 @@ class TestFormatChain:
         config_path, _ = make_config(ml_seq)
         try:
             _, output, _ = run_detect_chain(config_path)
-            if not output:
-                pytest.skip("No detections")
+            assert output, "Expected non-empty output (bird.jpg must yield detections)"
             _, json_str = output.split("--SPLIT--", 1)
             parsed = json.loads(json_str)
             assert isinstance(parsed["labels"], list)
@@ -40,8 +39,8 @@ class TestFormatChain:
         config_path, _ = make_config(ml_seq)
         try:
             matched_data, _, _ = run_detect_chain(config_path)
-            if not matched_data.get("labels"):
-                pytest.skip("No detections")
+            assert matched_data.get("labels"), \
+                "Expected detections (bird.jpg must yield labels)"
             assert len(matched_data["labels"]) == len(matched_data["confidences"])
             for conf in matched_data["confidences"]:
                 assert conf > 0
@@ -54,8 +53,8 @@ class TestFormatChain:
         config_path, _ = make_config(ml_seq)
         try:
             matched_data, _, _ = run_detect_chain(config_path)
-            if not matched_data.get("labels"):
-                pytest.skip("No detections")
+            assert matched_data.get("labels"), \
+                "Expected detections (bird.jpg must yield labels)"
             for box in matched_data["boxes"]:
                 assert len(box) == 4
                 x1, y1, x2, y2 = box

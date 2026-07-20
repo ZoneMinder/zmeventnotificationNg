@@ -435,4 +435,282 @@ $fcm_config{log_message_id} = 'NONE';
     ok(!defined $body->{image_url}, 'proxy: picture URL excluded when not configured');
 }
 
+# ===== STACKED (default) tag: proxy mode, replace_push_messages=0 (issue #30 / 5d815f5) =====
+{
+    # Android stacked tag carries eid + event_type for event_start
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{replace_push_messages} = 0;
+    my $obj = {
+        token       => 'tok_stack_start_1234567890',
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{android}{tag}, 'zmninja_55555_event_start',
+        'stacked proxy android: event_start tag is zmninja_<eid>_event_start');
+}
+
+{
+    # Android stacked tag carries eid + event_type for event_end
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{replace_push_messages} = 0;
+    my $obj = {
+        token       => 'tok_stack_end_1234567890',
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_end', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{android}{tag}, 'zmninja_55555_event_end',
+        'stacked proxy android: event_end tag is zmninja_<eid>_event_end');
+}
+
+{
+    # iOS stacked mode: no apns-collapse-id (collapsing disabled), thread-id stable
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{replace_push_messages} = 0;
+    my $obj = {
+        token       => 'tok_stack_ios_1234567890',
+        platform    => 'ios',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    ok(!exists $body->{ios}{headers}{'apns-collapse-id'},
+        'stacked proxy ios: apns-collapse-id absent when not replacing');
+    is($body->{ios}{thread_id}, 'zmninja_alarm',
+        'stacked proxy ios: thread_id still zmninja_alarm');
+}
+
+# ===== DIRECT-MODE FCM v1 (service account) payload branch (FCM.pm:251-327) =====
+# Prime the token cache so get_google_access_token returns early (no file read / HTTP).
+# NOTE: the cache-hit path does NOT populate cached_project_id, so we must set it
+# ourselves or sendOverFCMV1 aborts with "No project_id found".
+{
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{service_account_file}        = '/nonexistent/service-account.json';
+    local $fcm_config{cached_access_token}         = 'ya29.fake-access-token';
+    local $fcm_config{cached_access_token_expiry}  = time() + 3600;
+    local $fcm_config{cached_project_id}           = 'test-project-123';
+    local $fcm_config{replace_push_messages}       = 0;
+    local $fcm_config{android_priority}            = 'high';
+    my $obj = {
+        token       => 'direct_android_token_abc',
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+    local $notify_config{picture_url} = undef;
+    local $notify_config{include_picture} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    ok(scalar @captured_requests > 0, 'direct v1 android: request sent');
+    is($captured_requests[-1]->{uri},
+        'https://fcm.googleapis.com/v1/projects/test-project-123/messages:send',
+        'direct v1 android: URL uses cached project_id');
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{message}{token}, 'direct_android_token_abc', 'direct v1 android: message.token');
+    is($body->{message}{notification}{title}, 'Garage Alarm', 'direct v1 android: notification.title');
+    like($body->{message}{notification}{body}, qr/^\Q[a] detected:person\E at /,
+        'direct v1 android: notification.body has cause + timestamp');
+    is($body->{message}{android}{priority}, 'high', 'direct v1 android: android.priority');
+    is($body->{message}{android}{notification}{icon}, 'ic_stat_notification',
+        'direct v1 android: android.notification.icon');
+    is($body->{message}{android}{notification}{tag}, 'zmninja_55555_event_start',
+        'direct v1 android: stacked android.notification.tag');
+    is($body->{message}{android}{notification}{channel_id}, 'zmninja',
+        'direct v1 android: modern client gets channel_id');
+    is($body->{message}{data}{eid}, '55555', 'direct v1 android: data.eid');
+}
+
+{
+    # Direct v1 android: event_end stacked tag
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{service_account_file}        = '/nonexistent/service-account.json';
+    local $fcm_config{cached_access_token}         = 'ya29.fake-access-token';
+    local $fcm_config{cached_access_token_expiry}  = time() + 3600;
+    local $fcm_config{cached_project_id}           = 'test-project-123';
+    local $fcm_config{replace_push_messages}       = 0;
+    my $obj = {
+        token       => 'direct_android_end_token',
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_end', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{message}{android}{notification}{tag}, 'zmninja_55555_event_end',
+        'direct v1 android: event_end stacked tag');
+}
+
+{
+    # Direct v1 iOS: apns badge + thread-id
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{service_account_file}        = '/nonexistent/service-account.json';
+    local $fcm_config{cached_access_token}         = 'ya29.fake-access-token';
+    local $fcm_config{cached_access_token_expiry}  = time() + 3600;
+    local $fcm_config{cached_project_id}           = 'test-project-123';
+    local $fcm_config{replace_push_messages}       = 0;
+    my $obj = {
+        token       => 'direct_ios_token_xyz',
+        platform    => 'ios',
+        badge       => 3,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{message}{token}, 'direct_ios_token_xyz', 'direct v1 ios: message.token');
+    is($body->{message}{apns}{payload}{aps}{badge}, 4, 'direct v1 ios: apns badge incremented');
+    is($body->{message}{apns}{payload}{aps}{'thread-id'}, 'zmninja_alarm',
+        'direct v1 ios: apns thread-id');
+    ok(!exists $body->{message}{apns}{headers}{'apns-collapse-id'},
+        'direct v1 ios: no apns-collapse-id in stacked mode');
+}
+
+# ===== include_profile_in_push injection (FCM.pm:321-327,378-384,396-403) =====
+{
+    # Proxy android: profile appended to body + placed in data.profile
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{include_profile_in_push} = 'yes';
+    local $fcm_config{replace_push_messages} = 0;
+    my $obj = {
+        token       => 'tok_profile_android_1234',
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+        profile     => 'Night',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{data}{profile}, 'Night', 'proxy android: data.profile injected');
+    like($body->{body}, qr/\x{2014} Night$/, 'proxy android: profile appended to body');
+}
+
+{
+    # Proxy iOS: profile in ios.subtitle + data.profile
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{include_profile_in_push} = 'yes';
+    local $fcm_config{replace_push_messages} = 0;
+    my $obj = {
+        token       => 'tok_profile_ios_1234',
+        platform    => 'ios',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+        profile     => 'Night',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{ios}{subtitle}, 'Night', 'proxy ios: ios.subtitle set to profile');
+    is($body->{data}{profile}, 'Night', 'proxy ios: data.profile injected');
+}
+
+{
+    # Direct v1 android: profile appended to notification.body + message.data.profile
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{service_account_file}        = '/nonexistent/service-account.json';
+    local $fcm_config{cached_access_token}         = 'ya29.fake-access-token';
+    local $fcm_config{cached_access_token_expiry}  = time() + 3600;
+    local $fcm_config{cached_project_id}           = 'test-project-123';
+    local $fcm_config{include_profile_in_push}     = 'yes';
+    local $fcm_config{replace_push_messages}       = 0;
+    my $obj = {
+        token       => 'direct_profile_android',
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+        profile     => 'Night',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{message}{data}{profile}, 'Night', 'direct v1 android: message.data.profile injected');
+    like($body->{message}{notification}{body}, qr/\x{2014} Night$/,
+        'direct v1 android: profile appended to notification.body');
+}
+
+{
+    # Direct v1 iOS: profile in apns aps.alert.subtitle + message.data.profile
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{service_account_file}        = '/nonexistent/service-account.json';
+    local $fcm_config{cached_access_token}         = 'ya29.fake-access-token';
+    local $fcm_config{cached_access_token_expiry}  = time() + 3600;
+    local $fcm_config{cached_project_id}           = 'test-project-123';
+    local $fcm_config{include_profile_in_push}     = 'yes';
+    local $fcm_config{replace_push_messages}       = 0;
+    my $obj = {
+        token       => 'direct_profile_ios',
+        platform    => 'ios',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+        profile     => 'Night',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+
+    sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+
+    my $body = decode_json($captured_requests[-1]->{content});
+    is($body->{message}{apns}{payload}{aps}{alert}{subtitle}, 'Night',
+        'direct v1 ios: aps.alert.subtitle set to profile');
+    is($body->{message}{data}{profile}, 'Night', 'direct v1 ios: message.data.profile injected');
+}
+
 done_testing();

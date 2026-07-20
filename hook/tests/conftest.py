@@ -67,6 +67,8 @@ _mock_pyzm.ZMClient = _StubZMClient
 
 _mock_log = types.ModuleType("pyzm.log")
 _mock_log.setup_zm_logging = lambda *a, **kw: StubLogger()
+# main_handler() imports get_log_file from pyzm.log; return None (file logging off)
+_mock_log.get_log_file = lambda *a, **kw: None
 
 _mock_helpers = types.ModuleType("pyzm.helpers")
 _mock_helpers_utils = types.ModuleType("pyzm.helpers.utils")
@@ -117,6 +119,7 @@ if os.path.abspath(_hook_dir) not in sys.path:
 class StubLogger:
     def Debug(self, level, msg): pass
     def Info(self, msg): pass
+    def Warning(self, msg): pass
     def Error(self, msg): pass
     def Fatal(self, msg): raise SystemExit(msg)
     def close(self): pass

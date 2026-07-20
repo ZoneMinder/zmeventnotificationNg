@@ -35,8 +35,7 @@ class TestConfigToDetect:
         config_path, _ = make_config(ml_seq)
         try:
             matched_data, output, _ = run_detect_chain(config_path)
-            if not output:
-                pytest.skip("No detections to validate format")
+            assert output, "Expected non-empty output (bird.jpg must yield detections)"
             pred, json_str = output.split("--SPLIT--", 1)
             # --file mode uses frame_id from result (typically 'snapshot' or None)
             assert "detected:" in pred
@@ -54,8 +53,7 @@ class TestConfigToDetect:
         )
         try:
             _, output, _ = run_detect_chain(config_path)
-            if not output:
-                pytest.skip("No detections")
+            assert output, "Expected non-empty output (bird.jpg must yield detections)"
             pred, _ = output.split("--SPLIT--", 1)
             assert "%" in pred
         finally:
@@ -69,8 +67,8 @@ class TestConfigToDetect:
         config_path, _ = make_config(ml_seq)
         try:
             matched_data, _, _ = run_detect_chain(config_path)
-            if not matched_data.get("labels"):
-                pytest.skip("No detections")
+            assert matched_data.get("labels"), \
+                "Expected detections (bird.jpg must yield labels)"
             assert matched_data.get("image") is not None
             assert isinstance(matched_data["image"], np.ndarray)
         finally:

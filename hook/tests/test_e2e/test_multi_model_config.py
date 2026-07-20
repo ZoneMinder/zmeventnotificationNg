@@ -50,10 +50,15 @@ class TestMultiModelConfig:
         config_path, _ = make_config(ml_seq)
         try:
             matched_data, output, _ = run_detect_chain(config_path)
-            assert len(matched_data["labels"]) > 0
-            # With union strategy, both models should contribute
+            assert len(matched_data["labels"]) > 0, \
+                "Expected detections (bird.jpg must yield labels)"
+            # With union strategy, BOTH models must actually contribute
+            # detections to the merged result.
             model_names = set(matched_data.get("model_names", []))
-            assert len(model_names) > 0
+            assert {"model-a", "model-b"} <= model_names, (
+                "union strategy should include detections from both models; "
+                f"got model_names={sorted(model_names)}"
+            )
         finally:
             os.unlink(config_path)
 
@@ -92,8 +97,8 @@ class TestMultiModelConfig:
         config_path, _ = make_config(ml_seq)
         try:
             matched_data, _, _ = run_detect_chain(config_path)
-            if not matched_data.get("labels"):
-                pytest.skip("No detections")
+            assert matched_data.get("labels"), \
+                "Expected detections (bird.jpg must yield labels)"
             # FIRST strategy: all detections come from the first model
             for mn in matched_data.get("model_names", []):
                 assert mn == "first-model"
