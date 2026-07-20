@@ -287,6 +287,18 @@ def test_intermediate_missing_key_is_noop(rec_logger):
     assert len(rec_logger.warnings) == 1
 
 
+def test_name_as_final_segment_refuses_to_clobber(rec_logger):
+    # A name as the FINAL segment on a list (no trailing key) would overwrite
+    # the entire matched dict with a scalar. It must warn and leave the entry
+    # intact, not silently destroy it.
+    g.config = _nested_sequence_config()
+    before = copy.deepcopy(g.config)
+    utils.apply_cli_overrides(['ml_sequence.object.sequence[YOLOv11 ONNX]=0.5'])
+    assert g.config == before          # entry preserved, not replaced by 0.5
+    assert len(rec_logger.warnings) == 1
+    assert 'refusing' in rec_logger.warnings[0].lower()
+
+
 def test_multiple_overrides_applied_together():
     g.config = _nested_sequence_config()
     utils.apply_cli_overrides([

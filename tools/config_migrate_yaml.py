@@ -147,51 +147,74 @@ def find_unexpanded_variables(obj):
     return unexpanded
 
 
+def _placeholder_templates(text):
+    """Replace every {{template}} token with a placeholder identifier so
+    ast.literal_eval can parse the surrounding structure.
+
+    A template embedded inside a string literal ('{{var}}/models/x') keeps the
+    placeholder *inside* the quotes so the literal stays valid; a bare template
+    (not inside quotes) is wrapped in quotes so it becomes a valid string
+    literal on its own. Returns (substituted_text, {placeholder: original}).
+    """
+    placeholders = {}
+    out = []
+    i, n, counter = 0, len(text), 0
+    quote = None  # active string delimiter, or None when outside a string
+    while i < n:
+        ch = text[i]
+        if quote:
+            if ch == '\\' and i + 1 < n:      # keep escapes intact
+                out.append(text[i:i + 2]); i += 2; continue
+            if ch == quote:
+                quote = None; out.append(ch); i += 1; continue
+            if text.startswith('{{', i):
+                end = text.find('}}', i)
+                if end != -1:
+                    key = '__TMPL_{}__'.format(counter); counter += 1
+                    placeholders[key] = text[i:end + 2]
+                    out.append(key)           # inside quotes: no extra quotes
+                    i = end + 2; continue
+            out.append(ch); i += 1
+        else:
+            if ch in ('"', "'"):
+                quote = ch; out.append(ch); i += 1; continue
+            if text.startswith('{{', i):
+                end = text.find('}}', i)
+                if end != -1:
+                    key = '__TMPL_{}__'.format(counter); counter += 1
+                    placeholders[key] = text[i:end + 2]
+                    out.append("'{}'".format(key))   # bare: make it a string
+                    i = end + 2; continue
+            out.append(ch); i += 1
+    return ''.join(out), placeholders
+
+
 def safe_eval(value):
     """Try to evaluate a Python literal string; return as-is on failure.
 
-    Handles {{template_var}} by temporarily replacing them with placeholder
-    strings so ast.literal_eval can parse the structure.
+    Handles {{template_var}} tokens (including ones embedded inside a longer
+    quoted string) by temporarily replacing them with placeholders so
+    ast.literal_eval can parse the structure, then restoring them.
     """
     if not value or not value.strip():
         return None
     text = value.strip()
 
-    # Replace {{template_var}} with placeholder strings for parsing,
-    # then restore them in the resulting structure.
-    # Handle both quoted ('{{var}}') and unquoted ({{var}}) cases.
-    placeholders = {}
-    counter = [0]
-
-    def _replace_quoted(m):
-        quote = m.group(1)
-        template_token = m.group(2)
-        key = '__TMPL_{}__'.format(counter[0])
-        counter[0] += 1
-        placeholders[key] = template_token
-        return "{0}{1}{0}".format(quote, key)
-
-    def _replace_bare(m):
-        token = m.group(0)
-        key = '__TMPL_{}__'.format(counter[0])
-        counter[0] += 1
-        placeholders[key] = token
-        return "'{}'".format(key)
-
-    # First handle quoted templates: '{{var}}' or "{{var}}"
-    substituted = re.sub(r"""(['"])(\{\{\w+?\}\})\1""", _replace_quoted, text)
-    # Then handle remaining bare (unquoted) templates: {{var}}
-    substituted = re.sub(r'\{\{\w+?\}\}', _replace_bare, substituted)
+    substituted, placeholders = _placeholder_templates(text)
 
     try:
         result = ast.literal_eval(substituted)
     except (ValueError, SyntaxError):
         return value
 
-    # Restore {{template_var}} tokens in the parsed structure
+    # Restore {{template_var}} tokens in the parsed structure. Placeholders may
+    # be embedded in a larger string, so substitute rather than match whole.
     def _restore(obj):
         if isinstance(obj, str):
-            return placeholders.get(obj, obj)
+            for key, token in placeholders.items():
+                if key in obj:
+                    obj = obj.replace(key, token)
+            return obj
         elif isinstance(obj, dict):
             return {_restore(k): _restore(v) for k, v in obj.items()}
         elif isinstance(obj, list):
@@ -211,15 +234,30 @@ def strip_quotes(value):
 
 
 def coerce_value(value):
-    """Coerce a string to int or float if it looks numeric."""
+    """Coerce a string to int or float only when the conversion round-trips.
+
+    int()/float() are permissive and will silently change the value or
+    representation of strings that must stay strings, so those are left alone:
+      - digit separators: "1_000" -> int 1000
+      - exponent notation: "1e3"  -> float 1000.0
+      - leading-zero integers: "007" -> int 7
+    Plain canonical numbers ("800", "-5", "0", "0.6", "3.0") still coerce.
+    """
     if not isinstance(value, str):
         return value
+    s = value.strip()
+    # Reject the permissive forms that int()/float() would mangle.
+    if '_' in s or 'e' in s or 'E' in s:
+        return value
+    digits = s[1:] if s[:1] in ('+', '-') else s
+    if len(digits) > 1 and digits[0] == '0' and digits[1].isdigit():
+        return value  # leading-zero integer like "007"
     try:
-        return int(value)
+        return int(s)
     except ValueError:
         pass
     try:
-        return float(value)
+        return float(s)
     except ValueError:
         pass
     return value

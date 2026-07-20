@@ -87,24 +87,27 @@ class TestCoerceValue:
         assert coerce_value(True) is True
         assert coerce_value(5) == 5
 
-    # --- Latent-bug documentation: numeric-looking strings get mangled ---
-    # These asserts pin CURRENT behavior. They are NOT an endorsement of it;
-    # a zero-padded / underscore / exponent string that the user intended to
-    # stay a string is silently converted to a number. See module docstring
-    # in the test report.
-    def test_leading_zero_stripped_to_int(self):
-        # "007" is a plausible string id/region -> becomes int 7 (data loss).
-        assert coerce_value("007") == 7
-        assert isinstance(coerce_value("007"), int)
+    # --- Only round-tripping numbers coerce; lossy forms stay strings ---
+    def test_leading_zero_kept_as_string(self):
+        # "007" would lose its zeros as int 7, so it must stay a string.
+        assert coerce_value("007") == "007"
+        assert isinstance(coerce_value("007"), str)
 
-    def test_underscore_grouping_coerced(self):
-        # Python allows "1_000" as an int literal -> 1000 (surprising).
-        assert coerce_value("1_000") == 1000
+    def test_underscore_grouping_kept_as_string(self):
+        # Python would read "1_000" as int 1000; keep the literal string.
+        assert coerce_value("1_000") == "1_000"
 
-    def test_exponent_string_coerced_to_float(self):
-        # "1e3" is not int-parseable but float("1e3") == 1000.0.
-        assert coerce_value("1e3") == 1000.0
-        assert isinstance(coerce_value("1e3"), float)
+    def test_exponent_string_kept_as_string(self):
+        # "1e3" would float to 1000.0; keep the literal string.
+        assert coerce_value("1e3") == "1e3"
+        assert isinstance(coerce_value("1e3"), str)
+
+    def test_plain_numbers_still_coerce(self):
+        assert coerce_value("800") == 800
+        assert coerce_value("-5") == -5
+        assert coerce_value("0") == 0
+        assert coerce_value("0.6") == 0.6
+        assert coerce_value("3.0") == 3.0
 
     def test_coerce_types_recurses(self):
         obj = {"a": "5", "b": ["1", "x", "0.5"], "c": {"d": "no"}}
@@ -135,14 +138,20 @@ class TestSafeEval:
     def test_bare_template_only(self):
         assert safe_eval("'{{var}}'") == "{{var}}"
 
-    def test_embedded_template_fails_parse_LATENT_BUG(self):
-        # LATENT BUG: a {{template}} embedded *inside* a longer quoted string
-        # ("'{{var}}/suffix'") is replaced by a bare quoted placeholder, which
-        # produces invalid Python ("''__TMPL_0__'/suffix'") -> literal_eval
-        # raises -> safe_eval returns the ORIGINAL string unparsed. So such an
-        # ml_sequence would be emitted as a raw string, not a dict.
-        raw = "'{{var}}/suffix'"
-        assert safe_eval(raw) == raw
+    def test_embedded_template_in_quoted_string(self):
+        # A {{template}} embedded inside a longer quoted string parses to the
+        # string with the token intact (previously this failed to parse and the
+        # whole value was returned as a raw, unparsed string).
+        assert safe_eval("'{{var}}/suffix'") == "{{var}}/suffix"
+
+    def test_embedded_template_inside_dict_value(self):
+        # The real-world case: an ml_sequence-style dict whose value embeds a
+        # template must still parse to a dict, not collapse to a raw string.
+        result = safe_eval("{'weights': '{{base_data_path}}/models/yolov4.weights'}")
+        assert result == {"weights": "{{base_data_path}}/models/yolov4.weights"}
+
+    def test_multiple_embedded_templates(self):
+        assert safe_eval("['{{a}}/x', '{{b}}/y']") == ["{{a}}/x", "{{b}}/y"]
 
 
 # ── variable resolution ─────────────────────────────────────────────────
