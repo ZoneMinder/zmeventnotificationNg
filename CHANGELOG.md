@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.26] - 2026-07-20
+
+### Bug Fixes
+
+- stop silent config corruption in migrate and overrides ([76e5232](https://github.com/ZoneMinder/zmeventnotificationNg/commit/76e523265215e4719d527fc33d89dfa1c1a27052))
+- route URL-mode frame fetch through pyzm ZMAPI ([22bf084](https://github.com/ZoneMinder/zmeventnotificationNg/commit/22bf084cb779f271d76b16c978064aef9c2d77ad))
+
+### Documentation
+
+- unify CLAUDE.md and AGENTS.md into a single source of truth ([d037afe](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d037afec34965a0a0bc6563bcd306e720b460be7))
+- document full test suite and add test-first agent gate ([b625456](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b625456bd98df927f34196a9ec59b3fa985edb8c))
+
+### Features
+
+- fetch frame image from ZM when using remote gateway URL mode ([0d696fa](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0d696fa1f6dfb36d813a27cd812d02a66d7ce6a5))
+
+### Miscellaneous
+
+- bump version to v7.0.26 ([f28a04d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/f28a04d63676d3718edbcd1063c37ab2c10bed0f))
+
+### Refactoring
+
+- make config_edit.py testable, fix parse_var crash ([b211e50](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b211e5089534e6ddfe5a6f85ea77e8f4aa58b2b5))
+
+### Testing
+
+- harden test suite into a regression net ([aeda619](https://github.com/ZoneMinder/zmeventnotificationNg/commit/aeda619b67fa52b801463d6c64cbfd862a60d99c))
+
 ## [7.0.25] - 2026-07-19
 
 ### Bug Fixes
@@ -11,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.25 ([e5d9c12](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e5d9c127f3ccecd83a2bc44f1c53d3990208be36))
 - make Path 2 Step 8 self-contained for ML hook setup ([9e78f88](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9e78f888692691482ddac4867cb6df5b9e53dcd3))
 
 ### Miscellaneous
