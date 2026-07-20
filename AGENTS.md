@@ -1,7 +1,7 @@
 # Development Guidelines
 
-Read this file before work. It owns the process rules. `CLAUDE.md` holds the
-project overview and pointers; where both speak, follow the stricter rule.
+Read this file before work. It is the single source of truth for how to work in
+this repo; `CLAUDE.md` just points here.
 
 | Work | Read first |
 |---|---|
@@ -67,6 +67,15 @@ logic they claim to check. A useful test fails when the code it covers breaks.
 
 `docs/guides/testing.rst` maps every test file to what it covers. Update it when
 you add or repurpose a test file.
+
+## Documentation
+
+Docs live in `docs/` (Read the Docs / reStructuredText). Write for the user:
+clear, correct, comprehensive, and current. When you touch a subsystem, check
+its docs still match reality and fix drift. `zm_detect.py` leans on pyzmNg, so
+validate documented hook behavior by reading pyzmNg, not by assuming.
+
+Never edit `CHANGELOG.md`; it is auto-generated.
 
 ## Config-key checklist
 
