@@ -41,7 +41,19 @@ this repo; `CLAUDE.md` just points here.
 
 ## Verification (the test gate)
 
-Run all three tiers before committing. All must pass.
+Install the pre-push hook once per clone: `make hooks`. It runs `make gate`
+on `git push` and blocks a red push (`--no-verify` overrides an emergency).
+
+- `make gate` — Tier-1: perl + hook (not e2e) + tools. This is the per-push gate.
+- `make release-gate` — Tier-1 + real-pyzm e2e with `ZM_E2E_REQUIRE=1` (a missing
+  model or unimportable pyzm FAILS instead of skipping). Run before a release.
+
+The gate puts the pyzm checkout (`PYZM_SRC`, default `~/fiddle/pyzmNg`) on
+`PYTHONPATH` so `hook/tests/test_pyzm_contract.py` imports the REAL pyzm and
+catches cross-repo drift (a renamed `DetectionResult` key, a changed
+`detect_event` signature) on every push.
+
+The raw commands the Makefile runs, if you need them directly:
 
 ```bash
 # Perl (Event Server: zmeventnotification.pl + ZmEventNotification/*.pm)

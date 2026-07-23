@@ -448,6 +448,21 @@ def test_detect_event_called_with_signature_zm_detect_expects(harness, monkeypat
     assert 'stream_config' in kw
 
 
+def test_fakeit_with_show_models_does_not_crash(harness, monkeypatch, tmp_path, capsys):
+    """--fakeit + show_models: yes must not KeyError on model_names.
+
+    format_detection_output reads matched_data['model_names'][idx] when
+    show_models=='yes'; the fakeit override must supply model_names to match
+    the fake label count.
+    """
+    FakeDetector.result_data = {}          # detector finds nothing (KeyError path)
+    harness.cfg['show_models'] = 'yes'
+    _run(monkeypatch, tmp_path, ['-e', '55555', '-m', '7', '--fakeit', 'dog,person'])
+    out = capsys.readouterr().out
+    assert 'detected:' in out
+    assert 'dog' in out and 'person' in out
+
+
 # ---------------------------------------------------------------------------
 # ZM note update
 # ---------------------------------------------------------------------------
