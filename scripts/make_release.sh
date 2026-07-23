@@ -60,6 +60,27 @@ else
     echo
 fi
 
+# --- Cross-repo (ES + pyzm) e2e: must pass before releasing ---
+# Runs THIS ES hook chain against the pyzm checkout on real models, plus the
+# pyzm<->ES contract test. Aborts the release on any failure.
+# Overrides: PYZM_DIR=/path (pyzm checkout), SKIP_E2E=1 (emergency bypass).
+if [ "${SKIP_E2E:-}" = "1" ]; then
+    echo "WARNING: SKIP_E2E=1 -- skipping cross-repo e2e validation"
+else
+    PYZM_DIR="${PYZM_DIR:-$(cd "$REPO_DIR/../pyzmNg" 2>/dev/null && pwd || echo "$REPO_DIR/../pyzmNg")}"
+    if [ ! -d "$PYZM_DIR" ]; then
+        echo "ERROR: pyzm repo not found at $PYZM_DIR (set PYZM_DIR=... or SKIP_E2E=1)"
+        exit 1
+    fi
+    echo "Running cross-repo e2e (this ES hook chain vs pyzm) ..."
+    if ! ( cd "$REPO_DIR" && make release-gate PYZM_SRC="$PYZM_DIR" ); then
+        echo "ERROR: cross-repo e2e FAILED -- aborting release"
+        exit 1
+    fi
+    echo "Cross-repo e2e passed."
+    echo
+fi
+
 # --- Step 1: Check if tag already exists ---
 if git rev-parse "v${VER}" &>/dev/null; then
     # Compute bumped patch version
