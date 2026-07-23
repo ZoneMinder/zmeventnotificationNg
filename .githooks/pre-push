@@ -1,0 +1,17 @@
+#!/bin/sh
+# ES pre-push gate. Blocks a push when the Tier-1 suite is red.
+# Install once with: make hooks   (sets core.hooksPath -> .githooks)
+#
+# Tier-1: perl (prove) + hook unit tests + tools. The full real-pyzm e2e
+# gate is `make release-gate`, run before a release on a box with models.
+#
+# Escape hatch for a genuine emergency: git push --no-verify
+
+echo "pre-push: running Tier-1 test gate (make gate)..."
+if ! make gate; then
+	echo
+	echo "pre-push: BLOCKED -- Tier-1 tests failed. Fix them, or push with --no-verify to override."
+	exit 1
+fi
+echo "pre-push: gate green."
+exit 0
