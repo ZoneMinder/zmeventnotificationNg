@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.27] - 2026-07-23
+
+### Bug Fixes
+
+- supply model_names in --fakeit path (show_models KeyError) ([edb01ef](https://github.com/ZoneMinder/zmeventnotificationNg/commit/edb01efa8ce5f24a70d4a8dbfde9744ea4e5af48))
+
+### Miscellaneous
+
+- --no-verify internal pushes so the gate isn't re-run per push ([c9fa1af](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c9fa1af599600ba069a1b4c689d639404884ea13))
+- auto-run cross-repo ES+pyzm e2e before release, abort on failure ([91a0c48](https://github.com/ZoneMinder/zmeventnotificationNg/commit/91a0c4891d58d6dc30cafba6e463cfe67422b7db))
+- bump version to v7.0.27; pin pyzm>=2.4.0 ([85b4517](https://github.com/ZoneMinder/zmeventnotificationNg/commit/85b4517d8abc6415a2afbe9141860469e621c1d7))
+
+### Refactoring
+
+- centralize job-pipe parsing into parse_job_line + contract test ([d7bf9ce](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d7bf9ce58a973a011259e77d8363fa43c9c6b810))
+
+### Testing
+
+- extract + cover fork state-machine decisions (P3) ([57ca9ba](https://github.com/ZoneMinder/zmeventnotificationNg/commit/57ca9bae0b1837f8c0d4a3693f5350171dc1bc51))
+- local gate + real-pyzm contract test + model-require enforcement ([5c13e04](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5c13e042a8ba00f5c94807527ed8296628e5ebda))
+- cover config-upgrade in-place write, secrets check, detector signature ([fe1d08f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/fe1d08f361200cf1c9a65eb569a13642252c3bb3))
+
 ## [7.0.26] - 2026-07-20
 
 ### Bug Fixes
@@ -12,6 +34,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.26 ([921c19e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/921c19e9ad668b32c3273512e112903fc4f138b5))
 - unify CLAUDE.md and AGENTS.md into a single source of truth ([d037afe](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d037afec34965a0a0bc6563bcd306e720b460be7))
 - document full test suite and add test-first agent gate ([b625456](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b625456bd98df927f34196a9ec59b3fa985edb8c))
 
