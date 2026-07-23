@@ -167,6 +167,11 @@ def main_handler():
         matched_data['labels'] = fake_labels
         matched_data['boxes'] = [[50 + i * 100, 50, 150 + i * 100, 200] for i in range(len(fake_labels))]
         matched_data['confidences'] = [0.996] * len(fake_labels)
+        # Must stay index-aligned with labels: format_detection_output reads
+        # model_names[idx] when show_models=='yes'. Set (not setdefault) so a
+        # prior real detection's model_names can't leave a length mismatch.
+        matched_data['model_names'] = ['fakeit'] * len(fake_labels)
+        matched_data['detection_types'] = ['object'] * len(fake_labels)
         matched_data.setdefault('frame_id', 'snapshot')
         matched_data.setdefault('polygons', g.polygons)
         matched_data.setdefault('image_dimensions', {})
