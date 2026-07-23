@@ -256,6 +256,26 @@ sub _build_alarm_obj {
   };
 }
 
+# A hook that produced no detection text is a failure even if it exited 0.
+# Pure; used at both event-start and event-end in the fork state machine.
+# Locked by t/21.
+sub _effective_hook_result {
+  my ($exit_code, $res_txt) = @_;
+  return 1 if !defined($res_txt) || $res_txt eq '';
+  return $exit_code;
+}
+
+# Whether/why the event-end notification should be suppressed. Returns
+# 'start_failed' (event_end_notify_if_start_success is on and the start hook
+# failed), 'rules' (rules checks disallow it), or '' (send it). Pure; locked
+# by t/21.
+sub _end_notify_skip_reason {
+  my ($notify_if_start_success, $start_hook_result, $rules_allowed) = @_;
+  return 'start_failed' if $notify_if_start_success && $start_hook_result != 0;
+  return 'rules' if !$rules_allowed;
+  return '';
+}
+
 sub _run_api_push {
   my ($temp_alarm_obj, $eid, $mid, $event_type, $hookResult) = @_;
   return unless $push_config{enabled} && $push_config{script};
@@ -342,7 +362,7 @@ sub processNewAlarmsInFork {
 
           chomp($res);
           my ( $resTxt, $resJsonString ) = parseDetectResults($res);
-          $hookResult = 1 if !$resTxt;
+          $hookResult = _effective_hook_result($hookResult, $resTxt);
           $startHookResult = $hookResult;
 
           main::Debug(1, "hook start returned with text:$resTxt json:$resJsonString exit:$hookResult");
@@ -468,7 +488,7 @@ sub processNewAlarmsInFork {
 
           chomp($res);
           my ( $resTxt, $resJsonString ) = parseDetectResults($res);
-          $hookResult = 1 if (!$resTxt);
+          $hookResult = _effective_hook_result($hookResult, $resTxt);
 
           $alarm->{End}->{State} = 'ready';
           main::Debug(1, "hook end returned with text:$resTxt  json:$resJsonString exit:$hookResult");
@@ -534,11 +554,13 @@ sub processNewAlarmsInFork {
 
       my ( $rulesAllowed, $rulesObject ) = isAllowedInRules($alarm);
 
-      if ( $hooks_config{event_end_notify_if_start_success} && ($startHookResult != 0) ) {
+      my $end_skip = _end_notify_skip_reason(
+        $hooks_config{event_end_notify_if_start_success}, $startHookResult, $rulesAllowed);
+      if ( $end_skip eq 'start_failed' ) {
         main::Info(
           'Not sending event end alarm, as we did not send a start alarm for this, or start hook processing failed'
         );
-      } elsif ( !$rulesAllowed ) {
+      } elsif ( $end_skip eq 'rules' ) {
         main::Debug(1, 'rules: Not processing end notifications as rules checks failed for start notification');
       } else {
         my $temp_alarm_obj = _build_alarm_obj(
