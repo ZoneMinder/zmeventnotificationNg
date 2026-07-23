@@ -13,7 +13,7 @@ AUTHOR = 'Pliable Pixels'
 LICENSE = 'GPL'
 INSTALL_REQUIRES = [
     'numpy', 'requests', 'Shapely', 'imutils',
-    'pyzm>=2.3.8', 'scikit-learn', 'Pillow',
+    'pyzm>=2.4.0', 'scikit-learn', 'Pillow',
     'PyYAML', 'configupdater'
 ]
 
