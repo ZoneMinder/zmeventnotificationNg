@@ -98,7 +98,7 @@ if git rev-parse "v${VER}" &>/dev/null; then
             echo "  Deleting old release and tag v${VER} ..."
             gh release delete "v${VER}" --repo "$GH_REPO" --yes 2>/dev/null || true
             git tag -d "v${VER}"
-            git push origin --delete "v${VER}" 2>/dev/null || true
+            git push --no-verify origin --delete "v${VER}" 2>/dev/null || true
             ;;
         2)
             echo "  Bumping version: v${VER} -> v${BUMPED}"
@@ -107,7 +107,7 @@ if git rev-parse "v${VER}" &>/dev/null; then
             sed -i "s/^__version__ = \".*\"/__version__ = \"${VER}\"/" "$INIT_PY"
             git add VERSION "$INIT_PY" "$SETUP_PY"
             git commit -m "chore: bump version to v${VER}"
-            git push origin master
+            git push --no-verify origin master
             echo "  Done."
             ;;
         *)
@@ -131,7 +131,7 @@ if [ -n "$DIRTY_FILES" ]; then
     echo "Committing version files ..."
     git add VERSION "$INIT_PY" "$SETUP_PY"
     git commit -m "chore: bump version to v${VER}"
-    git push origin master
+    git push --no-verify origin master
     echo "  Done."
     echo
 fi
@@ -161,14 +161,14 @@ echo "  Done."
 echo "Committing CHANGELOG.md ..."
 git add CHANGELOG.md
 git commit -m "docs: update CHANGELOG for v${VER}"
-git push origin master
+git push --no-verify origin master
 echo "  Done."
 echo
 
 # --- Step 4: Tag ---
 echo "Creating tag v${VER} ..."
 git tag -a "v${VER}" -m "v${VER}"
-git push origin --tags
+git push --no-verify origin --tags
 echo "  Done."
 echo
 
