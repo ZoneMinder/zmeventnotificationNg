@@ -574,10 +574,10 @@ sub processJobs {
     } elsif ( $read_avail > 0 ) {
       chomp( my $txt = sysreadline(READER) );
       Debug(2, "RAW TEXT-->$txt");
-      my ( $job, $msg ) = split( '--TYPE--', $txt );
+      my ( $job, @fields ) = parse_job_line($txt);
 
       if ( $job eq 'message' ) {
-        my ( $id, $tmsg ) = split( '--SPLIT--', $msg );
+        my ( $id, $tmsg ) = @fields;
         Debug(2, "GOT JOB==>To: $id, message: $tmsg");
         foreach (@active_connections) {
           if ( ( $_->{id} eq $id ) && exists $_->{conn} ) {
@@ -593,7 +593,7 @@ sub processJobs {
         } # end foreach active connection
       } elsif ( $job eq 'fcm_notification' ) {
         # Update badge count of active connection
-        my ( $token, $badge, $count, $at ) = split( '--SPLIT--', $msg );
+        my ( $token, $badge, $count, $at ) = @fields;
         Debug(2, "GOT JOB==> update badge to $badge, count to $count for: $token, at: $at");
         foreach (@active_connections) {
           next unless defined $_->{token};
@@ -604,12 +604,12 @@ sub processJobs {
         }
       } elsif ( $job eq 'event_description' ) {
       # hook script result will be updated in ZM DB
-        my ( $mid, $eid, $desc ) = split( '--SPLIT--', $msg );
+        my ( $mid, $eid, $desc ) = @fields;
         Debug(2, 'Job: Update monitor ' . $mid . ' description:' . $desc);
         updateEventinZmDB( $eid, $desc );
       } elsif ( $job eq 'timestamp' ) {
         # marks the latest time an event was sent out. Needed for interval mgmt.
-        my ( $id, $mid, $timeval ) = split( '--SPLIT--', $msg );
+        my ( $id, $mid, $timeval ) = @fields;
         Debug(2, 'Job: Update last sent timestamp of monitor:'
             . $mid . ' to '
             . $timeval
@@ -623,7 +623,7 @@ sub processJobs {
         }
 
       } elsif ( $job eq 'active_event_update' ) {
-        my ( $mid, $eid, $type, $key, $val ) = split( '--SPLIT--', $msg );
+        my ( $mid, $eid, $type, $key, $val ) = @fields;
         Debug(2, "Job: Update active_event eid:$eid, mid:$mid, type:$type, field:$key to: $val");
         if ( $key eq 'State' ) {
           $active_events{$mid}->{$eid}->{$type}->{State} = $val;
@@ -637,20 +637,21 @@ sub processJobs {
             decode_json($causeJson);
         }
       } elsif ( $job eq 'active_event_delete' ) {
-        my ( $mid, $eid ) = split( '--SPLIT--', $msg );
+        my ( $mid, $eid ) = @fields;
         Debug(2, "Job: Deleting active_event eid:$eid, mid:$mid");
         delete( $active_events{$mid}->{$eid} );
         $child_forks--;
       } elsif ( $job eq 'update_parallel_hooks' ) {
-        if ($msg eq 'add') {
+        my $cmd = defined $fields[0] ? $fields[0] : '';
+        if ($cmd eq 'add') {
           $parallel_hooks++;
-        } elsif ($msg eq 'del') {
+        } elsif ($cmd eq 'del') {
           $parallel_hooks--;
         } else {
-          Error("Parallel hooks update: command not understood: $msg");
+          Error("Parallel hooks update: command not understood: $cmd");
         }
       } elsif ( $job eq 'mqtt_publish' ) {
-        my ( $id, $topic, $payload ) = split('--SPLIT--', $msg);
+        my ( $id, $topic, $payload ) = @fields;
         Debug(2, "Job: MQTT Publish on topic: $topic");
         foreach (@active_connections) {
           if (( $_->{id} eq $id ) && exists $_->{mqtt_conn}) {

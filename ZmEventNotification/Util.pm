@@ -12,7 +12,7 @@ use ZmEventNotification::Config qw(:all);
 our @EXPORT_OK = qw(
   trim rsplit uniq getInterval isValidMonIntList isInList
   getConnFields getObjectForConn getConnectionIdentity parseDetectResults
-  buildPictureUrl maskPassword appendImagePath getFrameId
+  buildPictureUrl maskPassword appendImagePath getFrameId parse_job_line
 );
 
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
@@ -195,6 +195,20 @@ sub parseDetectResults {
   $jsonstring = '[]' if !$jsonstring;
   main::Debug(2, "parse of hook:$txt and $jsonstring from " . ($results || '(empty)'));
   return ($txt, $jsonstring);
+}
+
+# Parse an inter-process job line written by a forked child to the WRITER pipe
+# and consumed by processJobs in the daemon. Format:
+#   <job>--TYPE--<field0>--SPLIT--<field1>--SPLIT--...
+# Returns ($job, @fields). This is the single source of truth for the
+# producer<->consumer job-pipe contract (see t/20). Pure: no globals, no I/O.
+sub parse_job_line {
+  my $txt = shift;
+  $txt = '' unless defined $txt;
+  my ($job, $msg) = split('--TYPE--', $txt);
+  $job = '' unless defined $job;
+  $msg = '' unless defined $msg;
+  return ($job, split('--SPLIT--', $msg));
 }
 
 1;
