@@ -112,6 +112,8 @@ class FakeDetector:
     result_image = None
     fail_when_gateway = False
     last_result = None
+    last_detect_event_call = None
+    last_detect_call = None
 
     def __init__(self, opts):
         self._opts = opts
@@ -131,9 +133,11 @@ class FakeDetector:
         return FakeDetector.last_result
 
     def detect(self, *a, **kw):
+        FakeDetector.last_detect_call = (a, kw)
         return self._run()
 
     def detect_event(self, *a, **kw):
+        FakeDetector.last_detect_event_call = (a, kw)
         return self._run()
 
 
@@ -212,6 +216,8 @@ def harness(monkeypatch, tmp_path):
     FakeDetector.result_image = None
     FakeDetector.fail_when_gateway = False
     FakeDetector.last_result = None
+    FakeDetector.last_detect_event_call = None
+    FakeDetector.last_detect_call = None
     FakeZMClient.last = None
     FakeZMClient.event_notes = ''
     LocalLogger.errors = []
@@ -425,6 +431,21 @@ def test_fakeit_overrides_labels(harness, monkeypatch, tmp_path, capsys):
     assert 'dog' in out and 'person' in out
     assert FakeDetectionResult.last is not None
     assert FakeDetectionResult.last.data['labels'] == ['dog', 'person']
+
+
+def test_detect_event_called_with_signature_zm_detect_expects(harness, monkeypatch, tmp_path):
+    """Guard against zm_detect.py drifting from pyzm's detect_event signature.
+
+    zm_detect.py calls detect_event(zm, int(stream), zones=..., stream_config=...).
+    The recording fake asserts that exact call shape so a wrong kwarg name or
+    dropped argument fails here (the real-pyzm side is locked by the contract
+    test)."""
+    _run(monkeypatch, tmp_path, ['-e', '55555', '-m', '7'])
+    a, kw = FakeDetector.last_detect_event_call
+    assert len(a) == 2                 # (zm_client, event_id) positional
+    assert a[1] == 55555               # event id passed positionally
+    assert 'zones' in kw
+    assert 'stream_config' in kw
 
 
 # ---------------------------------------------------------------------------

@@ -112,3 +112,46 @@ class TestApplyRemovedKeys:
         removed = apply_removed_keys(user, ["hook.keep_frame_match_type", "hook.old_key"])
         assert sorted(removed) == ["hook.keep_frame_match_type", "hook.old_key"]
         assert list(user["hook"].keys()) == ["enabled"]
+
+
+# ── main() orchestration: the in-place write that touches user configs ──────
+
+class TestMainInPlace:
+    def _write(self, tmp_path, name, text):
+        p = tmp_path / name
+        p.write_text(text)
+        return str(p)
+
+    def _run_main(self, monkeypatch, argv):
+        import sys
+        monkeypatch.setattr(sys, "argv", ["config_upgrade_yaml.py"] + argv)
+        mod.main()
+
+    def test_dry_run_leaves_config_byte_identical(self, tmp_path, monkeypatch, capsys):
+        user = self._write(tmp_path, "user.yml", "a: 1\n")
+        example = self._write(tmp_path, "example.yml", "a: 1\nb: 2\n")
+        before = open(user).read()
+        self._run_main(monkeypatch, ["-c", user, "-e", example, "--dry-run"])
+        assert open(user).read() == before          # nothing written
+        assert "Dry run" in capsys.readouterr().out
+
+    def test_real_run_adds_missing_keys_preserving_order(self, tmp_path, monkeypatch):
+        # user has z first, then a -> order must be preserved, new key appended
+        user = self._write(tmp_path, "user.yml", "z: 10\na: 1\n")
+        example = self._write(tmp_path, "example.yml", "z: 10\na: 1\nb: 2\n")
+        self._run_main(monkeypatch, ["-c", user, "-e", example])
+        import yaml
+        text = open(user).read()
+        loaded = yaml.safe_load(text)
+        assert loaded == {"z": 10, "a": 1, "b": 2}   # new key merged in
+        # order preserved (sort_keys=False): z before a in the written file
+        assert text.index("z:") < text.index("a:")
+
+    def test_output_flag_does_not_touch_input(self, tmp_path, monkeypatch):
+        user = self._write(tmp_path, "user.yml", "a: 1\n")
+        example = self._write(tmp_path, "example.yml", "a: 1\nb: 2\n")
+        out = str(tmp_path / "out.yml")
+        before = open(user).read()
+        self._run_main(monkeypatch, ["-c", user, "-e", example, "-o", out])
+        assert open(user).read() == before          # input untouched
+        assert "b" in open(out).read()               # output has merged key
