@@ -186,3 +186,41 @@ class TestCheckModelFiles:
         warnings = check_model_files(models, str(tmp_path))
         assert len(warnings) == 1
         assert "object_config" in warnings[0]
+
+
+check_secrets_file = mod.check_secrets_file
+
+
+# ── check_secrets_file (readability diagnostic; security-relevant) ──────────
+
+class TestCheckSecretsFile:
+    def test_no_secrets_key_returns_none(self):
+        assert check_secrets_file({"general": {}}, "www-data") is None
+
+    def test_none_cfg_returns_none(self):
+        assert check_secrets_file(None, "www-data") is None
+
+    def test_missing_secrets_file_warns(self, tmp_path):
+        cfg = {"general": {"secrets": str(tmp_path / "nope.yml")}}
+        warn = check_secrets_file(cfg, "www-data")
+        assert warn is not None and "not found" in warn
+
+    def test_owner_readable_no_warning(self, tmp_path, monkeypatch):
+        sf = tmp_path / "secrets.yml"
+        sf.write_text("x"); sf.chmod(0o600)
+        # web user owns the file -> readable -> no warning
+        monkeypatch.setattr(mod, "uid_for_user", lambda u: os.getuid())
+        assert check_secrets_file({"general": {"secrets": str(sf)}}, "www-data") is None
+
+    def test_not_owner_and_not_world_readable_warns(self, tmp_path, monkeypatch):
+        sf = tmp_path / "secrets.yml"
+        sf.write_text("x"); sf.chmod(0o600)  # no other-read
+        monkeypatch.setattr(mod, "uid_for_user", lambda u: os.getuid() + 12345)
+        warn = check_secrets_file({"general": {"secrets": str(sf)}}, "www-data")
+        assert warn is not None and "may not be readable" in warn
+
+    def test_world_readable_no_warning_even_if_not_owner(self, tmp_path, monkeypatch):
+        sf = tmp_path / "secrets.yml"
+        sf.write_text("x"); sf.chmod(0o604)  # other-read set
+        monkeypatch.setattr(mod, "uid_for_user", lambda u: os.getuid() + 12345)
+        assert check_secrets_file({"general": {"secrets": str(sf)}}, "www-data") is None
