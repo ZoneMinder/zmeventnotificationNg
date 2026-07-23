@@ -82,6 +82,11 @@ def _collect_prereq_reasons() -> list[str]:
     reasons = []
     if not os.path.isdir(MODELS_DIR):
         reasons.append(f"model dir {MODELS_DIR} not found")
+    elif _discover_model() is None:
+        # Dir exists but holds no usable YOLO model -- otherwise every e2e
+        # test would skip green from inside find_one_model_path(), defeating
+        # ZM_E2E_REQUIRE=1.
+        reasons.append(f"no usable YOLO model in {MODELS_DIR}")
     if not os.path.isfile(BIRD_IMAGE):
         reasons.append(f"test image {BIRD_IMAGE} not found")
     if not _real_pyzm_importable():
@@ -276,12 +281,27 @@ def run_detect_chain(
 
 
 def find_one_model_path() -> tuple[str, str, str]:
-    """Find one available YOLO model.
+    """Find one available YOLO model, or skip if none exists.
 
     Returns (weights_path, config_path, labels_path).
     config_path is "" for ONNX models (no config needed).
     """
+    found = _discover_model()
+    if found is None:
+        pytest.skip("No YOLO model found in " + str(MODELS_DIR))
+    return found
+
+
+def _discover_model() -> tuple[str, str, str] | None:
+    """Discover one usable YOLO model without skipping. Returns None if none.
+
+    Shared by find_one_model_path() and the prereq gate so that a missing
+    model is caught as a prerequisite (hard-failing under ZM_E2E_REQUIRE=1)
+    instead of skipping green from inside a test.
+    """
     models_dir = Path(MODELS_DIR)
+    if not models_dir.is_dir():
+        return None
 
     # First, build a labels lookup (some dirs have labels, others don't)
     all_labels: str | None = None
@@ -325,7 +345,7 @@ def find_one_model_path() -> tuple[str, str, str]:
             if config:
                 return weights, config, labels
 
-    pytest.skip("No YOLO model found in " + str(models_dir))
+    return None
 
 
 def basic_ml_sequence(
