@@ -50,7 +50,7 @@ tools:
 release-gate: gate e2e
 
 e2e:
-	cd hook && PYTHONPATH=$(PYZM_SRC) ZM_E2E_REQUIRE=1 $(PY) -m pytest tests/test_e2e/ -q
+	cd hook && PYTHONPATH=$(PYZM_SRC) ZM_E2E_REQUIRE=1 $(PY) -m pytest tests/test_e2e/ -v
 
 hooks:
 	git config core.hooksPath .githooks
