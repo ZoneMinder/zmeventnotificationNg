@@ -262,7 +262,6 @@ Then in ``objectconfig.yml`` on the ZM box, set::
 
    remote:
      ml_gateway: "http://gpu-box:5000"
-     ml_gateway_mode: "url"
      ml_fallback_local: "yes"
      ml_user: "!ML_USER"
      ml_password: "!ML_PASSWORD"
@@ -272,23 +271,22 @@ The advantage: models load once on the server and persist in memory, so subseque
 detections are fast. If the remote server is down and ``ml_fallback_local`` is ``yes``,
 detection falls back to local inference automatically.
 
-**Your config works identically in both modes:** The remote server is a pure inference
-engine — it only runs models and returns raw detections. All filtering (pattern matching,
-zones, size limits, past-detection deduplication) is applied client-side by the ``Detector``
-using your ``objectconfig.yml`` settings. This means you configure everything in one place
-and it works the same whether running locally or remotely.
+**Your config drives detection, and local and remote produce identical results.**
+The remote server is a dumb inference engine: it exposes a single ``POST /infer``
+that runs one model on one image and returns raw detections. Your ``Detector``
+on the ZM box runs the model sequence and applies all filtering (pattern, zones,
+size limits, past-detection dedup) and frame selection using your
+``objectconfig.yml``. Because the same client pipeline runs in both cases, the
+result is identical whether you run locally or remotely.
 
-**Choosing a gateway mode:**
+.. note::
 
-- ``ml_gateway_mode: "image"`` (default) — the ZM box fetches frames locally, JPEG-encodes
-  them, and uploads to the server. Works even if the GPU box can't reach ZM directly.
-  You still need OpenCV on the ZM box for frame extraction.
-
-- ``ml_gateway_mode: "url"`` (recommended) — the ZM box sends frame URLs to the server,
-  and the **server** fetches images directly from ZoneMinder. More efficient because frames
-  don't pass through the ZM box as an intermediary. Requires that the GPU box can reach
-  your ZM web portal over the network. With this mode, you don't need ML libraries *or*
-  OpenCV on the ZM box for the detection itself (OpenCV is still needed if you use
-  ``write_image_to_zm`` or ``write_debug_image``).
+   Your config chooses *which* models run, but the gateway must have those model
+   files present — the client sends a model reference (type/name), not the files.
+   Compute-heavy models (YOLO, Coral TPU, local face) run on the gateway; cloud
+   ALPR, AWS Rekognition and audio always run on the ZM box. Frames are uploaded
+   to the server as lossless PNG, so remote inference sees the same pixels as
+   local. (Having the server fetch frames from ZoneMinder itself — the older
+   "URL mode" — is a planned enhancement; today the ZM box fetches and uploads.)
 
 See :ref:`remote_ml_config` for full setup details

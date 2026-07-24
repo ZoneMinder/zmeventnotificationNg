@@ -630,8 +630,9 @@ Forwarded to pyzmNg ``Detector``:
      - *none*
      - URL of remote ``pyzm.serve`` instance (e.g. ``http://gpu:5000``)
    * - ``ml_gateway_mode``
-     - ``url``
-     - ``url`` (server fetches frames) or ``image`` (client sends JPEG)
+     - ``image``
+     - Reserved. Frames are uploaded to the gateway (image mode). Server-side
+       frame fetch (``url``) is a planned enhancement and not yet wired.
    * - ``ml_user``
      - *none*
      - Username for remote gateway authentication
