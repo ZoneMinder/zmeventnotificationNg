@@ -630,9 +630,11 @@ Forwarded to pyzmNg ``Detector``:
      - *none*
      - URL of remote ``pyzm.serve`` instance (e.g. ``http://gpu:5000``)
    * - ``ml_gateway_mode``
-     - ``image``
-     - Reserved. Frames are uploaded to the gateway (image mode). Server-side
-       frame fetch (``url``) is a planned enhancement and not yet wired.
+     - ``url``
+     - ``url``: the gateway fetches frames directly from ZM (no download on the
+       ZM box). ``image``: the ZM box fetches frames and uploads them. ``url``
+       requires every enabled model be gateway-run; if a client-side model
+       (cloud ALPR, audio) is enabled, that event downloads frames instead.
    * - ``ml_user``
      - *none*
      - Username for remote gateway authentication

@@ -284,9 +284,11 @@ result is identical whether you run locally or remotely.
    Your config chooses *which* models run, but the gateway must have those model
    files present — the client sends a model reference (type/name), not the files.
    Compute-heavy models (YOLO, Coral TPU, local face) run on the gateway; cloud
-   ALPR, AWS Rekognition and audio always run on the ZM box. Frames are uploaded
-   to the server as lossless PNG, so remote inference sees the same pixels as
-   local. (Having the server fetch frames from ZoneMinder itself — the older
-   "URL mode" — is a planned enhancement; today the ZM box fetches and uploads.)
+   ALPR, AWS Rekognition and audio always run on the ZM box. Two transports:
+   ``ml_gateway_mode: url`` (default) has the gateway fetch frames straight from
+   ZoneMinder — nothing downloads on the ZM box; ``image`` has the ZM box fetch
+   frames and upload them as lossless PNG. URL mode needs every enabled model to
+   be gateway-run; if a client-side model (cloud ALPR, audio) is enabled, that
+   event falls back to downloading frames.
 
 See :ref:`remote_ml_config` for full setup details

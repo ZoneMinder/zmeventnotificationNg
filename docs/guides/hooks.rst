@@ -536,8 +536,9 @@ If the remote server is unreachable and ``ml_fallback_local`` is ``yes``, detect
 falls back to running locally on the ZM box.
 
 **The server is a dumb inference engine.** It exposes a single ``POST /infer``
-endpoint that runs *one* model on *one* uploaded image and returns raw,
-unfiltered detections. Everything else runs on the ZM box: your ``Detector``
+endpoint that runs *one* model on *one* frame (fetched by the server in URL
+mode, or uploaded in image mode) and returns raw, unfiltered detections.
+Everything else runs on the ZM box: your ``Detector``
 runs the model sequence and applies all filtering (pattern, zones, size,
 past-detection dedup) and frame selection using your ``objectconfig.yml``.
 The only remote-capable models are the compute-heavy local ones (YOLO, Coral
@@ -554,16 +555,21 @@ detection produce identical results.**
    returns nothing (logged) and the rest still run. For local/remote parity,
    the gateway must have the same models your config references.
 
-Frames are uploaded to the server as lossless PNG (image mode), so the server
-runs inference on pixels identical to the local path. Letting the server fetch
-frames directly from ZoneMinder (the older "URL mode") is a planned
-enhancement; today the ZM box fetches frames and uploads them.
+Two transports, set by ``ml_gateway_mode``:
+
+- ``url`` (default) — the ZM box sends frame references and the **gateway**
+  fetches each frame directly from ZoneMinder. Nothing downloads on the ZM box.
+  Requires every enabled model be gateway-run; if a client-side model (cloud
+  ALPR, audio) is enabled, that event falls back to ``image`` for the download.
+- ``image`` — the ZM box fetches frames and uploads them as lossless PNG. Use
+  when the gateway cannot reach your ZM portal.
 
 **Server endpoints:**
 
 - ``GET /health`` — returns ``{"status": "ok", "models_loaded": true}``
 - ``GET /models`` — lists loaded models (``name``, ``type``, ``framework``, ``loaded``)
-- ``POST /infer`` — multipart ``image`` + ``type`` (+ optional ``name``); returns
+- ``POST /infer`` — ``type`` (+ optional ``name``) plus either an uploaded
+  ``image`` (image mode) or ``url`` + ``zm_auth`` (url mode); returns
   ``{"detections": [...], "error": null}`` — raw, unfiltered
 - ``POST /login`` — accepts ``{"username": ..., "password": ...}``, returns JWT token
 
