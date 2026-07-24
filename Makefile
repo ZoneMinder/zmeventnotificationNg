@@ -12,12 +12,13 @@
 PY ?= python3
 PYZM_SRC ?= $(HOME)/fiddle/pyzmNg
 
-.PHONY: gate release-gate perl hook tools e2e hooks help test-all
+.PHONY: gate release-gate perl hook tools e2e hooks help test-all test-all-e2e
 
 help:
 	@echo "make gate          - pre-push gate (perl + hook + tools)"
 	@echo "make release-gate  - full gate incl. real-pyzm e2e (needs models)"
-	@echo "make test-all      - run BOTH repos (ES + pyzm)"
+	@echo "make test-all      - run BOTH repos (ES + pyzm), unit/integration"
+	@echo "make test-all-e2e  - BOTH repos incl. e2e (needs models + live ZM)"
 	@echo "make hooks         - install the git pre-push hook (run once)"
 
 # The pre-push gate. PYZM_SRC on PYTHONPATH lets the pyzm<->ES contract test
@@ -29,6 +30,11 @@ gate: perl hook tools
 # local<->remote parity). Override the pyzm checkout with PYZM_SRC=/path.
 test-all: gate
 	$(MAKE) -C $(PYZM_SRC) gate
+
+# Everything, incl. e2e: ES release-gate (needs models) + pyzm release-gate
+# (needs models AND a live ZM). This runs the real-model local<->remote parity.
+test-all-e2e: release-gate
+	$(MAKE) -C $(PYZM_SRC) release-gate
 
 perl:
 	prove -I t/lib -I . -r t/
