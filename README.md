@@ -32,6 +32,14 @@ ES 7.0 is in development — expect breakages. If you find issues, please post t
 
 Developer Notes (for myself)
 ----------------------------
+To run ALL tests (ES + pyzm):
+```
+make test-all
+```
+Runs the ES suite (perl + hook + tools) and the pyzm suite (unit, including
+local↔remote parity). Point at a non-default pyzm checkout with
+`make test-all PYZM_SRC=/path/to/pyzmNg`.
+
 To make a release:
 ```
 ./scripts/make_release.sh

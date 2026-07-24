@@ -12,17 +12,23 @@
 PY ?= python3
 PYZM_SRC ?= $(HOME)/fiddle/pyzmNg
 
-.PHONY: gate release-gate perl hook tools e2e hooks help
+.PHONY: gate release-gate perl hook tools e2e hooks help test-all
 
 help:
 	@echo "make gate          - pre-push gate (perl + hook + tools)"
 	@echo "make release-gate  - full gate incl. real-pyzm e2e (needs models)"
+	@echo "make test-all      - run BOTH repos (ES + pyzm)"
 	@echo "make hooks         - install the git pre-push hook (run once)"
 
 # The pre-push gate. PYZM_SRC on PYTHONPATH lets the pyzm<->ES contract test
 # import real pyzm and catch cross-repo drift on every push; the rest of the
 # hook suite still runs against the stub in tests/conftest.py.
 gate: perl hook tools
+
+# Run BOTH repos' test suites: ES (perl + hook + tools) and pyzm (unit incl.
+# local<->remote parity). Override the pyzm checkout with PYZM_SRC=/path.
+test-all: gate
+	$(MAKE) -C $(PYZM_SRC) gate
 
 perl:
 	prove -I t/lib -I . -r t/
