@@ -303,7 +303,8 @@ sub processIncomingMessage {
             && ( $_->{conn}->ip() eq $conn->ip() )
             && ( $_->{conn}->port() eq $conn->port() )
           )
-          || ( $_->{token} eq $json_string->{token} )
+          || ( defined $json_string->{token}
+            && $_->{token} eq $json_string->{token} )
           )
         {
           $_->{badge} = $data->{badge};

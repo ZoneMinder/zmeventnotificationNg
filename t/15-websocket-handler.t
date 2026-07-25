@@ -622,6 +622,32 @@ subtest 'validateAuth - unmigrated -ZM- password rejected' => sub {
         'unmigrated -ZM- password returns 0 regardless of supplied password');
 };
 
+subtest 'processIncomingMessage - badge without top-level token warns nothing' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        # An FCM entry restored from the token file has no {conn}, so the
+        # ip/port test short-circuits to the token comparison.
+        { type => FCM, state => INVALID_CONNECTION, token => 'stored_token', badge => 0 },
+        { conn => $mock_conn, state => VALID_CONNECTION, type => WEB, token => '', badge => 0 },
+    );
+
+    # zmNinja sends badge updates without a top-level token
+    my $msg = encode_json({ event => 'push', data => { type => 'badge', badge => 7 } });
+
+    my @warnings;
+    do {
+        local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+        processIncomingMessage($mock_conn, $msg);
+    };
+
+    is_deeply(\@warnings, [], 'no uninitialized-value warnings')
+        or diag("warnings: @warnings");
+    is($main::active_connections[1]{badge}, 7, 'badge set on the matching connection');
+    is($main::active_connections[0]{badge}, 0, 'badge untouched on the non-matching connection');
+};
+
 done_testing();
 
 # Mock connection class
