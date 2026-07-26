@@ -521,6 +521,39 @@ Using the remote ML detection server (pyzm.serve)
    # Multiple models, GPU inference
    python -m pyzm.serve --models yolo11s yolo26s --port 5000 --processor gpu
 
+   # Serve a model under the name your objectconfig.yml uses for it
+   python -m pyzm.serve --models "YOLOv11 ONNX=yolo11s" --port 5000
+
+A remote client asks for a model **by name**, so the name in your
+``objectconfig.yml`` sequence must match a name the gateway publishes — check
+with ``curl http://<gateway>:5000/models``. Rather than renaming things on
+either side, write an entry as ``<published name>=<spec>``: the gateway loads
+*spec* and answers to *published name*. This works both on the command line and
+in a config file::
+
+   # /etc/zm/pyzm-serve.yml
+   host: "0.0.0.0"
+   port: 5000
+   base_path: "/var/lib/zmeventnotification/models"
+   processor: cpu
+   models:
+     - "YOLOv11 ONNX=yolo11s"
+     - "TPU face detection=ssd_mobilenet_v2_face_quant_postprocess_edgetpu"
+
+::
+
+   python -m pyzm.serve --config /etc/zm/pyzm-serve.yml
+
+For full control over a model's settings, use ``detector_config`` in the same
+file instead, which accepts complete model definitions::
+
+   detector_config:
+     models:
+       - name: "YOLOv11 ONNX"
+         type: object
+         framework: opencv
+         weights: "/var/lib/zmeventnotification/models/ultralytics/yolo11s.onnx"
+
 **Client setup** (``objectconfig.yml`` on the ZM box)::
 
    remote:
@@ -557,8 +590,9 @@ exception — see :ref:`remote-config-ownership` below.
    its own loaded models. If you name a model the gateway does not have, that
    model returns an error and is skipped (logged); the rest still run. The
    gateway never substitutes a different model for the one you asked for. For
-   local/remote parity, the gateway must have the same models your config
-   references.
+   local/remote parity, the gateway must publish the same model *names* your
+   config references — see the ``<published name>=<spec>`` syntax above if the
+   names differ.
 
 .. _remote-config-ownership:
 
