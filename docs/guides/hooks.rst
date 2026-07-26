@@ -212,7 +212,7 @@ so subsequent detections are fast. See :ref:`this FAQ entry <local_remote_ml>`.
 
 To start the server on your GPU box::
 
-   pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   pip install "pyzm[serve]"        # or "pyzm[full]" if this box also trains models
    python -m pyzm.serve --models "YOLOv11 ONNX=yolo11l" --port 5000
 
 Then point ``ml_gateway`` in ``objectconfig.yml`` to that server::
@@ -548,10 +548,17 @@ Server setup (the gateway box)
 
 ::
 
-   pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   pip install "pyzm[serve]"
 
    # Basic usage
    python -m pyzm.serve --models yolo11s --port 5000
+
+Install ``"pyzm[full]"`` instead of ``"pyzm[serve]"`` if this box will also
+**train** models — YOLO fine-tuning, or face recognition encodings, which must
+be built on whichever box runs the face model. ``[full]`` is ``[ml]`` +
+``[serve]`` + ``[train]``, so it covers the server too.
+
+More server options::
 
    # With authentication
    python -m pyzm.serve --models yolo11s --port 5000 \
@@ -573,7 +580,7 @@ configuration management::
    base_path: "/var/lib/zmeventnotification/models"
    processor: cpu
    models:
-     - "YOLOv11 ONNX=yolo11s"
+     - "YOLOv11 ONNX=yolo11l"
 
 ::
 
@@ -587,14 +594,14 @@ instead of ``models``; it accepts full model definitions::
        - name: "YOLOv11 ONNX"
          type: object
          framework: opencv
-         weights: "/var/lib/zmeventnotification/models/ultralytics/yolo11s.onnx"
+         weights: "/var/lib/zmeventnotification/models/ultralytics/yolo11l.onnx"
 
 Client setup (the ZM box)
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 Install pyzmNg without the ``serve`` extra — the ZM box is only a client::
 
-   pip install "pyzm @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   pip install pyzm
 
 Then in ``objectconfig.yml``::
 
@@ -645,12 +652,12 @@ There are three ways to make the two sides agree. Pick one:
    *spec* and answers to *published name*, so no files are renamed and the
    client config stays the source of truth for model identity::
 
-      python -m pyzm.serve --models "YOLOv11 ONNX=yolo11s"
+      python -m pyzm.serve --models "YOLOv11 ONNX=yolo11l"
 
    The same syntax works in a config file::
 
       models:
-        - "YOLOv11 ONNX=yolo11s"
+        - "YOLOv11 ONNX=yolo11l"
         - "TPU face detection=ssd_mobilenet_v2_face_quant_postprocess_edgetpu"
 
 2. **Define the model explicitly** with ``detector_config`` (see above) and set

@@ -162,8 +162,10 @@ ZM portal URL, username, and password (or point them to ``secrets.yml``).
    If you also want to run the remote ML detection server (``pyzm.serve``)
    on this same machine, install the ``serve`` extra into the same venv::
 
-      sudo /opt/zoneminder/venv/bin/pip install \
-        "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+      sudo /opt/zoneminder/venv/bin/pip install "pyzm[serve]"
+
+   Use ``"pyzm[full]"`` instead if you also want the model-training tools
+   (``[full]`` is ``[ml]`` + ``[serve]`` + ``[train]``).
 
    On a split setup this extra belongs on the gateway box only; the ZM box
    needs plain ``pyzm``. See :ref:`remote_ml_config` for details.

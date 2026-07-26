@@ -255,7 +255,7 @@ Local vs. Remote server for Machine Learning
 You can offload ML inference to a remote server using ``pyzm.serve``, the built-in
 remote ML detection server that replaces the legacy ``mlapi``. On the remote (GPU) box::
 
-   pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   pip install "pyzm[serve]"        # or "pyzm[full]" if this box also trains models
    python -m pyzm.serve --models "YOLOv11 ONNX=yolo11l" --port 5000
 
 The ``"<published name>=<spec>"`` form publishes the model under the name your
@@ -263,7 +263,7 @@ The ``"<published name>=<spec>"`` form publishes the model under the name your
 
 On the ZM box install the client without the ``serve`` extra::
 
-   pip install "pyzm @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   pip install pyzm
 
 Then in ``objectconfig.yml`` on the ZM box, set::
 
