@@ -212,8 +212,8 @@ so subsequent detections are fast. See :ref:`this FAQ entry <local_remote_ml>`.
 
 To start the server on your GPU box::
 
-   pip install pyzm[serve]
-   python -m pyzm.serve --models yolo11s --port 5000
+   pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   python -m pyzm.serve --models "YOLOv11 ONNX=yolo11l" --port 5000
 
 Then point ``ml_gateway`` in ``objectconfig.yml`` to that server::
 
@@ -222,9 +222,27 @@ Then point ``ml_gateway`` in ``objectconfig.yml`` to that server::
      ml_fallback_local: "yes"
 
 The server is a dumb inference engine; your ``objectconfig.yml`` drives which
-models run and does all filtering, so local and remote detection match. The
-gateway must have the model files your config references. See
-:ref:`remote_ml_config` for full details.
+models run, supplies the detection thresholds, and does all filtering.
+
+Two things must line up between the boxes, or results will differ from a local
+run without any error being raised:
+
+- **The model name.** A client asks for a model by the ``name`` in its sequence,
+  and the gateway answers only to names it publishes — hence the
+  ``"YOLOv11 ONNX=yolo11l"`` form above, which loads ``yolo11l`` and publishes it
+  under the name the config uses. A name the gateway does not have is skipped
+  with an error.
+- **The weights behind that name.** Publishing ``yolo11s`` under a name your
+  config points at ``yolo11l`` is accepted and runs, but the smaller model scores
+  differently, so detections your config would keep locally can fall below your
+  threshold remotely.
+
+Face recognition runs entirely on the gateway against its own trained encodings,
+so face results match only if both boxes have the same face data.
+
+See :ref:`remote_ml_config` for full details, :ref:`remote-model-names` for
+reconciling names, and :ref:`remote-config-ownership` for which box owns which
+setting.
 
 
 .. _supported_models:

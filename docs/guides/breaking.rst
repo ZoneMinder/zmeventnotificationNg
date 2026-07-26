@@ -27,7 +27,8 @@ The key changes that affect ES users:
 1. **Install pyzmNg v2**: ``pip install pyzm`` (or let ``install.sh`` handle it)
 2. **If using remote ML**: Replace ``mlapi`` with ``pyzm.serve``:
 
-   - On the GPU box: ``pip install pyzm[serve]`` then ``python -m pyzm.serve --models yolo11s --port 5000``
+   - On the GPU box: ``pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"``
+     then ``python -m pyzm.serve --models "<name in your config>=yolo11l" --port 5000``
    - In ``objectconfig.yml``: use the ``remote:`` section with ``ml_gateway`` (see below)
    - Delete ``mlapiconfig.ini`` — it is no longer used
 
@@ -71,8 +72,9 @@ After (``objectconfig.yml`` with ``pyzm.serve``):
 
 On the GPU box, start with::
 
-   pip install pyzm[serve]
-   python -m pyzm.serve --models yolo11s --port 5000 --auth --auth-user admin --auth-password secret
+   pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+   python -m pyzm.serve --models "YOLOv11 ONNX=yolo11l" --port 5000 \
+       --auth --auth-user admin --auth-password secret
 
 
 Frame Match Type Setting Moved (7.x)
