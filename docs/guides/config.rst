@@ -633,8 +633,9 @@ Forwarded to pyzmNg ``Detector``:
      - ``url``
      - ``url``: the gateway fetches frames directly from ZM (no download on the
        ZM box). ``image``: the ZM box fetches frames and uploads them. ``url``
-       requires every enabled model be gateway-run; if a client-side model
-       (cloud ALPR, audio) is enabled, that event downloads frames instead.
+       requires every enabled model be gateway-run and no ``resize`` in
+       ``stream_sequence``; if a client-side model (cloud ALPR, audio) is
+       enabled or a resize is set, that event downloads frames instead.
    * - ``ml_user``
      - *none*
      - Username for remote gateway authentication

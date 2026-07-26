@@ -294,7 +294,20 @@ encodings — train faces there, not on the ZM box. See
    ``ml_gateway_mode: url`` (default) has the gateway fetch frames straight from
    ZoneMinder — nothing downloads on the ZM box; ``image`` has the ZM box fetch
    frames and upload them as lossless PNG. URL mode needs every enabled model to
-   be gateway-run; if a client-side model (cloud ALPR, audio) is enabled, that
-   event falls back to downloading frames.
+   be gateway-run and no ``resize`` in ``stream_sequence``; otherwise that event
+   downloads frames instead.
+
+.. important::
+
+   **The model names must match.** A client asks for a model by the ``name`` in
+   its ``objectconfig.yml`` sequence, and the gateway answers only to names it
+   publishes — check with ``curl http://<gateway>:5000/models``. A mismatch skips
+   that model with ``Gateway cannot run <name>``; the gateway never substitutes
+   a different model. The easiest fix is to publish the gateway's model under
+   the client's name::
+
+      python -m pyzm.serve --models "YOLOv11 ONNX=yolo11s"
+
+   See :ref:`remote-model-names` for all three ways to reconcile them.
 
 See :ref:`remote_ml_config` for full setup details

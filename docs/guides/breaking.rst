@@ -32,10 +32,18 @@ The key changes that affect ES users:
    - Delete ``mlapiconfig.ini`` — it is no longer used
 
 3. **New: URL-mode remote detection**: If your GPU box can reach ZoneMinder directly,
-   set ``ml_gateway_mode: "url"`` in the ``remote:`` section. The server will fetch frames
-   directly from ZM instead of having them uploaded by the ZM box. This is more efficient.
+   leave ``ml_gateway_mode`` at its ``url`` default. The server fetches frames
+   directly from ZM instead of having them uploaded by the ZM box. This is more
+   efficient. Set ``image`` if the GPU box cannot reach your ZM portal.
 
-4. **No changes to objectconfig.yml format** — the ``ml_sequence`` and ``stream_sequence``
+4. **Model names must match between the two boxes.** A client asks for a model by
+   the ``name`` in its ``objectconfig.yml`` sequence; the gateway answers only to
+   names it publishes, and never substitutes a different model. If the names differ,
+   publish the gateway's model under the client's name:
+   ``python -m pyzm.serve --models "YOLOv11 ONNX=yolo11s"``. See
+   :ref:`remote-model-names`.
+
+5. **No changes to objectconfig.yml format** — the ``ml_sequence`` and ``stream_sequence``
    YAML structures are fully backward compatible. ``Detector.from_dict()`` reads them
    identically.
 
@@ -55,7 +63,7 @@ After (``objectconfig.yml`` with ``pyzm.serve``):
 
    remote:
      ml_gateway: "http://gpu-box:5000"
-     ml_gateway_mode: "url"          # NEW — "image" (default) or "url"
+     ml_gateway_mode: "url"          # NEW — "url" (default) or "image"
      ml_fallback_local: "yes"
      ml_user: "!ML_USER"
      ml_password: "!ML_PASSWORD"

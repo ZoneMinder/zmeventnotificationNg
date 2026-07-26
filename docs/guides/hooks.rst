@@ -507,9 +507,30 @@ Using the remote ML detection server (pyzm.serve)
    uses the same ``Detector`` API, and requires no separate configuration file. The old
    ``mlapiconfig.ini`` is no longer needed.
 
-**Server setup** (GPU box)::
+How it works
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-   pip install pyzm[serve]
+The gateway is a **dumb inference engine**. It exposes one endpoint,
+``POST /infer``, which runs *one* model on *one* frame and returns raw,
+unfiltered detections. Everything else stays on the ZM box: your ``Detector``
+runs the model sequence and applies pattern, zone, size and past-detection
+filtering plus frame selection, all from your ``objectconfig.yml``.
+
+Only compute-heavy local models are remote-capable (YOLO, Coral TPU, local
+face). Cloud ALPR, AWS Rekognition and audio always run on the ZM box — they
+are network calls or need local data, so remoting them would only leak your API
+keys to the gateway.
+
+Because the same client pipeline runs either way, **local and remote object
+detection produce identical results**. Face recognition is the one exception;
+see :ref:`remote-config-ownership`.
+
+Server setup (the gateway box)
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+::
+
+   pip install "pyzm[serve] @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
 
    # Basic usage
    python -m pyzm.serve --models yolo11s --port 5000
@@ -521,15 +542,12 @@ Using the remote ML detection server (pyzm.serve)
    # Multiple models, GPU inference
    python -m pyzm.serve --models yolo11s yolo26s --port 5000 --processor gpu
 
-   # Serve a model under the name your objectconfig.yml uses for it
-   python -m pyzm.serve --models "YOLOv11 ONNX=yolo11s" --port 5000
+Model files must be present **on this box**, under ``--base-path`` (default
+``/var/lib/zmeventnotification/models``). The client sends a model *reference*,
+never model files or paths.
 
-A remote client asks for a model **by name**, so the name in your
-``objectconfig.yml`` sequence must match a name the gateway publishes — check
-with ``curl http://<gateway>:5000/models``. Rather than renaming things on
-either side, write an entry as ``<published name>=<spec>``: the gateway loads
-*spec* and answers to *published name*. This works both on the command line and
-in a config file::
+Everything can also come from a YAML file, which is easier to keep under
+configuration management::
 
    # /etc/zm/pyzm-serve.yml
    host: "0.0.0.0"
@@ -538,14 +556,13 @@ in a config file::
    processor: cpu
    models:
      - "YOLOv11 ONNX=yolo11s"
-     - "TPU face detection=ssd_mobilenet_v2_face_quant_postprocess_edgetpu"
 
 ::
 
    python -m pyzm.serve --config /etc/zm/pyzm-serve.yml
 
-For full control over a model's settings, use ``detector_config`` in the same
-file instead, which accepts complete model definitions::
+For complete control over each model's settings, use ``detector_config``
+instead of ``models``; it accepts full model definitions::
 
    detector_config:
      models:
@@ -554,45 +571,83 @@ file instead, which accepts complete model definitions::
          framework: opencv
          weights: "/var/lib/zmeventnotification/models/ultralytics/yolo11s.onnx"
 
-**Client setup** (``objectconfig.yml`` on the ZM box)::
+Client setup (the ZM box)
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Install pyzmNg without the ``serve`` extra — the ZM box is only a client::
+
+   pip install "pyzm @ git+https://github.com/ZoneMinder/pyzmNg.git@master"
+
+Then in ``objectconfig.yml``::
 
    remote:
      ml_gateway: "http://192.168.1.183:5000"
+     ml_gateway_mode: "url"
      ml_fallback_local: "yes"
      ml_user: "!ML_USER"
      ml_password: "!ML_PASSWORD"
      ml_timeout: 60
 
-When ``ml_gateway`` is set, ``zm_detect.py`` creates the ``Detector`` in remote mode.
-The server keeps models loaded in memory so subsequent requests skip the expensive
-model-load step.
+When ``ml_gateway`` is set, ``zm_detect.py`` creates the ``Detector`` in remote
+mode. The gateway keeps models loaded in memory, so requests skip the expensive
+model-load step. If the gateway is unreachable and ``ml_fallback_local`` is
+``yes``, detection falls back to running locally on the ZM box.
 
-If the remote server is unreachable and ``ml_fallback_local`` is ``yes``, detection
-falls back to running locally on the ZM box.
+.. tip::
 
-**The server is a dumb inference engine.** It exposes a single ``POST /infer``
-endpoint that runs *one* model on *one* frame (fetched by the server in URL
-mode, or uploaded in image mode) and returns raw, unfiltered detections.
-Everything else runs on the ZM box: your ``Detector``
-runs the model sequence and applies all filtering (pattern, zones, size,
-past-detection dedup) and frame selection using your ``objectconfig.yml``.
-The only remote-capable models are the compute-heavy local ones (YOLO, Coral
-TPU, local face); cloud ALPR, AWS Rekognition and audio always run on the ZM
-box. Because the same client pipeline runs in both cases, **local and remote
-object detection produce identical results.** Face recognition is the one
-exception — see :ref:`remote-config-ownership` below.
+   While first setting this up, use ``ml_fallback_local: "no"``. A gateway
+   problem then fails loudly instead of quietly running locally and looking
+   like everything works. Switch it back to ``"yes"`` once you are happy.
 
-.. important::
+.. _remote-model-names:
 
-   Your ``objectconfig.yml`` chooses *which* models run, but the gateway must
-   have those model files present. The client sends the server a model
-   reference (type/name), not the model files; the server resolves it against
-   its own loaded models. If you name a model the gateway does not have, that
-   model returns an error and is skipped (logged); the rest still run. The
-   gateway never substitutes a different model for the one you asked for. For
-   local/remote parity, the gateway must publish the same model *names* your
-   config references — see the ``<published name>=<spec>`` syntax above if the
-   names differ.
+Matching model names between client and gateway
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+**A client asks for a model by name.** The ``name`` of each entry in your
+``objectconfig.yml`` ``sequence`` must match a name the gateway publishes. If it
+does not, that model is skipped with an error like::
+
+   Gateway cannot run YOLOv11 ONNX: no model loaded for type=object
+   name='YOLOv11 ONNX'. Load that model on the gateway (pyzm.serve --config),
+   or run it locally.
+
+The gateway never substitutes a different model for the one you asked for.
+Silently answering with some other model would return detections you did not
+request while looking like a successful run.
+
+Ask the gateway what it publishes::
+
+   curl -s http://<gateway>:5000/models | python3 -m json.tool
+
+There are three ways to make the two sides agree. Pick one:
+
+1. **Publish the gateway's model under the client's name (recommended).**
+   Write a ``models`` entry as ``<published name>=<spec>``. The gateway loads
+   *spec* and answers to *published name*, so no files are renamed and the
+   client config stays the source of truth for model identity::
+
+      python -m pyzm.serve --models "YOLOv11 ONNX=yolo11s"
+
+   The same syntax works in a config file::
+
+      models:
+        - "YOLOv11 ONNX=yolo11s"
+        - "TPU face detection=ssd_mobilenet_v2_face_quant_postprocess_edgetpu"
+
+2. **Define the model explicitly** with ``detector_config`` (see above) and set
+   its ``name`` to whatever your ``objectconfig.yml`` uses.
+
+3. **Rename on the client.** Change the sequence entry's ``name`` in
+   ``objectconfig.yml`` to a name the gateway already publishes. Fine when you
+   have one object model; awkward once several ZM boxes share a gateway.
+
+.. note::
+
+   Names must match, but the *weights behind the name* need not be identical to
+   what you would run locally — the gateway may serve a larger model on better
+   hardware. Detections will then legitimately differ from a local run. For
+   exact local/remote parity, point the published name at the same weights.
 
 .. _remote-config-ownership:
 
@@ -603,12 +658,15 @@ Every setting has exactly one owner. The other side has no say in it. There is
 no merging and no overriding, so nothing silently wins.
 
 **The ZM box owns the outcome.** These come from your ``objectconfig.yml`` and
-are sent with each request, so they apply identically to local and remote runs:
+travel with each request, so they apply identically to local and remote runs:
 
 - ``object_min_confidence`` (and the per-type ``*_min_confidence`` keys)
 - ``pattern``, zone definitions, ``max_detection_size``
 - ``model_sequence``, ``same_model_sequence_strategy``, ``frame_strategy``
 - past-detection filtering, ``pre_existing_labels`` gating
+
+Change a threshold on the ZM box and the next event uses it. The gateway needs
+no restart and has no say in the value.
 
 **The gateway owns the machine.** These come from how you started
 ``pyzm.serve`` and cannot be set from ``objectconfig.yml`` for a remote run:
@@ -644,36 +702,83 @@ disk; the ZM box receives only the recognised name. This means:
   two machines have different face databases. Object detection parity is exact;
   face parity depends on you keeping the encodings in sync.
 
-Two transports, set by ``ml_gateway_mode``:
+Transports: url vs image
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Set by ``ml_gateway_mode``:
 
 - ``url`` (default) — the ZM box sends frame references and the **gateway**
   fetches each frame directly from ZoneMinder. Nothing downloads on the ZM box.
-  Requires every enabled model be gateway-run; if a client-side model (cloud
-  ALPR, audio) is enabled, that event falls back to ``image`` for the download.
 - ``image`` — the ZM box fetches frames and uploads them as lossless PNG. Use
   when the gateway cannot reach your ZM portal.
 
-``url`` mode needs the gateway to reach your ZM portal directly. Verify it from
-the gateway box before relying on it::
+``url`` mode needs the gateway to reach your ZM portal directly. Verify from the
+gateway box before relying on it::
 
    curl -sI https://your-zm-host/zm/index.php | head -1
 
-A ``resize`` in ``stream_sequence`` forces ``image`` mode for that event. The
-gateway fetches frames from ZM at full resolution and never sees your resize, so
-staying in ``url`` mode would run inference on different pixels than a local run.
-The switch is automatic and logged.
+Two situations fall back to ``image`` automatically, per event, and log the
+reason:
 
-**Server endpoints:**
+- **A client-side model is enabled** (cloud ALPR, audio). Those need local
+  pixels, so the frames have to be downloaded anyway.
+- **A** ``resize`` **is set in** ``stream_sequence``. The gateway fetches frames
+  from ZM at full resolution and never sees your resize, so staying in ``url``
+  mode would run inference on different pixels than a local run.
+
+Server endpoints
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 - ``GET /health`` — returns ``{"status": "ok", "models_loaded": true}``
-- ``GET /models`` — lists loaded models (``name``, ``type``, ``framework``, ``loaded``)
+- ``GET /models`` — lists published models (``name``, ``type``, ``framework``,
+  ``loaded``). This is the list your client's model names must match.
 - ``POST /infer`` — ``type`` (+ optional ``name``) plus either an uploaded
   ``image`` (image mode) or ``url`` + ``zm_auth`` (url mode). Also accepts
   ``min_confidence``, which replaces the threshold the gateway loaded the model
   with, so your config's value applies remotely. Returns
   ``{"detections": [...], "error": null}`` — otherwise raw and unfiltered.
   A ``name`` the gateway has not loaded is an error, never a substitution.
-- ``POST /login`` — accepts ``{"username": ..., "password": ...}``, returns JWT token
+- ``POST /login`` — accepts ``{"username": ..., "password": ...}``, returns a
+  JWT token.
+
+Verifying a remote setup
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+On the gateway::
+
+   curl -s localhost:5000/health
+   curl -s localhost:5000/models
+   curl -s -F type=object -F image=@/path/to/some.jpg -F min_confidence=0.15 \
+        http://localhost:5000/infer
+
+Then run one event on the ZM box::
+
+   sudo -u www-data /var/lib/zmeventnotification/bin/zm_detect.py \
+     --config /etc/zm/objectconfig.yml --eventid <EID> --monitorid <MID> --debug
+
+It is working when the gateway logs ``POST /infer HTTP/1.1" 200 OK`` once per
+model per frame, and the ZM box logs no ``Remote failed (...), falling back to
+local``. In ``url`` mode the ZM box also logs no ``index.php?view=image``
+fetches — those requests reach your portal from the gateway's IP instead.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Symptom
+     - Cause
+   * - ``404`` on ``POST /infer``, ``/login`` works
+     - The gateway runs a pyzm older than the dumb-gateway rework. Upgrade it
+       and restart the process — a running server keeps the old code in memory.
+   * - ``Gateway cannot run <name>``
+     - Model-name mismatch. See :ref:`remote-model-names`.
+   * - A detection appears locally but not remotely
+     - Check the gateway's ``dropping <label> (x < y)`` line. ``y`` should be
+       your configured ``object_min_confidence``; if it is not, the ZM box is
+       running an older pyzm that does not send the threshold.
+   * - Frames download on the ZM box despite ``url`` mode
+     - A ``resize`` or a client-side model forced ``image`` mode for that event.
+       The reason is logged.
 
 Here is a part of my config, for example:
 
