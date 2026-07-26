@@ -219,12 +219,12 @@ Then point ``ml_gateway`` in ``objectconfig.yml`` to that server::
 
    remote:
      ml_gateway: "http://gpu-box:5000"
-     ml_gateway_mode: "url"          # let the server fetch images directly from ZM
      ml_fallback_local: "yes"
 
-Use ``ml_gateway_mode: "url"`` if your GPU box can reach ZoneMinder directly (recommended
-for best performance). Use ``"image"`` (default) if the GPU box is on a different network
-and can't reach ZM. See :ref:`remote_ml_config` for full details.
+The server is a dumb inference engine; your ``objectconfig.yml`` drives which
+models run and does all filtering, so local and remote detection match. The
+gateway must have the model files your config references. See
+:ref:`remote_ml_config` for full details.
 
 
 .. _supported_models:
@@ -523,7 +523,6 @@ Using the remote ML detection server (pyzm.serve)
 
    remote:
      ml_gateway: "http://192.168.1.183:5000"
-     ml_gateway_mode: "image"       # "image" (default) or "url"
      ml_fallback_local: "yes"
      ml_user: "!ML_USER"
      ml_password: "!ML_PASSWORD"
@@ -536,39 +535,43 @@ model-load step.
 If the remote server is unreachable and ``ml_fallback_local`` is ``yes``, detection
 falls back to running locally on the ZM box.
 
-All settings (``ml_sequence``, ``stream_sequence``, monitor overrides, zones,
-image writing, etc.) stay in ``objectconfig.yml`` — there is no second config file to manage.
-The remote server is a pure inference engine that only needs models and a processor setting;
-all filtering (pattern, zones, size, past-detection dedup) is applied client-side by the
-``Detector`` using your local config.
+**The server is a dumb inference engine.** It exposes a single ``POST /infer``
+endpoint that runs *one* model on *one* frame (fetched by the server in URL
+mode, or uploaded in image mode) and returns raw, unfiltered detections.
+Everything else runs on the ZM box: your ``Detector``
+runs the model sequence and applies all filtering (pattern, zones, size,
+past-detection dedup) and frame selection using your ``objectconfig.yml``.
+The only remote-capable models are the compute-heavy local ones (YOLO, Coral
+TPU, local face); cloud ALPR, AWS Rekognition and audio always run on the ZM
+box. Because the same client pipeline runs in both cases, **local and remote
+detection produce identical results.**
 
-**Two detection modes:**
+.. important::
 
-Image mode (``ml_gateway_mode: "image"``, default)
-   Frame extraction happens locally on the ZM box, then each frame is JPEG-encoded and
-   uploaded to the server's ``/detect`` endpoint. This works universally but transfers
-   every frame through the ZM box.
+   Your ``objectconfig.yml`` chooses *which* models run, but the gateway must
+   have those model files present. The client sends the server a model
+   reference (type/name), not the model files; the server resolves it against
+   its own loaded models. If the server lacks a requested model, that model
+   returns nothing (logged) and the rest still run. For local/remote parity,
+   the gateway must have the same models your config references.
 
-URL mode (``ml_gateway_mode: "url"``)
-   The ZM box sends frame URLs (e.g. ``https://zm/index.php?view=image&eid=123&fid=snapshot``)
-   and ZM auth credentials to the server's ``/detect_urls`` endpoint. The **server** fetches
-   images directly from ZoneMinder and runs detection. This is more efficient when the GPU box
-   has fast/direct network access to ZM, since frames don't have to pass through the ZM box
-   as an intermediary.
+Two transports, set by ``ml_gateway_mode``:
 
-   To use URL mode, the server must be able to reach your ZM web portal over HTTP/HTTPS.
+- ``url`` (default) — the ZM box sends frame references and the **gateway**
+  fetches each frame directly from ZoneMinder. Nothing downloads on the ZM box.
+  Requires every enabled model be gateway-run; if a client-side model (cloud
+  ALPR, audio) is enabled, that event falls back to ``image`` for the download.
+- ``image`` — the ZM box fetches frames and uploads them as lossless PNG. Use
+  when the gateway cannot reach your ZM portal.
 
 **Server endpoints:**
 
 - ``GET /health`` — returns ``{"status": "ok", "models_loaded": true}``
-- ``POST /detect`` — (image mode) accepts multipart ``file`` (JPEG), returns raw (unfiltered) detections
-- ``POST /detect_urls`` — (URL mode) accepts JSON with frame URLs and auth token, returns per-frame raw detections
-- ``POST /login`` — (auth mode only) accepts ``{"username": ..., "password": ...}``, returns JWT token
-
-The server returns raw detection results without any filtering. Pattern matching, zone
-filtering, size filtering, and past-detection deduplication are all applied client-side
-by the ``Detector`` class using your ``objectconfig.yml`` settings. This means your
-configuration works identically whether running locally or remotely.
+- ``GET /models`` — lists loaded models (``name``, ``type``, ``framework``, ``loaded``)
+- ``POST /infer`` — ``type`` (+ optional ``name``) plus either an uploaded
+  ``image`` (image mode) or ``url`` + ``zm_auth`` (url mode); returns
+  ``{"detections": [...], "error": null}`` — raw, unfiltered
+- ``POST /login`` — accepts ``{"username": ..., "password": ...}``, returns JWT token
 
 Here is a part of my config, for example:
 

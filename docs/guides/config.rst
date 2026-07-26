@@ -631,7 +631,10 @@ Forwarded to pyzmNg ``Detector``:
      - URL of remote ``pyzm.serve`` instance (e.g. ``http://gpu:5000``)
    * - ``ml_gateway_mode``
      - ``url``
-     - ``url`` (server fetches frames) or ``image`` (client sends JPEG)
+     - ``url``: the gateway fetches frames directly from ZM (no download on the
+       ZM box). ``image``: the ZM box fetches frames and uploads them. ``url``
+       requires every enabled model be gateway-run; if a client-side model
+       (cloud ALPR, audio) is enabled, that event downloads frames instead.
    * - ``ml_user``
      - *none*
      - Username for remote gateway authentication

@@ -32,6 +32,28 @@ ES 7.0 is in development — expect breakages. If you find issues, please post t
 
 Developer Notes (for myself)
 ----------------------------
+To run ALL tests (ES + pyzm):
+```
+make test-all
+```
+Runs the ES suite (perl + hook + tools) and the pyzm suite (unit, including
+local↔remote parity). Fast, no models or ZM needed. Point at a non-default
+pyzm checkout with `make test-all PYZM_SRC=/path/to/pyzmNg`.
+
+To run EVERYTHING including e2e (real models + live ZM):
+```
+make test-all-e2e
+```
+Adds ES e2e and pyzm e2e — this is what runs the **real-model** local↔remote
+parity. Environment required:
+- ML model files at `/var/lib/zmeventnotification/models` (override:
+  `PYZM_E2E_MODELS=/path`)
+- a live ZoneMinder (DB + config under `/etc/zm`) for pyzm's `test_zm_e2e`
+- run as the ZM user for ZM access, e.g. `sudo -u www-data make test-all-e2e`
+
+Missing prerequisites FAIL (not skip) because the e2e gates set
+`ZM_E2E_REQUIRE=1` / `PYZM_E2E_REQUIRE=1`.
+
 To make a release:
 ```
 ./scripts/make_release.sh
