@@ -271,13 +271,19 @@ The advantage: models load once on the server and persist in memory, so subseque
 detections are fast. If the remote server is down and ``ml_fallback_local`` is ``yes``,
 detection falls back to local inference automatically.
 
-**Your config drives detection, and local and remote produce identical results.**
-The remote server is a dumb inference engine: it exposes a single ``POST /infer``
-that runs one model on one image and returns raw detections. Your ``Detector``
-on the ZM box runs the model sequence and applies all filtering (pattern, zones,
-size limits, past-detection dedup) and frame selection using your
-``objectconfig.yml``. Because the same client pipeline runs in both cases, the
-result is identical whether you run locally or remotely.
+**Your config drives detection, and local and remote produce identical object
+detections.** The remote server is a dumb inference engine: it exposes a single
+``POST /infer`` that runs one model on one image and returns raw detections.
+Your ``Detector`` on the ZM box runs the model sequence and applies all
+filtering (pattern, zones, size limits, past-detection dedup) and frame
+selection using your ``objectconfig.yml``, and sends per-model settings such as
+``object_min_confidence`` with each request.
+
+Model file paths, ``--processor`` and face recognition data belong to the
+machine that runs the model, so they are gateway-owned. Face recognition in
+particular runs entirely on the gateway, against the gateway's trained
+encodings — train faces there, not on the ZM box. See
+:ref:`remote-config-ownership` for the full split.
 
 .. note::
 

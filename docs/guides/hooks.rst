@@ -402,7 +402,9 @@ Here is a concrete example from the default ``objectconfig.yml``:
   **Note**: All ``ml_sequence`` settings (pattern, zones, past-detection filtering, etc.)
   work identically whether detection runs locally or via a remote ``pyzm.serve`` server.
   The remote server is a pure inference engine — all filtering is applied client-side
-  using your ``objectconfig.yml``.
+  using your ``objectconfig.yml``. The exceptions are model file paths, hardware
+  choice and face recognition data, which belong to whichever machine runs the
+  model; see :ref:`remote-config-ownership`.
 
 Leveraging same_model_sequence_strategy and frame_strategy effectively
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -544,16 +546,69 @@ past-detection dedup) and frame selection using your ``objectconfig.yml``.
 The only remote-capable models are the compute-heavy local ones (YOLO, Coral
 TPU, local face); cloud ALPR, AWS Rekognition and audio always run on the ZM
 box. Because the same client pipeline runs in both cases, **local and remote
-detection produce identical results.**
+object detection produce identical results.** Face recognition is the one
+exception — see :ref:`remote-config-ownership` below.
 
 .. important::
 
    Your ``objectconfig.yml`` chooses *which* models run, but the gateway must
    have those model files present. The client sends the server a model
    reference (type/name), not the model files; the server resolves it against
-   its own loaded models. If the server lacks a requested model, that model
-   returns nothing (logged) and the rest still run. For local/remote parity,
-   the gateway must have the same models your config references.
+   its own loaded models. If you name a model the gateway does not have, that
+   model returns an error and is skipped (logged); the rest still run. The
+   gateway never substitutes a different model for the one you asked for. For
+   local/remote parity, the gateway must have the same models your config
+   references.
+
+.. _remote-config-ownership:
+
+Which side owns which setting
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Every setting has exactly one owner. The other side has no say in it. There is
+no merging and no overriding, so nothing silently wins.
+
+**The ZM box owns the outcome.** These come from your ``objectconfig.yml`` and
+are sent with each request, so they apply identically to local and remote runs:
+
+- ``object_min_confidence`` (and the per-type ``*_min_confidence`` keys)
+- ``pattern``, zone definitions, ``max_detection_size``
+- ``model_sequence``, ``same_model_sequence_strategy``, ``frame_strategy``
+- past-detection filtering, ``pre_existing_labels`` gating
+
+**The gateway owns the machine.** These come from how you started
+``pyzm.serve`` and cannot be set from ``objectconfig.yml`` for a remote run:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Setting
+     - Why the gateway owns it
+   * - ``object_weights``, ``object_config``, ``object_labels``, ``--base-path``
+     - Filesystem paths. A ZM-box path is meaningless on the gateway, so paths
+       never cross the wire in either direction.
+   * - ``--processor`` (cpu/gpu/tpu)
+     - Hardware the gateway actually has.
+   * - Model input dimensions
+     - A property of the weights file loaded on the gateway.
+   * - ``known_images_path``, ``unknown_images_path``
+     - Face encodings and unknown-face crops live where the face model runs.
+
+**Face recognition runs entirely on the gateway.** It matches against the
+gateway's trained encodings and writes unknown-face crops to the gateway's
+disk; the ZM box receives only the recognised name. This means:
+
+- Train faces **on the gateway**, not on the ZM box. Encodings built on the ZM
+  box are never consulted for a remote run.
+- ``known_images_path``, ``unknown_images_path``, ``face_train_model``,
+  ``face_num_jitters``, ``face_upsample_times``, ``face_recog_dist_threshold``,
+  ``save_unknown_faces`` and ``save_unknown_faces_leeway_pixels`` in your
+  ``objectconfig.yml`` apply to **local** runs only. With ``ml_gateway`` set,
+  the gateway's own values are used.
+- Face results therefore need not match between a local and a remote run — the
+  two machines have different face databases. Object detection parity is exact;
+  face parity depends on you keeping the encodings in sync.
 
 Two transports, set by ``ml_gateway_mode``:
 
@@ -564,13 +619,26 @@ Two transports, set by ``ml_gateway_mode``:
 - ``image`` — the ZM box fetches frames and uploads them as lossless PNG. Use
   when the gateway cannot reach your ZM portal.
 
+``url`` mode needs the gateway to reach your ZM portal directly. Verify it from
+the gateway box before relying on it::
+
+   curl -sI https://your-zm-host/zm/index.php | head -1
+
+A ``resize`` in ``stream_sequence`` forces ``image`` mode for that event. The
+gateway fetches frames from ZM at full resolution and never sees your resize, so
+staying in ``url`` mode would run inference on different pixels than a local run.
+The switch is automatic and logged.
+
 **Server endpoints:**
 
 - ``GET /health`` — returns ``{"status": "ok", "models_loaded": true}``
 - ``GET /models`` — lists loaded models (``name``, ``type``, ``framework``, ``loaded``)
 - ``POST /infer`` — ``type`` (+ optional ``name``) plus either an uploaded
-  ``image`` (image mode) or ``url`` + ``zm_auth`` (url mode); returns
-  ``{"detections": [...], "error": null}`` — raw, unfiltered
+  ``image`` (image mode) or ``url`` + ``zm_auth`` (url mode). Also accepts
+  ``min_confidence``, which replaces the threshold the gateway loaded the model
+  with, so your config's value applies remotely. Returns
+  ``{"detections": [...], "error": null}`` — otherwise raw and unfiltered.
+  A ``name`` the gateway has not loaded is an error, never a substitution.
 - ``POST /login`` — accepts ``{"username": ..., "password": ...}``, returns JWT token
 
 Here is a part of my config, for example:
