@@ -3,11 +3,38 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.28] - 2026-07-26
+
+### Bug Fixes
+
+- guard badge token comparison against undef ([8119bf8](https://github.com/ZoneMinder/zmeventnotificationNg/commit/8119bf8a346e006468d578ed096a059e0f06c1cf))
+
+### Documentation
+
+- install from release packages, and point at [full] for training ([92c499d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/92c499d63df9e80cc6d808d68ee8eea33e3209ca))
+- fix remote ML install and setup across the remaining guides ([ec0aeee](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ec0aeeedab84e7e2c8c013e7813a68c9467ffb66))
+- restructure the remote ML guide around the two-box split ([20806c7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/20806c7eb1e92965f54357f9bec0ba3eb1fa7b55))
+- how to publish gateway models under the client's names ([e642f39](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e642f39b353442da2dbbadbc5562ccc195c4c9ab))
+- state which side owns which setting in remote mode ([b2091b3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b2091b31d0fdb58f00ce4ddb18c1fd7577ad7cdf))
+- URL mode is default and implemented (gateway fetches frames) ([e8c1f0c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e8c1f0cbeaf4a1364c7a0a4e7cba5714140d4fcb))
+- describe dumb remote inference gateway + local↔remote parity ([89d507e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/89d507e526afd750e6eb7587d1a04263a2183c1f))
+
+### Miscellaneous
+
+- bump version to v7.0.28 ([43334c1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/43334c1114d89392c8d1e629385879fec2a0a035))
+- run e2e verbosely (-v) so test names show ([9f55fae](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9f55faec961249395496541b01cd46091f77a07b))
+- add 'make test-all-e2e' (both repos incl. real-model e2e) ([b4cca5c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b4cca5cbd3f560fdaa42bff2b10e35d1014d4fd0))
+- add 'make test-all' to run ES + pyzm suites; document in README ([ec13f53](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ec13f53b492accd0f24994293cca36c0162c48f0))
+
 ## [7.0.27] - 2026-07-23
 
 ### Bug Fixes
 
 - supply model_names in --fakeit path (show_models KeyError) ([edb01ef](https://github.com/ZoneMinder/zmeventnotificationNg/commit/edb01efa8ce5f24a70d4a8dbfde9744ea4e5af48))
+
+### Documentation
+
+- update CHANGELOG for v7.0.27 ([b91a54e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b91a54e5a58f3bf370e176b7651fffbb8c632f8b))
 
 ### Miscellaneous
 
