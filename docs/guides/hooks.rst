@@ -661,7 +661,8 @@ There are three ways to make the two sides agree. Pick one:
         - "TPU face detection=ssd_mobilenet_v2_face_quant_postprocess_edgetpu"
 
 2. **Define the model explicitly** with ``detector_config`` (see above) and set
-   its ``name`` to whatever your ``objectconfig.yml`` uses.
+   its ``name`` to whatever your ``objectconfig.yml`` uses. This is **required**
+   for any model without a weights file of its own — see below.
 
 3. **Rename on the client.** Change the sequence entry's ``name`` in
    ``objectconfig.yml`` to a name the gateway already publishes. Fine when you
@@ -673,6 +674,48 @@ There are three ways to make the two sides agree. Pick one:
    what you would run locally — the gateway may serve a larger model on better
    hardware. Detections will then legitimately differ from a local run. For
    exact local/remote parity, point the published name at the same weights.
+
+The name is only half the key. The gateway matches on **(type, name)**, and the
+type comes from which sequence your entry sits in — ``object``, ``face``,
+``alpr`` or ``audio``. A model the gateway registered as type ``object`` is
+unreachable from your ``face`` sequence no matter how well the names line up.
+``curl http://<gateway>:5000/models`` reports both halves.
+
+.. important::
+
+   **Face recognition cannot be declared in the gateway's ``models`` list.**
+   That list is a filename shorthand: each entry is looked up on disk and the
+   type and framework are inferred from the file found. dlib face recognition
+   has no weights file at all — it runs off ``known_images_path`` and the
+   encodings trained from it — so a bare ``"DLIB face recognition"`` entry
+   matches nothing, falls back to ``type: object`` with no weights, and fails
+   to load.
+
+   Declare it under ``detector_config`` with an explicit type and framework::
+
+      detector_config:
+        models:
+          - name: "YOLOv11 ONNX"
+            type: object
+            framework: opencv
+            processor: gpu
+            weights: "/var/lib/zmeventnotification/models/ultralytics/yolo11l.onnx"
+
+          - name: "DLIB face recognition"
+            type: face
+            framework: face_dlib
+            known_faces_dir: "/var/lib/zmeventnotification/known_faces"
+            unknown_faces_dir: "/var/lib/zmeventnotification/unknown_faces"
+            face_model: cnn
+
+   ``detector_config`` **replaces** the ``models`` list — when it is present,
+   ``models``, ``base_path`` and ``processor`` at the top level are ignored, so
+   each model needs its own absolute ``weights`` path and ``processor``.
+
+   The gateway also needs ``dlib`` and ``face_recognition`` importable (not
+   included in the ``[serve]`` extra — see ``[full]``), and the face images
+   themselves in ``known_faces_dir`` **on the gateway**, since that is where
+   the encodings are trained.
 
 .. _remote-config-ownership:
 
@@ -796,7 +839,14 @@ fetches — those requests reach your portal from the gateway's IP instead.
      - The gateway runs a pyzm older than the dumb-gateway rework. Upgrade it
        and restart the process — a running server keeps the old code in memory.
    * - ``Gateway cannot run <name>``
-     - Model-name mismatch. See :ref:`remote-model-names`.
+     - The gateway has no model with that (type, name). Either the names differ,
+       or the model registered under the wrong type — a face model listed in the
+       gateway's ``models`` shorthand registers as ``object``. See
+       :ref:`remote-model-names`.
+   * - Gateway logs ``cannot determine an origin framework``
+     - A ``models`` entry matched no file on disk and fell back to
+       ``type: object`` / ``framework: opencv`` with no weights. Declare that
+       model under ``detector_config``. Newer pyzm reports this directly.
    * - A detection appears locally but not remotely
      - Check the gateway's ``dropping <label> (x < y)`` line. ``y`` should be
        your configured ``object_min_confidence``; if it is not, the ZM box is
