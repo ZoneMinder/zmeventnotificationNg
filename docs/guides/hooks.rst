@@ -658,7 +658,7 @@ There are three ways to make the two sides agree. Pick one:
 
       models:
         - "YOLOv11 ONNX=yolo11l"
-        - "TPU face detection=ssd_mobilenet_v2_face_quant_postprocess_edgetpu"
+        - "MobileDet=ssdlite_mobiledet_coco_qat_postprocess_edgetpu"
 
 2. **Define the model explicitly** with ``detector_config`` (see above) and set
    its ``name`` to whatever your ``objectconfig.yml`` uses. This is **required**
@@ -683,13 +683,20 @@ unreachable from your ``face`` sequence no matter how well the names line up.
 
 .. important::
 
-   **Face recognition cannot be declared in the gateway's ``models`` list.**
+   **Face models cannot be declared in the gateway's ``models`` list.**
    That list is a filename shorthand: each entry is looked up on disk and the
-   type and framework are inferred from the file found. dlib face recognition
-   has no weights file at all — it runs off ``known_images_path`` and the
-   encodings trained from it — so a bare ``"DLIB face recognition"`` entry
-   matches nothing, falls back to ``type: object`` with no weights, and fails
-   to load.
+   type and framework are inferred from the file found. Every path through it
+   produces ``type: object`` — there is no branch that yields ``face``.
+
+   This is why a gateway can serve YOLO perfectly while failing on faces.
+   ``yolo11l`` finds ``yolo11l.onnx``, and the ``.onnx`` extension alone
+   establishes both facts the gateway needs, so nothing more has to be said.
+   dlib face recognition has no weights file at all — it runs off
+   ``known_images_path`` and the encodings trained from it — so a bare
+   ``"DLIB face recognition"`` entry matches nothing, falls back to
+   ``type: object`` with no weights, and fails to load. A TPU face
+   ``.tflite`` is worse: it loads fine, as an *object* model, and is then
+   unreachable from your ``face`` sequence.
 
    Declare it under ``detector_config`` with an explicit type and framework::
 
