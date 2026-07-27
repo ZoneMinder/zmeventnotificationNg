@@ -525,6 +525,22 @@ Using the remote ML detection server (pyzm.serve)
    uses the same ``Detector`` API, and requires no separate configuration file. The old
    ``mlapiconfig.ini`` is no longer needed.
 
+**What this section covers**, in the order you will need it:
+
+#. :ref:`remote-how-it-works` — what runs on which box.
+#. `Server setup (the gateway box)`_ — installing and starting ``pyzm.serve``.
+#. `Client setup (the ZM box)`_ — the ``remote:`` section of ``objectconfig.yml``.
+#. :ref:`remote-model-names` — **the most common thing to get wrong.** The
+   gateway answers only to the model names your config asks for, and face models
+   need an explicit ``detector_config`` declaration.
+#. :ref:`remote-config-ownership` — which box decides thresholds, paths,
+   hardware and face data.
+#. `Transports: url vs image`_ — how frames reach the gateway.
+#. :ref:`verifying-a-remote-setup` — commands that prove a run went remote,
+   and a symptom/cause table.
+
+.. _remote-how-it-works:
+
 How it works
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
