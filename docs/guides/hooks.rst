@@ -546,6 +546,11 @@ see :ref:`remote-config-ownership`.
 Server setup (the gateway box)
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
+This page covers what a ZoneMinder user needs. The full server reference — every
+CLI flag, the YAML schema, ``--models all`` discovery, multi-worker setup and the
+API — lives in the
+`pyzmNg remote server guide <https://pyzmng.readthedocs.io/en/latest/guide/serve.html>`__.
+
 ::
 
    pip install "pyzm[serve]"
@@ -724,6 +729,14 @@ unreachable from your ``face`` sequence no matter how well the names line up.
    themselves in ``known_faces_dir`` **on the gateway**, since that is where
    the encodings are trained.
 
+   Full field reference for ``detector_config``, and the table of what each
+   file extension registers as, are in
+   `Declaring models on the gateway <https://pyzmng.readthedocs.io/en/latest/guide/serve.html#declaring-models-two-forms-and-when-each-works>`__.
+
+Once the names line up, check that the rest of your settings land where you
+expect: see :ref:`remote-config-ownership` for which box decides what, and
+:ref:`verifying-a-remote-setup` for the commands that prove a run went remote.
+
 .. _remote-config-ownership:
 
 Which side owns which setting
@@ -815,6 +828,8 @@ Server endpoints
   A ``name`` the gateway has not loaded is an error, never a substitution.
 - ``POST /login`` — accepts ``{"username": ..., "password": ...}``, returns a
   JWT token.
+
+.. _verifying-a-remote-setup:
 
 Verifying a remote setup
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
