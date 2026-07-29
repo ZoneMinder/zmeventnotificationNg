@@ -24,7 +24,7 @@ The key changes that affect ES users:
 
 **What you need to do:**
 
-1. **Install pyzmNg v2**: ``pip install pyzm`` (or let ``install.sh`` handle it)
+1. **Install pyzmNg v2**: ``pip install "pyzm[ml]"`` (or let ``install.sh`` handle it)
 2. **If using remote ML**: Replace ``mlapi`` with ``pyzm.serve``:
 
    - On the GPU box: ``pip install "pyzm[serve]"`` (use ``"pyzm[full]"`` if that box

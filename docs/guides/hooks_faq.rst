@@ -263,7 +263,7 @@ The ``"<published name>=<spec>"`` form publishes the model under the name your
 
 On the ZM box install the client without the ``serve`` extra::
 
-   pip install pyzm
+   pip install "pyzm[ml]"
 
 Then in ``objectconfig.yml`` on the ZM box, set::
 

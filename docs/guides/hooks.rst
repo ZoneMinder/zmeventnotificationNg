@@ -37,7 +37,7 @@ Requirements
 
 - Python 3.10+
 - OpenCV 4.13+ (for the default ONNX YOLO models)
-- pyzmNg v2 (``pip install pyzm``)
+- pyzmNg v2 with the ML extra (``pip install "pyzm[ml]"``)
 
 How it works
 ~~~~~~~~~~~~
@@ -622,7 +622,11 @@ Client setup (the ZM box)
 
 Install pyzmNg without the ``serve`` extra — the ZM box is only a client::
 
-   pip install pyzm
+   pip install "pyzm[ml]"
+
+The ``ml`` extra is still needed here: it carries the packages local detection
+uses when ``ml_fallback_local`` kicks in, including ``onnx``, which reads class
+labels and end2end metadata out of ``.onnx`` models.
 
 Then in ``objectconfig.yml``::
 

@@ -122,6 +122,32 @@ def check_face_recognition(enabled_models):
         )
 
 
+def check_onnx_package(enabled_models):
+    """Warn if ONNX models are enabled but the onnx package is missing.
+
+    pyzm reads class labels and end2end metadata out of the .onnx file with
+    the onnx package; without it the model fails to load. Refs #47.
+    """
+    onnx_models = [
+        (s, m) for s, m in enabled_models
+        if str(m.get("object_weights", "")).endswith(".onnx")
+    ]
+    if not onnx_models:
+        return None
+
+    try:
+        import onnx  # noqa: F401
+        return None
+    except ImportError:
+        names = ", ".join(m.get("name", "unknown") for _, m in onnx_models)
+        return (
+            f"onnx package is not installed but ONNX models are enabled.\n"
+            f"    Affected models: {names}\n"
+            f"    pyzm needs it to read class labels and end2end metadata from the model.\n"
+            f"    Install it with: pip install onnx"
+        )
+
+
 def check_opencv_version(enabled_models):
     """Warn if OpenCV is too old for enabled ONNX YOLOv11/YOLOv26 or YOLOv4 models."""
     try:
@@ -455,6 +481,10 @@ def main():
             warnings.append(w)
 
         w = check_face_recognition(enabled_models)
+        if w:
+            warnings.append(w)
+
+        w = check_onnx_package(enabled_models)
         if w:
             warnings.append(w)
 

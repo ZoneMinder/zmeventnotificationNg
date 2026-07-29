@@ -22,6 +22,7 @@ spec.loader.exec_module(mod)
 
 collect_enabled_models = mod.collect_enabled_models
 check_opencv_version = mod.check_opencv_version
+check_onnx_package = mod.check_onnx_package
 check_model_files = mod.check_model_files
 resolve_path = mod.resolve_path
 
@@ -145,6 +146,48 @@ class TestCheckOpencvVersion:
         warnings = check_opencv_version(models)
         assert len(warnings) == 1
         assert "YOLOv26" in warnings[0]
+
+
+# ── check_onnx_package ──────────────────────────────────────────────────
+
+@pytest.fixture
+def onnx_installed():
+    """Force `import onnx` to succeed or fail; restore afterwards. Refs #47."""
+    saved = sys.modules.get("onnx")
+    present = "onnx" in sys.modules
+
+    def set_state(installed):
+        if installed:
+            sys.modules["onnx"] = types.ModuleType("onnx")
+        else:
+            sys.modules["onnx"] = None  # import raises ImportError
+
+    yield set_state
+
+    if present:
+        sys.modules["onnx"] = saved
+    else:
+        sys.modules.pop("onnx", None)
+
+
+class TestCheckOnnxPackage:
+    def test_missing_onnx_with_onnx_model_warns(self, onnx_installed):
+        onnx_installed(False)
+        models = [("object", {"name": "m11", "object_weights": "/x/yolo11n.onnx"})]
+        w = check_onnx_package(models)
+        assert w is not None
+        assert "m11" in w
+        assert "pip install onnx" in w
+
+    def test_installed_onnx_no_warning(self, onnx_installed):
+        onnx_installed(True)
+        models = [("object", {"name": "m11", "object_weights": "/x/yolo11n.onnx"})]
+        assert check_onnx_package(models) is None
+
+    def test_no_onnx_models_no_warning(self, onnx_installed):
+        onnx_installed(False)
+        models = [("object", {"name": "YOLOv4", "object_weights": "/x/yolov4.weights"})]
+        assert check_onnx_package(models) is None
 
 
 # ── check_model_files ───────────────────────────────────────────────────
