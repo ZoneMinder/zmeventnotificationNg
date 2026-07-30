@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.29] - 2026-07-30
+
+### Bug Fixes
+
+- depend on pyzm[ml] so onnx is installed ([02fc932](https://github.com/ZoneMinder/zmeventnotificationNg/commit/02fc93239c74feb6f9952f7595bc1cd8c1e1c878))
+
+### Documentation
+
+- add a roadmap at the top of the remote ML section ([4e65e4e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4e65e4e885f4bd7d006df276152d7f4d2b4e0c76))
+- connect the remote ML sections to each other and to pyzmNg ([7bf450b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7bf450befcbb69ee866419a5e1e034d2c6304654))
+- say why the models shorthand serves YOLO but not faces ([65bd34b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/65bd34bb7d2281fa12b6e6cbabd7446e9f6b95a9))
+- face recognition needs detector_config on the gateway ([5d2a4d2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5d2a4d270b9f6ce9741421def62037881453c6b3))
+
+### Miscellaneous
+
+- bump version to v7.0.29 ([953443e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/953443e8e056c7f452067bd20de3771dccef4485))
+
 ## [7.0.28] - 2026-07-26
 
 ### Bug Fixes
@@ -11,6 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.28 ([71482b1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/71482b13c12a7e8e84f4acfe9a6b6587f6ee343b))
 - install from release packages, and point at [full] for training ([92c499d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/92c499d63df9e80cc6d808d68ee8eea33e3209ca))
 - fix remote ML install and setup across the remaining guides ([ec0aeee](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ec0aeeedab84e7e2c8c013e7813a68c9467ffb66))
 - restructure the remote ML guide around the two-box split ([20806c7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/20806c7eb1e92965f54357f9bec0ba3eb1fa7b55))
