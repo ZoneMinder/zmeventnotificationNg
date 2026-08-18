@@ -110,6 +110,98 @@ class TestMonitorOverrides:
         process_config({"config": patched_config, "monitorid": "1"}, ctx)
         assert g.config["poly_thickness"] == 4
 
+    def test_zone_without_coords_records_pattern_for_join(self, tmp_path, ctx):
+        """A zone with patterns but no coords is kept for the ZM join, not dropped. Ref: #48"""
+        cfg = {
+            "general": _minimal_general(import_zm_zones="yes"),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+            "monitors": {
+                5: {
+                    "zones": {
+                        "Front Yard": {
+                            "detection_pattern": "(person|car)",
+                            "ignore_pattern": "(cat)",
+                        },
+                    },
+                },
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "5"}, ctx)
+
+        assert g.polygons == []
+        assert g.zone_patterns == {
+            "front_yard": {"pattern": "(person|car)", "ignore_pattern": "(cat)"},
+        }
+        assert g.logger.error == []
+
+    def test_zone_without_coords_errors_when_import_off(self, tmp_path, ctx):
+        """Without import_zm_zones there is no geometry to join to, so say so. Ref: #48"""
+        cfg = {
+            "general": _minimal_general(import_zm_zones="no"),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+            "monitors": {
+                5: {"zones": {"front_yard": {"detection_pattern": "(person)"}}},
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "5"}, ctx)
+
+        assert g.polygons == []
+        assert any("front_yard" in m for m in g.logger.error)
+
+    def test_per_monitor_import_zm_zones_applies_before_zones(self, tmp_path, ctx):
+        """A per-monitor import_zm_zones override is in effect while zones are read. Ref: #48"""
+        cfg = {
+            "general": _minimal_general(import_zm_zones="no"),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+            "monitors": {
+                5: {
+                    "import_zm_zones": "yes",
+                    "zones": {"front_yard": {"detection_pattern": "(person)"}},
+                },
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "5"}, ctx)
+
+        assert g.config["import_zm_zones"] == "yes"
+        assert g.zone_patterns["front_yard"]["pattern"] == "(person)"
+        assert g.logger.error == []
+
+    def test_zone_names_are_normalized(self, tmp_path, ctx):
+        """Config zone names are normalized so they can join ZM names. Ref: #48"""
+        cfg = {
+            "general": _minimal_general(),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+            "monitors": {
+                5: {
+                    "zones": {
+                        "Front Yard": {
+                            "coords": "0,0 10,0 10,10",
+                            "detection_pattern": "(person)",
+                        },
+                    },
+                },
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "5"}, ctx)
+
+        assert [p["name"] for p in g.polygons] == ["front_yard"]
+
     def test_only_triggered_zm_zones_skips_polygons(self, tmp_path, ctx):
         """only_triggered_zm_zones=yes (global) skips zone polygons and sets import_zm_zones."""
         cfg = {

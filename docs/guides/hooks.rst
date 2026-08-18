@@ -313,7 +313,7 @@ under the ``monitors`` section. You can override the entire structure or just pa
 
 Per-monitor zones
 ^^^^^^^^^^^^^^^^^^
-You can define detection zones per monitor. Each zone specifies a polygon region and optionally
+You can define detection zones per monitor. Each zone names a polygon region and optionally
 a ``detection_pattern`` (regex of labels to look for in that zone) and an ``ignore_pattern``
 (regex of labels to suppress even if they match ``detection_pattern``).
 
@@ -329,18 +329,58 @@ a ``detection_pattern`` (regex of labels to look for in that zone) and an ``igno
          front_porch:
            coords: "0,0 200,300 700,900"
 
-- ``coords`` — polygon coordinates as ``"x1,y1 x2,y2 x3,y3 ..."``
+- ``coords`` — polygon coordinates as ``"x1,y1 x2,y2 x3,y3 ..."``. Optional; see
+  :ref:`zone_geometry_from_zm` below
 - ``detection_pattern`` — regex for which labels to accept in this zone (optional; if omitted, all labels match)
 - ``ignore_pattern`` — regex for labels to suppress in this zone even if ``detection_pattern`` allows them
   (optional). Useful for excluding parked cars or other stationary objects from a specific area.
 
-You can also import zones from ZoneMinder instead of defining them manually:
+.. _zone_geometry_from_zm:
+
+Letting ZoneMinder own the geometry
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Zone polygons are already drawn in the ZoneMinder web UI. Rather than copying them into
+``objectconfig.yml`` — where they go stale the moment a zone is edited in ZM — turn on
+``import_zm_zones`` and leave ``coords`` out:
 
 ::
 
    general:
      import_zm_zones: "yes"
      only_triggered_zm_zones: "no"
+
+   monitors:
+     999:
+       zones:
+         my_driveway:
+           detection_pattern: "(person|car)"
+           ignore_pattern: "(car|truck)"
+
+Each zone imported from ZoneMinder is matched against ``monitors.<id>.zones`` **by name**, and
+the config's patterns are applied to it. Names are compared with spaces turned into underscores
+and lowercased, so a ZM zone called ``My Driveway`` matches a config key of ``my_driveway``.
+ZoneMinder stays the source of truth for where the zone is; the config says which labels matter
+there.
+
+Precedence:
+
+- a config zone **with** ``coords`` pins its own geometry — the same-named ZM zone is not
+  imported on top of it
+- a config zone **without** ``coords`` takes its geometry from the ZM zone of the same name
+- a ZM zone with no matching config entry is imported with no pattern, so every label matches
+- if a config zone declares a pattern but has no ``coords`` and no ZM zone of that name is
+  imported, that is logged as an error — the zone would otherwise do nothing
+
+With ``only_triggered_zm_zones: "yes"``, only the ZM zones named in the alarm cause are imported
+(and ``import_zm_zones`` is forced to ``yes``). Config zones that were not triggered are simply
+absent, and no error is logged for them.
+
+.. note::
+
+   A monitor with no zones at all — no ``zones:`` block and ``import_zm_zones: "no"`` — is not
+   spatially filtered: a detection anywhere in the frame is kept. ``zm_detect`` logs this at Info
+   level on every run. If you want ZoneMinder's zones to gate detection, turn on
+   ``import_zm_zones``.
 
 
 

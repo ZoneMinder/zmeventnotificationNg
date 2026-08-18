@@ -5,6 +5,10 @@ ctx = None  # SSL context
 logger = None  # logging handler
 config = {}  # object that will hold config values
 polygons = []  # will contain mask(s) for a monitor
+# per-zone patterns from the config, keyed by normalized zone name. Zones
+# declared without coords live only here, until import_zm_zones() joins them
+# onto the geometry ZoneMinder owns.
+zone_patterns = {}
 
 # valid config keys and defaults
 config_vals = {
