@@ -80,7 +80,7 @@ def main_handler():
     g.logger.Debug(1, 'Log file: {}'.format(get_log_file() or '(file logging disabled)'))
     g.logger.Debug(1, '---------| app:{}, pyzm:{}, OpenCV:{}|------------'.format(__app_version__, pyzm_version, cv2.__version__))
 
-    g.polygons, g.ctx = [], ssl.create_default_context()
+    g.polygons, g.zone_patterns, g.ctx = [], {}, ssl.create_default_context()
     utils.process_config(args, g.ctx)
     os.makedirs(g.config['base_data_path'] + '/misc/', exist_ok=True)
 
@@ -107,6 +107,9 @@ def main_handler():
     # --- Detection ---
     stream_cfg = StreamConfig.from_dict(stream_options)
     zones = [Zone(name=p['name'], points=p['value'], pattern=p.get('pattern'), ignore_pattern=p.get('ignore_pattern')) for p in g.polygons]
+    if not zones:
+        g.logger.Info('No zones in effect: detections anywhere in the frame are kept. '
+                      'Set import_zm_zones: "yes" or define monitors.<id>.zones to gate by area.')
     matched_data = None
 
     # Inject remote gateway settings into ml_options so Detector.from_dict() picks them up

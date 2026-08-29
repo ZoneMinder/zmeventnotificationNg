@@ -175,7 +175,8 @@ Python unit / integration reference
      - ``-O`` dot-notation overrides: coercion, ``[index]`` / ``[name]`` paths,
        error/edge cases
    * - ``tests/test_config_flow.py``
-     - Monitor/remote config loading, deep-merge, ``import_zm_zones`` passthrough
+     - Monitor/remote config loading, deep-merge, ``import_zm_zones`` passthrough,
+       coords-less zones recorded for the ZM name join
    * - ``tests/test_utils_config.py``
      - ``process_config`` config resolution and zone parsing
    * - ``tests/test_output_format.py``
@@ -185,7 +186,8 @@ Python unit / integration reference
    * - ``tests/test_config_errors.py``
      - ``process_config`` error/exit paths
    * - ``tests/test_import_zm_zones.py``
-     - Zone import filtering (active/triggered)
+     - Zone import filtering (active/triggered), and the name-based join of config
+       patterns onto ZM zone geometry
    * - ``tests/test_zm_detect.py``
      - CLI argparse early-exits (version, missing config)
 

@@ -117,10 +117,15 @@ if os.path.abspath(_hook_dir) not in sys.path:
 # Stub logger that satisfies g.logger.Debug / Info / Error / Fatal
 # ---------------------------------------------------------------------------
 class StubLogger:
-    def Debug(self, level, msg): pass
-    def Info(self, msg): pass
-    def Warning(self, msg): pass
-    def Error(self, msg): pass
+    """Records what was logged so tests can assert on warnings/errors."""
+
+    def __init__(self):
+        self.debug, self.info, self.warning, self.error = [], [], [], []
+
+    def Debug(self, level, msg): self.debug.append(msg)
+    def Info(self, msg): self.info.append(msg)
+    def Warning(self, msg): self.warning.append(msg)
+    def Error(self, msg): self.error.append(msg)
     def Fatal(self, msg): raise SystemExit(msg)
     def close(self): pass
 
@@ -131,6 +136,7 @@ def reset_common_params():
     import zmes_hook_helpers.common_params as g
     g.config = {}
     g.polygons = []
+    g.zone_patterns = {}
     g.ctx = None
     g.logger = StubLogger()
     yield

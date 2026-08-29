@@ -105,7 +105,17 @@ def findWholeWord(w):
     return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
 
 
-# Imports zone definitions from ZM via pyzm client
+def normalize_zone_name(name):
+    """Normalize a zone name so config zones and ZM zones join on it.
+
+    ZoneMinder allows spaces and mixed case in zone names; config keys are
+    written by hand. Both sides go through here before being compared.
+    """
+    return str(name).strip().replace(' ', '_').lower()
+
+
+# Imports zone definitions from ZM via pyzm client, joining any patterns the
+# config declared for a zone of the same name onto ZM's geometry.
 def import_zm_zones(mid, reason, zm_client):
 
     match_reason = False
@@ -115,6 +125,10 @@ def import_zm_zones(mid, reason, zm_client):
 
     monitor = zm_client.monitor(int(mid))
     zones = monitor.get_zones()
+
+    # zones the config already pinned geometry for -- those win over ZM's
+    config_coords = set(p['name'] for p in g.polygons)
+    joined = set()
 
     for z in zones:
         raw = z.raw().get('Zone', {})
@@ -128,15 +142,37 @@ def import_zm_zones(mid, reason, zm_client):
                 g.logger.Debug(1,'dropping {} as zones in alarm cause is {}'.format(z.name, reason))
                 continue
 
-        name = z.name.replace(' ','_').lower()
-        g.logger.Debug(2,'importing zoneminder polygon: {} [{}]'.format(name, z.points))
+        name = normalize_zone_name(z.name)
+        zone_cfg = g.zone_patterns.get(name)
+        if zone_cfg is not None:
+            joined.add(name)
+
+        if name in config_coords:
+            g.logger.Debug(1, 'not importing zoneminder zone {} as the config pins its coords'.format(name))
+            continue
+
+        zone_cfg = zone_cfg or {}
+        pattern = zone_cfg.get('pattern') or z.pattern
+        ignore_pattern = zone_cfg.get('ignore_pattern') or z.ignore_pattern
+        g.logger.Debug(2,'importing zoneminder polygon: {} [{}] pattern={} ignore_pattern={}'.format(
+            name, z.points, pattern, ignore_pattern))
         g.polygons.append({
             'name': name,
             'value': z.points,
-            'pattern': z.pattern,
-            'ignore_pattern': z.ignore_pattern,
+            'pattern': pattern,
+            'ignore_pattern': ignore_pattern,
         })
 
+    # A pattern-only zone that matched nothing silently does nothing. Say so.
+    # Under only_triggered_zm_zones a non-triggered zone is legitimately absent.
+    if g.config['only_triggered_zm_zones'] != 'yes':
+        for name, zone_cfg in g.zone_patterns.items():
+            if name in joined or name in config_coords:
+                continue
+            if zone_cfg.get('pattern') or zone_cfg.get('ignore_pattern'):
+                g.logger.Error(
+                    'zone "{}" declares a pattern but has no coords and no active ZoneMinder '
+                    'zone of that name was imported, so it has no effect'.format(name))
 
 
 def get_pyzm_config(args):
@@ -389,6 +425,7 @@ def process_config(args, ctx):
             g.logger.Debug(1, 'strict SSL cert checking is on...')
 
         g.polygons = []
+        g.zone_patterns = {}
 
         # Check if we have custom overrides for this monitor
         g.logger.Debug(2, 'Now checking for monitor overrides')
@@ -404,27 +441,9 @@ def process_config(args, ctx):
                 monitor_cfg = monitors.get(str(mid))
 
             if monitor_cfg:
-                # Process zone definitions
-                zones = monitor_cfg.get('zones', {})
-                for zone_name, zone_data in zones.items():
-                    coords_str = zone_data.get('coords', '')
-                    if coords_str:
-                        if g.config['only_triggered_zm_zones'] != 'yes':
-                            p = str2tuple(coords_str)
-                            pattern = zone_data.get('detection_pattern', None)
-                            ignore_pattern = zone_data.get('ignore_pattern', None)
-                            g.polygons.append({
-                                'name': zone_name,
-                                'value': p,
-                                'pattern': pattern,
-                                'ignore_pattern': ignore_pattern,
-                            })
-                            g.logger.Debug(2, 'adding polygon: {} [{}] pattern={} ignore_pattern={}'.format(
-                                zone_name, coords_str, pattern, ignore_pattern))
-                        else:
-                            g.logger.Debug(2, 'ignoring polygon: {} as only_triggered_zm_zones is true'.format(zone_name))
-
-                # Apply config overrides from monitor section (deep-merge dicts)
+                # Apply config overrides from monitor section (deep-merge dicts).
+                # This runs before the zone loop below so a per-monitor
+                # import_zm_zones/only_triggered_zm_zones is already in effect there.
                 for k, v in monitor_cfg.items():
                     if k in ('zones',):
                         continue
@@ -443,6 +462,40 @@ def process_config(args, ctx):
             # after ZMClient creation, via import_zm_zones(mid, reason, zm_client).
             if g.config['only_triggered_zm_zones'] == 'yes':
                 g.config['import_zm_zones'] = 'yes'
+
+            if monitor_cfg:
+                # Process zone definitions. coords are optional: a zone may name
+                # patterns only and let import_zm_zones() supply ZM's geometry.
+                zones = monitor_cfg.get('zones', {})
+                for zone_name, zone_data in zones.items():
+                    name = normalize_zone_name(zone_name)
+                    pattern = zone_data.get('detection_pattern', None)
+                    ignore_pattern = zone_data.get('ignore_pattern', None)
+                    g.zone_patterns[name] = {
+                        'pattern': pattern,
+                        'ignore_pattern': ignore_pattern,
+                    }
+                    coords_str = zone_data.get('coords', '')
+                    if not coords_str:
+                        if g.config['import_zm_zones'] == 'yes':
+                            g.logger.Debug(2, 'zone {} has no coords, taking geometry from ZoneMinder'.format(name))
+                        else:
+                            g.logger.Error(
+                                'zone "{}" has no coords and import_zm_zones is not yes, '
+                                'so it has no effect'.format(zone_name))
+                        continue
+                    if g.config['only_triggered_zm_zones'] == 'yes':
+                        g.logger.Debug(2, 'ignoring polygon: {} as only_triggered_zm_zones is true'.format(name))
+                        continue
+                    p = str2tuple(coords_str)
+                    g.polygons.append({
+                        'name': name,
+                        'value': p,
+                        'pattern': pattern,
+                        'ignore_pattern': ignore_pattern,
+                    })
+                    g.logger.Debug(2, 'adding polygon: {} [{}] pattern={} ignore_pattern={}'.format(
+                        name, coords_str, pattern, ignore_pattern))
         else:
             g.logger.Info(
                 'Ignoring monitor specific settings, as you did not provide a monitor id'

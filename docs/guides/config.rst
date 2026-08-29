@@ -439,7 +439,8 @@ The file is organized into these sections:
     (see :doc:`hooks` for full details)
 
 - ``monitors`` — per-monitor overrides for ``wait``, ``ml_sequence``,
-  ``stream_sequence``, and ``zones`` (with ``detection_pattern`` and ``ignore_pattern``)
+  ``stream_sequence``, and ``zones`` (``coords`` plus ``detection_pattern`` and
+  ``ignore_pattern``; ``coords`` may be omitted when ``import_zm_zones`` is on)
 
 .. _push_config:
 
@@ -555,7 +556,7 @@ Consumed by ``zm_detect.py`` / ``utils.py``:
      - Line thickness for polygon overlays (pixels)
    * - ``import_zm_zones``
      - ``no``
-     - Import zone definitions from ZoneMinder instead of using config zones
+     - Take zone polygons from ZoneMinder. Imported zones are matched to ``monitors.<id>.zones`` by name, so a config zone can supply ``detection_pattern``/``ignore_pattern`` without ``coords``. See :ref:`zone_geometry_from_zm`
    * - ``only_triggered_zm_zones``
      - ``no``
      - When ``yes``, import only ZM zones that triggered the alarm (forces ``import_zm_zones: yes``)
@@ -756,7 +757,8 @@ on model-specific keys (``object_weights``, ``face_detection_framework``,
 
 Any key from the sections above can be overridden per monitor. Dict values
 (``ml_sequence``, ``stream_sequence``) are deep-merged; scalar values are replaced.
-See :doc:`hooks` for zone configuration (``detection_pattern``, ``ignore_pattern``).
+See :doc:`hooks` for zone configuration (``detection_pattern``, ``ignore_pattern``, and
+taking zone geometry from ZoneMinder).
 
 Configuration Tools
 ---------------------

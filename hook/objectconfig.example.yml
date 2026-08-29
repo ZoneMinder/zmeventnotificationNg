@@ -54,7 +54,9 @@ general:
   poly_color: "(255,255,255)"
   poly_thickness: 2
 
-  # ZoneMinder zone import
+  # ZoneMinder zone import. When yes, zone polygons come from ZoneMinder and are
+  # matched to monitors.<id>.zones by name, so a config zone can supply
+  # detection_pattern/ignore_pattern without repeating coords.
   #import_zm_zones: "yes"
   only_triggered_zm_zones: "no"
 
@@ -269,3 +271,9 @@ monitors:
         ignore_pattern: "(car|truck)"
       some_other_area:
         coords: "0,0 200,300 700,900"
+      # coords are optional. With import_zm_zones: "yes", a zone with no coords
+      # is matched to the ZoneMinder zone of the same name (spaces -> underscores,
+      # lowercased) and these patterns are applied to ZM's polygon. That keeps
+      # ZoneMinder as the source of truth for the geometry.
+      #front_porch:
+      #  detection_pattern: "(person)"

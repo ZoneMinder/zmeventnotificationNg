@@ -11,9 +11,12 @@ from pyzm.models.zm import Zone
 
 
 class _FakeLogger:
+    def __init__(self):
+        self.error = []
+
     def Debug(self, *a, **kw): pass
     def Info(self, *a, **kw): pass
-    def Error(self, *a, **kw): pass
+    def Error(self, msg): self.error.append(msg)
 
 
 def _make_zone(name, coords, zone_type="Active"):
@@ -29,6 +32,7 @@ def _make_zone(name, coords, zone_type="Active"):
 class TestImportZmZones:
     def setup_method(self):
         g.polygons = []
+        g.zone_patterns = {}
         g.logger = _FakeLogger()
         g.config = {
             'only_triggered_zm_zones': 'no',
@@ -161,3 +165,115 @@ class TestImportZmZones:
 
         import_zm_zones("1", None, mock_zm)
         assert g.polygons[0]['name'] == 'front_yard_camera_1'
+
+
+class TestConfigPatternJoin:
+    """Config patterns join onto ZM geometry by zone name. Ref: #48"""
+
+    def setup_method(self):
+        g.polygons = []
+        g.zone_patterns = {}
+        g.logger = _FakeLogger()
+        g.config = {
+            'only_triggered_zm_zones': 'no',
+            'import_zm_zones': 'yes',
+        }
+
+    def _client(self, zones):
+        mock_zm = MagicMock()
+        mock_monitor = MagicMock()
+        mock_monitor.get_zones.return_value = zones
+        mock_zm.monitor.return_value = mock_monitor
+        return mock_zm
+
+    def test_config_pattern_applied_to_imported_zone(self):
+        """A config zone with patterns but no coords stamps them onto ZM's geometry."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        g.zone_patterns = {
+            'front_yard': {'pattern': '(person|car)', 'ignore_pattern': '(cat)'},
+        }
+        import_zm_zones("1", None, self._client([
+            _make_zone("Front Yard", "0,0 100,0 100,100 0,100"),
+        ]))
+
+        assert len(g.polygons) == 1
+        poly = g.polygons[0]
+        assert poly['name'] == 'front_yard'
+        assert poly['value'] == [(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)]
+        assert poly['pattern'] == '(person|car)'
+        assert poly['ignore_pattern'] == '(cat)'
+        assert g.logger.error == []
+
+    def test_zone_without_config_entry_keeps_none_pattern(self):
+        """A ZM zone the config says nothing about is imported unchanged."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        g.zone_patterns = {'front_yard': {'pattern': '(person)', 'ignore_pattern': None}}
+        import_zm_zones("1", None, self._client([
+            _make_zone("Front Yard", "0,0 100,0 100,100 0,100"),
+            _make_zone("Back Yard", "0,0 50,0 50,50 0,50"),
+        ]))
+
+        back = [p for p in g.polygons if p['name'] == 'back_yard'][0]
+        assert back['pattern'] is None
+        assert back['ignore_pattern'] is None
+
+    def test_config_coords_win_and_zm_zone_not_duplicated(self):
+        """A config zone with coords pins geometry; the same ZM zone is not appended."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        g.polygons = [{
+            'name': 'front_yard',
+            'value': [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0)],
+            'pattern': '(person)',
+            'ignore_pattern': None,
+        }]
+        g.zone_patterns = {'front_yard': {'pattern': '(person)', 'ignore_pattern': None}}
+        import_zm_zones("1", None, self._client([
+            _make_zone("Front Yard", "0,0 100,0 100,100 0,100"),
+        ]))
+
+        assert len(g.polygons) == 1
+        assert g.polygons[0]['value'] == [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0)]
+        assert g.logger.error == []
+
+    def test_unmatched_config_pattern_logs_error(self):
+        """A pattern-only zone matching no imported ZM zone is reported, not silent."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        g.zone_patterns = {'no_such_zone': {'pattern': '(person)', 'ignore_pattern': None}}
+        import_zm_zones("1", None, self._client([
+            _make_zone("Front Yard", "0,0 100,0 100,100 0,100"),
+        ]))
+
+        assert len(g.polygons) == 1
+        assert any('no_such_zone' in m for m in g.logger.error)
+
+    def test_unmatched_config_pattern_silent_when_only_triggered(self):
+        """Under only_triggered_zm_zones a non-triggered zone is legitimately absent."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        g.config['only_triggered_zm_zones'] = 'yes'
+        g.zone_patterns = {'backyard': {'pattern': '(person)', 'ignore_pattern': None}}
+        import_zm_zones("1", "Motion: Driveway", self._client([
+            _make_zone("Driveway", "0,0 100,0 100,100 0,100"),
+            _make_zone("Backyard", "0,0 50,0 50,50 0,50"),
+        ]))
+
+        assert [p['name'] for p in g.polygons] == ['driveway']
+        assert g.logger.error == []
+
+    def test_config_pattern_beats_zm_pattern(self):
+        """When ZM ever supplies a pattern, the config's still wins."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        z = _make_zone("Front Yard", "0,0 100,0 100,100 0,100")
+        z.pattern = "(dog)"
+        z.ignore_pattern = "(bird)"
+        g.zone_patterns = {'front_yard': {'pattern': '(person)', 'ignore_pattern': '(cat)'}}
+        import_zm_zones("1", None, self._client([z]))
+
+        assert g.polygons[0]['pattern'] == '(person)'
+        assert g.polygons[0]['ignore_pattern'] == '(cat)'
+
