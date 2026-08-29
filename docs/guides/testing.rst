@@ -188,6 +188,10 @@ Python unit / integration reference
    * - ``tests/test_import_zm_zones.py``
      - Zone import filtering (active/triggered), and the name-based join of config
        patterns onto ZM zone geometry
+   * - ``tests/test_pyzm_contract.py``
+     - The shape ES consumes from the REAL pyzm: ``DetectionResult`` keys,
+       ``detect_event`` signature, and ``ml_sequence.general.zone_match_strategy``
+       still reaching ``DetectorConfig``
    * - ``tests/test_zm_detect.py``
      - CLI argparse early-exits (version, missing config)
 

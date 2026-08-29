@@ -122,3 +122,39 @@ def test_detect_event_signature_matches_es_call():
             f"pyzm Detector.detect_event lost the '{needed}' parameter that "
             f"zm_detect.py passes by keyword."
         )
+
+
+def test_zone_match_strategy_reaches_pyzm_from_ml_sequence():
+    """ES documents ml_sequence.general.zone_match_strategy (see hooks.rst) but
+    never reads it -- the key rides through untouched and only pyzm gives it
+    meaning. If pyzm renames or drops it, the docs and objectconfig example
+    become a silent no-op: the key is simply ignored and the default stands."""
+    _real_pyzm_or_skip()
+    import importlib
+
+    saved = {k: v for k, v in list(sys.modules.items())
+             if k == "pyzm" or k.startswith("pyzm.")}
+    for k in saved:
+        del sys.modules[k]
+    try:
+        config_mod = importlib.import_module("pyzm.models.config")
+        cfg = config_mod.DetectorConfig.from_dict({
+            "general": {
+                "model_sequence": "object",
+                "zone_match_strategy": "largest_overlap",
+            },
+            "object": {
+                "general": {},
+                "sequence": [{"name": "test_model", "object_weights": "/tmp/w.weights"}],
+            },
+        })
+        strategy = cfg.zone_match_strategy
+    finally:
+        for k in [k for k in sys.modules if k == "pyzm" or k.startswith("pyzm.")]:
+            del sys.modules[k]
+        sys.modules.update(saved)
+
+    assert getattr(strategy, "value", strategy) == "largest_overlap", (
+        "pyzm no longer honours ml_sequence.general.zone_match_strategy; the "
+        "value ES documents is being ignored."
+    )

@@ -131,6 +131,11 @@ ml:
       model_sequence: "object,face,alpr"
       # frame_strategy options: most_models (default), first, first_new, most, most_unique
       frame_strategy: most_models
+      # Which zone decides when a detection box intersects several of them:
+      # any_matching (default - any zone whose pattern matches keeps it),
+      # first_intersecting (ES 6 behaviour), largest_overlap. Only the last two
+      # let an exclusion zone stay final. Read by pyzm, not by the event server.
+      #zone_match_strategy: "largest_overlap"
       disable_locks: "no"
       # Deduplicate static objects across detections
       match_past_detections: "no"

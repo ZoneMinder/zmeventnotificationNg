@@ -716,6 +716,9 @@ Read by pyzmNg ``DetectorConfig``:
    * - ``frame_strategy``
      - ``most_models``
      - How to pick the best frame: ``most_models``, ``first``, ``first_new``, ``most``, ``most_unique``
+   * - ``zone_match_strategy``
+     - ``any_matching``
+     - Which zone rules on a box that intersects several: ``any_matching`` (any matching zone keeps it), ``first_intersecting`` (ES 6 behaviour), ``largest_overlap``. See :ref:`zone_overlap_strategy`
    * - ``same_model_sequence_strategy``
      - ``first``
      - How to combine results from multiple models of the same type: ``first``, ``most``, ``most_unique``, ``union``

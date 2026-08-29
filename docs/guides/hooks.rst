@@ -382,6 +382,40 @@ absent, and no error is logged for them.
    level on every run. If you want ZoneMinder's zones to gate detection, turn on
    ``import_zm_zones``.
 
+.. _zone_overlap_strategy:
+
+When zones overlap
+^^^^^^^^^^^^^^^^^^^
+
+A zone matches when the detection's bounding box *intersects* the polygon, not when it is
+contained by it, so one object can land in several zones at once — a car in the street whose
+box dips a few pixels into the driveway is in both. By default the detection is kept as soon
+as **any** intersecting zone's ``detection_pattern`` matches it, which means a zone that
+rejected it does not stop a neighbouring zone from keeping it. An exclusion zone bordering a
+permissive one can be defeated by a few pixels of overlap.
+
+pyzmNg's ``zone_match_strategy`` chooses a different rule: ``first_intersecting`` (the ES 6
+behaviour, where the first intersecting zone decides either way) or ``largest_overlap`` (the
+zone covering most of the box decides). Under both, a rejection is final, which is what makes
+"never alert on this label here" expressible.
+
+It is a **pyzmNg** key, so it goes in ``ml_sequence.general`` — not the event server's own
+top-level ``general`` section, which validates against a whitelist and drops unknown keys with
+one Info line:
+
+::
+
+   ml:
+     ml_sequence:
+       general:
+         model_sequence: "object"
+         zone_match_strategy: "largest_overlap"
+
+See the `pyzmNg detection guide
+<https://pyzmng.readthedocs.io/en/latest/guide/detection.html#resolving-overlapping-zones>`__
+for the full comparison. This matters more once ``import_zm_zones`` is on, because every zone
+then carries the pattern the config gave it instead of matching everything.
+
 
 
 Understanding ml_sequence
