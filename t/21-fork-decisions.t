@@ -15,7 +15,7 @@ use lib "$FindBin::Bin/../";
 use lib "$FindBin::Bin/lib";
 
 use Test::More;
-require StubZM;
+BEGIN { require StubZM }
 use ZmEventNotification::HookProcessor;
 
 my $effective   = \&ZmEventNotification::HookProcessor::_effective_hook_result;
