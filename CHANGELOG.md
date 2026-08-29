@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.30] - 2026-08-29
+
+### Bug Fixes
+
+- join config zone patterns onto ZoneMinder zone geometry by name ([50beae7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/50beae7d5f36f1d45a4b5505180e76685da9fc52))
+
+### Documentation
+
+- document zone_match_strategy alongside the ZM zone join ([31a6ac4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/31a6ac43fde7a115a1c1064358bb9adaf2f56593))
+
+### Miscellaneous
+
+- bump version to v7.0.30 ([ad9862a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ad9862a3a093840379bacb62de8b0c3ed3d97cba))
+
+### Testing
+
+- load StubZM at compile time in t/21 ([9d72086](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9d72086ea2b3f9c06c8ccafb35b1fb27cee7880a))
+
 ## [7.0.29] - 2026-07-30
 
 ### Bug Fixes
@@ -11,6 +29,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.29 ([782e230](https://github.com/ZoneMinder/zmeventnotificationNg/commit/782e230401aa1dffa064f607db053c65cfea19a0))
 - add a roadmap at the top of the remote ML section ([4e65e4e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4e65e4e885f4bd7d006df276152d7f4d2b4e0c76))
 - connect the remote ML sections to each other and to pyzmNg ([7bf450b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7bf450befcbb69ee866419a5e1e034d2c6304654))
 - say why the models shorthand serves YOLO but not faces ([65bd34b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/65bd34bb7d2281fa12b6e6cbabd7446e9f6b95a9))
