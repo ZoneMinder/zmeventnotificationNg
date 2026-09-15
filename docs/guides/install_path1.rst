@@ -113,24 +113,28 @@ GPU support or a specific version.
    ONNX models (YOLOv11, YOLOv26) require **OpenCV 4.13+**.
 
    YOLOv4 and YOLOv3 are Darknet models, and OpenCV **5.0 removed the Darknet
-   importer**. They load only on OpenCV 4.x, so **4.13.x is the newest release
-   that runs every bundled model**. On OpenCV 5 a Darknet model fails at load
-   time with ``Darknet importer has been removed``; convert it to ONNX, or
-   stay on 4.13.x.
+   importer**. They load only on OpenCV 4.x. Since the installer enables both
+   ONNX and Darknet models by default, **stay on a 4.13 or newer 4.x release**
+   (4.14 is the latest at the time of writing). On OpenCV 5 a Darknet model
+   fails at load time with ``Darknet importer has been removed``.
 
-   =========================  ==========================
+   =========================  =============================
    Models you run             Supported OpenCV
-   =========================  ==========================
+   =========================  =============================
    YOLOv11 / YOLOv26 (ONNX)   4.13 or newer, including 5.x
-   YOLOv4 / YOLOv3 (Darknet)  4.4 up to 4.13.x
-   Both                       4.13.x
-   =========================  ==========================
+   YOLOv4 / YOLOv3 (Darknet)  4.4 or newer, but below 5.0
+   Both (the default)         4.13 or newer 4.x
+   =========================  =============================
 
 **Quick install (no GPU):**
 
 .. code:: bash
 
-   /opt/zoneminder/venv/bin/pip install opencv-contrib-python
+   /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
+
+The ``<5`` matters: PyPI now ships OpenCV 5 wheels, and an unconstrained
+``pip install opencv-contrib-python`` gives you a build that cannot load the
+YOLOv4 models the installer downloads by default.
 
 **For GPU support**, compile from source with CUDA enabled. See the
 `official OpenCV build guide <https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html>`__.
@@ -187,7 +191,7 @@ Pick whichever side is easier to move:
    /opt/zoneminder/venv/bin/pip install "numpy<2"
 
    # Or use an OpenCV built for NumPy 2.x (no CUDA in these wheels)
-   /opt/zoneminder/venv/bin/pip install opencv-contrib-python
+   /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
 
 Use the venv's ``pip``, not the system one — a plain ``pip install`` outside
 the venv changes a numpy that the hooks never load.

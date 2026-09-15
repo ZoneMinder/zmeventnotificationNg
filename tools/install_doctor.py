@@ -126,7 +126,7 @@ def check_cv2_import():
         f"    match the numpy your OpenCV was built against:\n"
         f"        {pip} install \"numpy<2\"\n"
         f"    or install an OpenCV built for the numpy you have:\n"
-        f"        {pip} install opencv-contrib-python"
+        f"        {pip} install \"opencv-contrib-python<5\""
     )
 
 
@@ -265,8 +265,9 @@ def check_opencv_version(enabled_models):
             f"OpenCV {cv_ver_str} removed the Darknet importer, so YOLOv4\n"
             f"    .weights/.cfg models can no longer be loaded.\n"
             f"    Affected models: {names}\n"
-            f"    Use OpenCV 4.13.x (the newest release that still loads Darknet\n"
-            f"    models), or convert these models to ONNX (YOLOv11/YOLOv26)."
+            f"    Use a 4.x OpenCV (4.13 or newer also covers ONNX models):\n"
+            f"        pip install \"opencv-contrib-python<5\"\n"
+            f"    or switch these models to ONNX (YOLOv11/YOLOv26)."
         )
 
     return warnings

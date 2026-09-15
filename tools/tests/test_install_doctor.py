@@ -324,7 +324,7 @@ class TestCheckCv2Import:
         assert "numpy in use:" in w
         # Both remedies, aimed at this interpreter's own pip.
         assert 'install "numpy<2"' in w
-        assert "opencv-contrib-python" in w
+        assert 'install "opencv-contrib-python<5"' in w
 
     def test_missing_cv2_is_not_this_checks_problem(self, cv2_state):
         # cv2 absent entirely is reported by check_opencv_version; warning
@@ -383,7 +383,7 @@ class TestOpencvFiveDarknet:
         assert len(warnings) == 1
         assert "Darknet importer" in warnings[0]
         assert "YOLOv4" in warnings[0]
-        assert "4.13" in warnings[0]
+        assert '"opencv-contrib-python<5"' in warnings[0]
 
     def test_opencv5_leaves_onnx_models_alone(self, fake_cv2):
         # readNetFromONNX still exists in OpenCV 5, so ONNX models are fine.

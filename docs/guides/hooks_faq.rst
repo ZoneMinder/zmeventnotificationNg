@@ -256,7 +256,8 @@ shadowing the system one. See :ref:`numpy_abi_mismatch`.
 Model load fails with "Darknet importer has been removed"
 -----------------------------------------------------------
 OpenCV 5 dropped Darknet support, so YOLOv4 and YOLOv3 ``.weights`` models can
-no longer load. Use OpenCV 4.13.x, or switch to an ONNX model. See
+no longer load. Use a 4.x OpenCV (4.13 or newer for ONNX support too), or
+switch to an ONNX model. See
 :ref:`opencv_install`.
 
 .. _local_remote_ml:
