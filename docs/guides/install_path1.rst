@@ -112,6 +112,20 @@ GPU support or a specific version.
 
    ONNX models (YOLOv11, YOLOv26) require **OpenCV 4.13+**.
 
+   YOLOv4 and YOLOv3 are Darknet models, and OpenCV **5.0 removed the Darknet
+   importer**. They load only on OpenCV 4.x, so **4.13.x is the newest release
+   that runs every bundled model**. On OpenCV 5 a Darknet model fails at load
+   time with ``Darknet importer has been removed``; convert it to ONNX, or
+   stay on 4.13.x.
+
+   =========================  ==========================
+   Models you run             Supported OpenCV
+   =========================  ==========================
+   YOLOv11 / YOLOv26 (ONNX)   4.13 or newer, including 5.x
+   YOLOv4 / YOLOv3 (Darknet)  4.4 up to 4.13.x
+   Both                       4.13.x
+   =========================  ==========================
+
 **Quick install (no GPU):**
 
 .. code:: bash
@@ -148,6 +162,39 @@ Verify it works:
 .. code:: bash
 
    /opt/zoneminder/venv/bin/python -c "import cv2; print(cv2.__version__)"
+
+.. _numpy_abi_mismatch:
+
+NumPy version must match your OpenCV build
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If that command fails with::
+
+   A module that was compiled using NumPy 1.x cannot be run in NumPy 2.x
+
+your OpenCV was compiled against NumPy 1.x, but a NumPy 2.x inside the venv is
+shadowing the system one. This happens because the venv can see system
+site-packages: a system OpenCV in ``/usr/lib/python3/dist-packages`` stays
+importable, while a numpy installed into
+``/opt/zoneminder/venv/lib/.../site-packages`` takes precedence over the system
+numpy that OpenCV was built against.
+
+Pick whichever side is easier to move:
+
+.. code:: bash
+
+   # Match numpy to the OpenCV you already built
+   /opt/zoneminder/venv/bin/pip install "numpy<2"
+
+   # Or use an OpenCV built for NumPy 2.x (no CUDA in these wheels)
+   /opt/zoneminder/venv/bin/pip install opencv-contrib-python
+
+Use the venv's ``pip``, not the system one — a plain ``pip install`` outside
+the venv changes a numpy that the hooks never load.
+
+``tools/install_doctor.py`` reports this mismatch by name, along with the numpy
+it found. GPU builds are the common case: rebuilding OpenCV with CUDA pulls in
+whichever numpy headers were present at build time.
 
 .. _opencv_seg_fault:
 

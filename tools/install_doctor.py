@@ -76,6 +76,60 @@ def collect_enabled_models(cfg):
     return enabled
 
 
+def _import_cv2():
+    """Import cv2, telling "not installed" apart from "installed but broken".
+
+    Returns (module, error) where error is None on success, the string
+    "missing" when cv2 is not installed at all, and otherwise the exception
+    that broke the import. Callers must not collapse the last case into a
+    zero/empty result: a cv2 that fails to load is a different problem from a
+    cv2 that reports nothing. Refs #50.
+    """
+    try:
+        import cv2
+        return cv2, None
+    except ModuleNotFoundError as e:
+        if getattr(e, "name", None) == "cv2":
+            return None, "missing"
+        return None, e
+    except Exception as e:
+        return None, e
+
+
+def check_cv2_import():
+    """Warn if cv2 is installed but fails to import.
+
+    The usual cause is a NumPy ABI mismatch. install.sh creates the venv with
+    include-system-site-packages so a system/source-built cv2 stays importable,
+    but a numpy installed into the venv shadows the system numpy that cv2 was
+    compiled against, and a module built for NumPy 1.x cannot run on 2.x.
+
+    cv2 being absent entirely is left to check_opencv_version, which already
+    reports it per model. Refs #50.
+    """
+    _, err = _import_cv2()
+    if err is None or err == "missing":
+        return None
+
+    try:
+        import numpy
+        np_detail = f"{numpy.__version__} ({numpy.__file__})"
+    except Exception:
+        np_detail = "not installed"
+
+    pip = os.path.join(sys.prefix, "bin", "pip")
+    return (
+        f"cv2 is installed but fails to import.\n"
+        f"    {type(err).__name__}: {err}\n"
+        f"    numpy in use: {np_detail}\n"
+        f"    A module built against NumPy 1.x cannot run on NumPy 2.x. Either\n"
+        f"    match the numpy your OpenCV was built against:\n"
+        f"        {pip} install \"numpy<2\"\n"
+        f"    or install an OpenCV built for the numpy you have:\n"
+        f"        {pip} install opencv-contrib-python"
+    )
+
+
 def check_gpu_cuda(enabled_models, config_path):
     """Warn if GPU processing is configured but no CUDA devices are available."""
     gpu_models = [
@@ -85,8 +139,14 @@ def check_gpu_cuda(enabled_models, config_path):
     if not gpu_models:
         return None
 
+    cv2, err = _import_cv2()
+    if err is not None and err != "missing":
+        # cv2 is broken, not CUDA-less. check_cv2_import reports the real
+        # cause; claiming "no CUDA devices" here sends users after the wrong
+        # problem. Refs #50.
+        return None
+
     try:
-        import cv2
         cuda_count = cv2.cuda.getCudaEnabledDeviceCount()
     except Exception:
         cuda_count = 0
@@ -167,7 +227,7 @@ def check_opencv_version(enabled_models):
             onnx_v26_models.append((s, m))
         elif weights.endswith(".onnx") or "yolo11" in weights or "yolov11" in name_lower:
             onnx_v11_models.append((s, m))
-        elif "yolov4" in name_lower:
+        elif weights.endswith(".weights") or "yolov4" in name_lower:
             v4_models.append((s, m))
 
     warnings = []
@@ -193,6 +253,20 @@ def check_opencv_version(enabled_models):
             f"OpenCV {cv_ver_str} detected but 4.4+ is required for YOLOv4 models.\n"
             f"    Affected models: {names}\n"
             f"    Upgrade OpenCV or disable these models."
+        )
+
+    # OpenCV 5 dropped the Darknet importer, so pyzm's yolo_darknet backend
+    # (cv2.dnn.readNet(weights, config)) can no longer load .weights/.cfg
+    # models. ONNX models are unaffected: readNetFromONNX still exists.
+    # Refs #50.
+    if v4_models and cv_ver >= (5, 0):
+        names = ", ".join(m.get("name", "unknown") for _, m in v4_models)
+        warnings.append(
+            f"OpenCV {cv_ver_str} removed the Darknet importer, so YOLOv4\n"
+            f"    .weights/.cfg models can no longer be loaded.\n"
+            f"    Affected models: {names}\n"
+            f"    Use OpenCV 4.13.x (the newest release that still loads Darknet\n"
+            f"    models), or convert these models to ONNX (YOLOv11/YOLOv26)."
         )
 
     return warnings
@@ -537,6 +611,10 @@ def main():
             ))
 
     # --- Python dependency checks ---
+    w = check_cv2_import()
+    if w:
+        warnings.append(w)
+
     w = check_pyzm()
     if w:
         warnings.append(w)

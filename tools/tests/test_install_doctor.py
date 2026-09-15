@@ -24,6 +24,8 @@ collect_enabled_models = mod.collect_enabled_models
 check_opencv_version = mod.check_opencv_version
 check_onnx_package = mod.check_onnx_package
 check_model_files = mod.check_model_files
+check_cv2_import = mod.check_cv2_import
+check_gpu_cuda = mod.check_gpu_cuda
 resolve_path = mod.resolve_path
 
 
@@ -267,3 +269,139 @@ class TestCheckSecretsFile:
         sf.write_text("x"); sf.chmod(0o604)  # other-read set
         monkeypatch.setattr(mod, "uid_for_user", lambda u: os.getuid() + 12345)
         assert check_secrets_file({"general": {"secrets": str(sf)}}, "www-data") is None
+
+
+# ── cv2 import state ────────────────────────────────────────────────────
+
+# The real numpy 1.x/2.x ABI failure, as a user sees it. Refs #50.
+NUMPY_ABI_ERROR = (
+    "numpy.core._multiarray_umath failed to import: a module compiled using "
+    "NumPy 1.x cannot be run in NumPy 2.5.3"
+)
+
+
+@pytest.fixture
+def cv2_state(monkeypatch):
+    """Force `import cv2` into one of: ok / missing / broken.
+
+    Patches __import__ rather than sys.modules so a *broken* cv2 raises the
+    same ImportError shape the numpy ABI mismatch produces, instead of
+    Python's "None in sys.modules" placeholder.
+    """
+    import builtins
+
+    real_import = builtins.__import__
+
+    def set_state(state, cuda_devices=0):
+        fake = types.ModuleType("cv2")
+        fake.__version__ = "4.13.0"
+        fake.cuda = types.SimpleNamespace(
+            getCudaEnabledDeviceCount=lambda: cuda_devices
+        )
+
+        def fake_import(name, *args, **kwargs):
+            if name == "cv2":
+                if state == "missing":
+                    raise ModuleNotFoundError("No module named 'cv2'", name="cv2")
+                if state == "broken":
+                    raise ImportError(NUMPY_ABI_ERROR)
+                return fake
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        return fake
+
+    return set_state
+
+
+class TestCheckCv2Import:
+    def test_broken_cv2_reports_real_error(self, cv2_state):
+        cv2_state("broken")
+        w = check_cv2_import()
+        assert w is not None
+        assert "fails to import" in w
+        assert "NumPy 1.x cannot be run in NumPy 2.5.3" in w
+        assert "numpy in use:" in w
+        # Both remedies, aimed at this interpreter's own pip.
+        assert 'install "numpy<2"' in w
+        assert "opencv-contrib-python" in w
+
+    def test_missing_cv2_is_not_this_checks_problem(self, cv2_state):
+        # cv2 absent entirely is reported by check_opencv_version; warning
+        # here too would just be noise.
+        cv2_state("missing")
+        assert check_cv2_import() is None
+
+    def test_working_cv2_no_warning(self, cv2_state):
+        cv2_state("ok")
+        assert check_cv2_import() is None
+
+
+# ── check_gpu_cuda ──────────────────────────────────────────────────────
+
+def _gpu_models():
+    return [("object", {"name": "m3", "object_processor": "gpu"})]
+
+
+class TestCheckGpuCuda:
+    def test_broken_cv2_does_not_blame_cuda(self, cv2_state):
+        # Refs #50: a numpy ABI break used to surface as "no CUDA devices
+        # found", sending users after the wrong problem.
+        cv2_state("broken")
+        assert check_gpu_cuda(_gpu_models(), "/etc/objectconfig.yml") is None
+
+    def test_no_cuda_devices_still_warns(self, cv2_state):
+        cv2_state("ok", cuda_devices=0)
+        w = check_gpu_cuda(_gpu_models(), "/etc/objectconfig.yml")
+        assert w is not None and "no CUDA devices found" in w
+        assert "m3" in w
+
+    def test_cuda_present_no_warning(self, cv2_state):
+        cv2_state("ok", cuda_devices=2)
+        assert check_gpu_cuda(_gpu_models(), "/etc/objectconfig.yml") is None
+
+    def test_missing_cv2_warns_as_before(self, cv2_state):
+        # Unchanged legacy behaviour: no cv2 at all means no CUDA either.
+        cv2_state("missing")
+        w = check_gpu_cuda(_gpu_models(), "/etc/objectconfig.yml")
+        assert w is not None and "no CUDA devices found" in w
+
+    def test_no_gpu_models_no_warning(self, cv2_state):
+        cv2_state("broken")
+        models = [("object", {"name": "cpu1", "object_processor": "cpu"})]
+        assert check_gpu_cuda(models, "/etc/objectconfig.yml") is None
+
+
+# ── check_opencv_version: OpenCV 5 upper bound ──────────────────────────
+
+class TestOpencvFiveDarknet:
+    def test_opencv5_warns_for_darknet_weights(self, fake_cv2):
+        # OpenCV 5 removed the Darknet importer; pyzm yolo_darknet.py calls
+        # cv2.dnn.readNet(weights, cfg), which now raises. Refs #50.
+        fake_cv2("5.1.0")
+        warnings = check_opencv_version(_models())
+        assert len(warnings) == 1
+        assert "Darknet importer" in warnings[0]
+        assert "YOLOv4" in warnings[0]
+        assert "4.13" in warnings[0]
+
+    def test_opencv5_leaves_onnx_models_alone(self, fake_cv2):
+        # readNetFromONNX still exists in OpenCV 5, so ONNX models are fine.
+        fake_cv2("5.1.0")
+        models = [
+            ("object", {"name": "m26", "object_weights": "/x/yolo26s.onnx"}),
+            ("object", {"name": "m11", "object_weights": "/x/yolo11n.onnx"}),
+        ]
+        assert check_opencv_version(models) == []
+
+    def test_opencv413_has_no_darknet_warning(self, fake_cv2):
+        # Regression lock: the supported ceiling must stay silent.
+        fake_cv2("4.13.0")
+        assert check_opencv_version(_models()) == []
+
+    def test_darknet_detected_by_extension_not_just_name(self, fake_cv2):
+        fake_cv2("5.1.0")
+        models = [("object", {"name": "my tiny model", "object_weights": "/x/t.weights"})]
+        warnings = check_opencv_version(models)
+        assert len(warnings) == 1
+        assert "Darknet importer" in warnings[0]

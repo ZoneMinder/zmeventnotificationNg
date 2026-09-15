@@ -248,6 +248,17 @@ I get a segment fault/core dump while trying to use opencv in detection
 --------------------------------------------------------------------------
 See :ref:`opencv_seg_fault`.
 
+cv2 fails to import with "compiled using NumPy 1.x cannot be run in NumPy 2.x"
+------------------------------------------------------------------------------
+Your OpenCV was built against NumPy 1.x and a NumPy 2.x in the venv is
+shadowing the system one. See :ref:`numpy_abi_mismatch`.
+
+Model load fails with "Darknet importer has been removed"
+-----------------------------------------------------------
+OpenCV 5 dropped Darknet support, so YOLOv4 and YOLOv3 ``.weights`` models can
+no longer load. Use OpenCV 4.13.x, or switch to an ONNX model. See
+:ref:`opencv_install`.
+
 .. _local_remote_ml:
 
 Local vs. Remote server for Machine Learning
