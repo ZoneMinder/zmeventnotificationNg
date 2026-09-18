@@ -256,12 +256,17 @@ Which models should I use?
   — smaller models are faster, larger models are more accurate.
   The default is ``yolo11n`` (nano) which provides a good balance.
 
-- **YOLOv4**: Still supported via Darknet weights. Requires OpenCV 4.4+.
+- **YOLOv4**: Still supported via Darknet weights. Requires OpenCV **4.4 or newer,
+  but below 5.0** — OpenCV 5.0 removed the Darknet importer, so ``.weights``/``.cfg``
+  models cannot be loaded on it at all. Prefer YOLO ONNX above: it is more accurate,
+  faster, and runs on every current OpenCV, which leaves you free to upgrade.
 
 - **Google Coral Edge TPU**: Supported for both object detection and face detection. See install instructions above.
 
-- **YOLOv3 / Tiny YOLOv3 / Tiny YOLOv4**: Still available but no longer installed by default.
-  Set the appropriate ``INSTALL_*`` flag to ``yes`` during install if you need them.
+- **YOLOv3 / Tiny YOLOv3 / Tiny YOLOv4**: Still available. Tiny YOLOv4 is installed by
+  default (``INSTALL_TINYYOLOV4=yes``); the YOLOv3 variants are not — set the matching
+  ``INSTALL_*`` flag to ``yes`` during install if you need them. All three are Darknet
+  models and carry the same OpenCV 4.x ceiling as YOLOv4.
 
 - **BirdNET audio recognition**: Identifies 6500+ bird species from audio in ZM events.
   Install via the installer with ``--install-birdnet`` (or ``INSTALL_BIRDNET=yes``),

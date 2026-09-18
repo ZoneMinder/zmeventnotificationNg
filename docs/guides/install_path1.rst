@@ -126,8 +126,14 @@ GPU support or a specific version.
    =========================  =============================
    YOLOv11 / YOLOv26 (ONNX)   4.13 or newer, including 5.x
    YOLOv4 / YOLOv3 (Darknet)  4.4 or newer, but below 5.0
-   Both (the default)         4.13 or newer 4.x
+   Both                       4.13 or newer 4.x
    =========================  =============================
+
+   **Recommendation:** run the ONNX models (YOLOv11 or YOLOv26, the shipped
+   default). They are more accurate and faster than YOLOv4, and they work on
+   every OpenCV from 4.13 up, so nothing stops you moving to newer releases
+   later. Darknet models are the only reason to hold OpenCV below 5.0 — see
+   :ref:`supported_models`.
 
 **Quick install (no GPU):**
 
