@@ -769,26 +769,6 @@ install_hook_config() {
     echo
 }
 
-# returns 'ok' if openCV version >= version passed
-check_opencv_version() {
-    MAJOR=$1
-    MINOR=$2
-    CVVERS=`${PYTHON} -c "import cv2; print (cv2.__version__)" 2>/dev/null`
-    if [ -z "${CVVERS}" ]; then
-            echo "fail"
-            return 1
-    fi
-    IFS='.'
-    list=($CVVERS)
-    if [ ${list[0]} -ge ${MAJOR} ] && [ ${list[1]} -ge ${MINOR} ]; then
-            echo "ok"
-            return 0
-    else
-            echo "fail"
-            return 1
-    fi
-}
-
 print_opencv_message() {
 
     print_success "Done"
