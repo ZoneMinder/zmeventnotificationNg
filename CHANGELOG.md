@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.31] - 2026-09-18
+
+### Bug Fixes
+
+- constrain documented OpenCV installs to 4.x ([4e9d899](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4e9d89987900126ba23391b3a370e9cc6759e523))
+- diagnose broken cv2 imports and OpenCV 5 Darknet removal ([358b68f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/358b68fe4ac3998e42e38f78c9af1c1e23c6e734))
+
+### Documentation
+
+- state the OpenCV range per model family and recommend ONNX ([9534359](https://github.com/ZoneMinder/zmeventnotificationNg/commit/95343599899b31229d2689981c87003c9d12cc57))
+- correct which models the shipped config enables ([add3dcc](https://github.com/ZoneMinder/zmeventnotificationNg/commit/add3dcc7dd6e6ea8f6a497d3def9c6ed3eee6e49))
+
+### Miscellaneous
+
+- bump version to v7.0.31 ([4f42496](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4f42496f77e6da9eeb4958bfb9bc4a5caf8ec0b4))
+
+### Refactoring
+
+- drop dead check_opencv_version() ([1ebfc19](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1ebfc19ccfea759fe08e37b7470af0f872401f23))
+
 ## [7.0.30] - 2026-08-29
 
 ### Bug Fixes
@@ -11,6 +31,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.30 ([e1285a4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e1285a412c7dccc514b5f399b3633cdfb2a85a07))
 - document zone_match_strategy alongside the ZM zone join ([31a6ac4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/31a6ac43fde7a115a1c1064358bb9adaf2f56593))
 
 ### Miscellaneous
