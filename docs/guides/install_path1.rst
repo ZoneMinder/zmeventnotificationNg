@@ -113,10 +113,13 @@ GPU support or a specific version.
    ONNX models (YOLOv11, YOLOv26) require **OpenCV 4.13+**.
 
    YOLOv4 and YOLOv3 are Darknet models, and OpenCV **5.0 removed the Darknet
-   importer**. They load only on OpenCV 4.x. Since the installer enables both
-   ONNX and Darknet models by default, **stay on a 4.13 or newer 4.x release**
-   (4.14 is the latest at the time of writing). On OpenCV 5 a Darknet model
-   fails at load time with ``Darknet importer has been removed``.
+   importer**. They load only on OpenCV 4.x. The shipped config enables the
+   ONNX model and leaves YOLOv4 off, so a default install runs on OpenCV 5 —
+   but the installer still downloads the YOLOv4 weights, and enabling them
+   later on an OpenCV 5 build fails at load time with ``Darknet importer has
+   been removed``. **A 4.13 or newer 4.x release runs everything** (4.14 is the
+   latest at the time of writing); pick OpenCV 5 only if you are certain you
+   will stay on ONNX models.
 
    =========================  =============================
    Models you run             Supported OpenCV
@@ -132,9 +135,10 @@ GPU support or a specific version.
 
    /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
 
-The ``<5`` matters: PyPI now ships OpenCV 5 wheels, and an unconstrained
-``pip install opencv-contrib-python`` gives you a build that cannot load the
-YOLOv4 models the installer downloads by default.
+The ``<5`` matters: PyPI now ships OpenCV 5 wheels, and OpenCV 5 cannot load
+the YOLOv4/YOLOv3 weights the installer downloads. The shipped config does not
+enable those models, so an OpenCV 5 build works until you switch one on. The
+``<5`` keeps that option open.
 
 **For GPU support**, compile from source with CUDA enabled. See the
 `official OpenCV build guide <https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html>`__.
