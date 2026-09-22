@@ -26,3 +26,11 @@ notifications:
           daysofweek: "NONE_MATCH"
           cause_has: person
           action: mute
+
+    4:
+      rules:
+        - time_format: "%I:%M %p"
+          from: "7:00 pm"
+          to: "7:00 am"
+          cause_has: person
+          action: critical_notify

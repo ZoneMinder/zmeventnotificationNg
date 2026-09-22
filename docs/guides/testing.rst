@@ -113,7 +113,7 @@ Perl test reference
    * - ``t/02-util.t``
      - ``Util`` helpers, ``buildPictureUrl``
    * - ``t/03-rules.t``
-     - Rules matching
+     - Rules matching, including time windows that cross midnight
    * - ``t/04-hook-processor-logic.t``
      - HookProcessor decision logic
    * - ``t/05-contract-split-format.t``

@@ -1,6 +1,11 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
+
+# Let tests pin "now" for time-window rules. Must be set before Time::Piece loads.
+our $FAKE_TIME;
+BEGIN { *CORE::GLOBAL::time = sub { $FAKE_TIME // CORE::time() } }
+
 use FindBin;
 use lib "$FindBin::Bin/../";
 use lib "$FindBin::Bin/lib";
@@ -9,6 +14,7 @@ use Test::More;
 use YAML::XS;
 use File::Spec;
 use Time::Piece;
+use Time::Local qw(timelocal);
 
 require StubZM;
 
@@ -112,6 +118,25 @@ sub make_alarm {
     my ($allowed, $obj) = isAllowedInRules($alarm);
     is($allowed, 1, 'cause fallback to End cause -> matches critical_notify');
     is($obj->{notification_type}, 'critical', 'cause fallback: notification_type is critical');
+}
+
+# ===== Monitor 4: 7:00 pm - 7:00 am window crosses midnight =====
+{
+    for my $case (
+        [ 22, 0,  1, 'before midnight' ],
+        [ 19, 0,  1, 'at from' ],
+        [ 2,  0,  1, 'after midnight' ],
+        [ 7,  0,  1, 'at to' ],
+        [ 12, 0,  0, 'midday, outside window' ],
+        [ 18, 59, 0, 'just before from' ],
+    ) {
+        my ($h, $m, $want_critical, $label) = @$case;
+        local $FAKE_TIME = timelocal(0, $m, $h, 15, 5, 2026);
+        my ($allowed, $obj) = isAllowedInRules(make_alarm(mid => 4, cause => 'detected:person'));
+        is($allowed, 1, "monitor 4 overnight window, $label: allowed");
+        is($obj->{notification_type} // '', $want_critical ? 'critical' : '',
+            "monitor 4 overnight window, $label: " . ($want_critical ? 'critical' : 'not critical'));
+    }
 }
 
 done_testing();

@@ -240,6 +240,20 @@ don't send alarms if the alarm cause has "truck" in it. From 10pm - 6am, any ala
 Rules are evaluated sequentially; the first matching rule wins.
 
 For Monitor 998, don't send notifications from 5pm to 7am for all days of the week.
+
+A few things to keep in mind:
+
+- ``from`` and ``to`` are required on every rule and both ends are inclusive.
+  If two rules share a boundary minute (for example one ends at ``7:00 pm``
+  and the next starts at ``7:00 pm``), the rule listed first wins for that
+  minute. End a window at ``6:59 pm`` to avoid the overlap.
+- A window where ``to`` is earlier than ``from`` (``5 pm`` to ``7 am``) crosses
+  midnight and covers both the evening and the early morning.
+- A monitor that has no entry in the rules file always notifies. To silence a
+  monitor completely, give it a ``mute`` rule from ``12:00 am`` to ``11:59 pm``.
+- If ``es_rules.yml`` fails to parse, the ES loads no rules and every monitor
+  notifies. The ES logs ``rules: Failed loading es rules`` when this happens;
+  check the log after editing the file.
 Note that you need to install ``Time::Piece`` in Perl.
 
 
