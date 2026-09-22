@@ -11,7 +11,6 @@ use ZmEventNotification::Constants qw(:all);
 use ZmEventNotification::Config qw(:all);
 
 use Time::Piece;
-use Time::Seconds;
 
 sub isAllowedInRules {
 
@@ -89,10 +88,6 @@ sub isAllowedInRules {
       main::Debug(2, "rules: parsing rule $from/$to using format:$format");
       my $d_from = Time::Piece->strptime( $from, $format );
       my $d_to   = Time::Piece->strptime( $to,   $format );
-      if ( $d_to < $d_from ) {
-        main::Debug(2, "rules: to is less than from, so we are wrapping dates");
-        $d_from -= ONE_DAY;
-      }
       main::Debug(2, "rules: parsed time from: $d_from and to:$d_to");
 
       $rule_ref->{parsed_from} = $d_from;
@@ -112,7 +107,10 @@ sub isAllowedInRules {
         . " is between:"
         . $rule_ref->{parsed_from} . " and "
         . $rule_ref->{parsed_to});
-    if ( ($t < $rule_ref->{parsed_from}) || ($t > $rule_ref->{parsed_to}) ) {
+    my ($from, $to) = ( $rule_ref->{parsed_from}, $rule_ref->{parsed_to} );
+    # from > to means the window crosses midnight (e.g. 7:00 pm to 7:00 am)
+    my $in_window = $from <= $to ? ( $t >= $from && $t <= $to ) : ( $t >= $from || $t <= $to );
+    if ( !$in_window ) {
       main::Debug(1, "rules: Skipping this rule as times don't match..");
       next;
     }
