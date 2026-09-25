@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.32] - 2026-09-25
+
+### Bug Fixes
+
+- handle time windows that cross midnight ([e67cc0f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e67cc0f2c593574819560359af179a5a0aac23bd))
+
+### Miscellaneous
+
+- bump version to v7.0.32 ([7a13b23](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7a13b231bfe75ab4eee44bcde3b138d0ee29a971))
+
 ## [7.0.31] - 2026-09-18
 
 ### Bug Fixes
@@ -12,6 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.31 ([4f25eb2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4f25eb25fd0e65975dccb2c6bae0952f041b8b2b))
 - state the OpenCV range per model family and recommend ONNX ([9534359](https://github.com/ZoneMinder/zmeventnotificationNg/commit/95343599899b31229d2689981c87003c9d12cc57))
 - correct which models the shipped config enables ([add3dcc](https://github.com/ZoneMinder/zmeventnotificationNg/commit/add3dcc7dd6e6ea8f6a497d3def9c6ed3eee6e49))
 
