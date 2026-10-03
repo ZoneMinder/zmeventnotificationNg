@@ -68,6 +68,13 @@ use ZmEventNotification::Util qw(parse_job_line);
   is_deeply(\@f, ['add'], 'update_parallel_hooks: single command field');
 }
 
+# fcm_token_delete--TYPE--<token>  (no --SPLIT--)
+{
+  my ($job, @f) = parse_job_line('fcm_token_delete--TYPE--tok123');
+  is($job, 'fcm_token_delete', 'fcm_token_delete: job key');
+  is_deeply(\@f, ['tok123'], 'fcm_token_delete: token');
+}
+
 # Edge cases
 {
   my ($job, @f) = parse_job_line('');

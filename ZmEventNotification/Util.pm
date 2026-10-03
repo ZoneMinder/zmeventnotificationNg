@@ -179,12 +179,13 @@ sub maskPassword {
   return $str;
 }
 
+# Appends the event's storage path to an argument list (arrayref).
 sub appendImagePath {
-  my ($cmd, $eid) = @_;
+  my ($args, $eid) = @_;
   my $event = new ZoneMinder::Event($eid);
-  $cmd = $cmd . ' "' . $event->Path() . '"';
+  push @$args, $event->Path();
   main::Debug(2, 'Adding event path:' . $event->Path());
-  return $cmd;
+  return $args;
 }
 
 sub parseDetectResults {

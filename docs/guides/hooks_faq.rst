@@ -71,10 +71,11 @@ If your events are not getting detection results, follow these steps to isolate 
 
 Look at your ``zmeventnotification.log`` for lines like::
 
-   FORK:DoorBell (2), eid:12345 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' 12345 2 "DoorBell" "Motion" "/var/cache/zoneminder/events/2/2026-02-14/12345"
+   FORK:DoorBell (2), eid:12345 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' "12345" "2" "DoorBell" "Motion" "/var/cache/zoneminder/events/2/2026-02-14/12345"
 
 This tells you the exact arguments the ES passed to the hook script:
-``<eid> <mid> "<MonitorName>" "<Cause>" "<EventPath>"``.
+``"<eid>" "<mid>" "<MonitorName>" "<Cause>" "<EventPath>"``. Each quoted value is passed
+to the hook as one argument, exactly as shown.
 
 **Step 2: Run zm_detect manually with debug flags**
 

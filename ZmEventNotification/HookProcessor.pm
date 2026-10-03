@@ -20,6 +20,7 @@ our @EXPORT_OK = qw(
   isAllowedChannel
   shouldSendEventToConn
   sendOverWebSocket
+  hookLimitReached
 );
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
@@ -317,6 +318,17 @@ sub _tag_detected_objects {
   main::Error("tagEventObjects ($label): $@") if $@;
 }
 
+# Hook output is not trusted: invalid detection JSON is logged and treated
+# as no detections ([]) instead of killing the fork.
+# Returns (decoded, json string to pass on).
+sub _decode_detect_json {
+  my $str = shift;
+  my $ref = eval { decode_json($str) };
+  return ( $ref, $str ) if !$@;
+  main::Error("Could not parse hook detection JSON [$str]: $@");
+  return ( [], '[]' );
+}
+
 sub _build_alarm_obj {
   my ($mname, $mid, $eid, $cause, $detectJson, $rulesObject) = @_;
   return {
@@ -349,6 +361,24 @@ sub _end_notify_skip_reason {
   return '';
 }
 
+# Runs a configured command (hook, user script, api push script) with the
+# event values as separate arguments. The configured command line is still
+# parsed by the shell, so it may carry quotes or its own arguments. The
+# values (monitor name, cause, detection text/JSON) reach it through "$@"
+# and are never parsed by the shell. Appends the event path when
+# hook_pass_image_path is on. Returns (stdout, exit code) like backticks
+# and $? >> 8.
+sub _run_cmd {
+  my ( $label, $cmd, $eid, @args ) = @_;
+  appendImagePath( \@args, $eid ) if $hooks_config{hook_pass_image_path};
+  main::Debug(1, "$label:$cmd " . join( ' ', map {"\"$_\""} @args ));
+  open( my $fh, '-|', '/bin/sh', '-c', $cmd . ' "$@"', 'sh', @args )
+    or do { main::Error("$label: could not run $cmd: $!"); return ( '', 1 ); };
+  my $out = do { local $/; <$fh> } // '';
+  close($fh);
+  return ( $out, $? >> 8 );
+}
+
 sub _run_api_push {
   my ($temp_alarm_obj, $eid, $mid, $event_type, $hookResult) = @_;
   return unless $push_config{enabled} && $push_config{script};
@@ -366,23 +396,28 @@ sub _run_api_push {
   {
     main::Info("Sending push over API as it is allowed for $event_type");
 
-    my $api_cmd =
-        $push_config{script} . ' '
-      . $eid . ' '
-      . $mid . ' "'
-      . $temp_alarm_obj->{Name} . '" "'
-      . $temp_alarm_obj->{Cause} . '" '
-      . " $event_type";
-
-    $api_cmd = appendImagePath($api_cmd, $eid) if $hooks_config{hook_pass_image_path};
-    main::Info("Executing API script command for $event_type: $api_cmd");
-    my $api_res = `$api_cmd`;
-    chomp($api_res);
-    my $retcode = $? >> 8;
+    my ( $api_res, $retcode ) = _run_cmd( "Executing API script command for $event_type",
+      $push_config{script}, $eid, $eid, $mid, $temp_alarm_obj->{Name},
+      $temp_alarm_obj->{Cause}, $event_type );
     main::Debug(1, "API push script returned ($event_type): $retcode");
   } else {
     main::Info("Not sending push over API as it is not allowed for $event_type");
   }
+}
+
+# Parent, before forking for each new event of a tick. A child reports its
+# running hook ('add' on the job pipe) only by the next tick, so start hooks
+# forked earlier in this tick are counted in $$forked_ref.
+# Returns 1 if max_parallel_hooks is reached and the event must be dropped.
+# ponytail: per-tick count; a child slower than one tick to report its 'add'
+# is still missed. Count per child pid if that matters.
+sub hookLimitReached {
+  my ( $running, $forked_ref, $mid ) = @_;
+  my $max = $hooks_config{max_parallel_hooks};
+  return 1 if $max && ( $running + $$forked_ref ) >= $max;
+  my %skip_hooks = map { $_ => 1 } split( ',', $hooks_config{hook_skip_monitors} // '' );
+  $$forked_ref++ if $hooks_config{event_start_hook} && $hooks_config{enabled} && !$skip_hooks{$mid};
+  return 0;
 }
 
 sub processNewAlarmsInFork {
@@ -418,18 +453,10 @@ sub processNewAlarmsInFork {
         $hookResult = 0;
       } else {
         if ( $hooks_config{event_start_hook} && $hooks_config{enabled} ) {
-          my $cmd =
-              $hooks_config{event_start_hook} . ' '
-            . $eid . ' '
-            . $mid . ' "'
-            . $alarm->{MonitorName} . '" "'
-            . $alarm->{Start}->{Cause} . '"';
-
-          $cmd = appendImagePath($cmd, $eid) if $hooks_config{hook_pass_image_path};
-          main::Debug(1, 'Invoking hook on event start:' . $cmd);
           print main::WRITER "update_parallel_hooks--TYPE--add\n";
-          my $res = `$cmd`;
-          $hookResult = $? >> 8;
+          ( my $res, $hookResult ) = _run_cmd( 'Invoking hook on event start',
+            $hooks_config{event_start_hook}, $eid, $eid, $mid,
+            $alarm->{MonitorName}, $alarm->{Start}->{Cause} );
 
           print main::WRITER "update_parallel_hooks--TYPE--del\n";
 
@@ -441,23 +468,14 @@ sub processNewAlarmsInFork {
           main::Debug(1, "hook start returned with text:$resTxt json:$resJsonString exit:$hookResult");
 
           if ($hooks_config{event_start_hook_notify_userscript}) {
-            my $user_cmd =
-                $hooks_config{event_start_hook_notify_userscript} . ' '
-              . $hookResult . ' '
-              . $eid . ' '
-              . $mid . ' ' . '"'
-              . $alarm->{MonitorName} . '" ' . '"'
-              . $resTxt . '" ' . '"'
-              . $resJsonString . '" ';
-
-            $user_cmd = appendImagePath($user_cmd, $eid) if $hooks_config{hook_pass_image_path};
-            main::Debug(1, "invoking user start notification script $user_cmd");
-            my $user_res = `$user_cmd`;
+            _run_cmd( 'invoking user start notification script',
+              $hooks_config{event_start_hook_notify_userscript}, $eid,
+              $hookResult, $eid, $mid, $alarm->{MonitorName}, $resTxt, $resJsonString );
           } # user notify script
 
           if ( $hooks_config{use_hook_description} && $hookResult == 0 ) {
             $alarm->{Start}->{Cause} = $resTxt . ' ' . $alarm->{Start}->{Cause};
-            $alarm->{Start}->{DetectionJson} = decode_json($resJsonString);
+            ( $alarm->{Start}->{DetectionJson}, $resJsonString ) = _decode_detect_json($resJsonString);
 
             print main::WRITER 'active_event_update--TYPE--'
               . $mid
@@ -544,18 +562,10 @@ sub processNewAlarmsInFork {
 
         if ( $hooks_config{event_end_hook} && $hooks_config{enabled} ) {
 
-          my $cmd =
-              $hooks_config{event_end_hook} . ' '
-            . $eid . ' '
-            . $mid . ' "'
-            . $alarm->{MonitorName} . '" "'
-            . $notes . '"';
-
-          $cmd = appendImagePath($cmd, $eid) if $hooks_config{hook_pass_image_path};
-          main::Debug(1, 'Invoking hook on event end:' . $cmd);
           print main::WRITER "update_parallel_hooks--TYPE--add\n";
-          my $res = `$cmd`;
-          $hookResult = $? >> 8;
+          ( my $res, $hookResult ) = _run_cmd( 'Invoking hook on event end',
+            $hooks_config{event_end_hook}, $eid, $eid, $mid,
+            $alarm->{MonitorName}, $notes );
 
           print main::WRITER "update_parallel_hooks--TYPE--del\n";
 
@@ -567,28 +577,19 @@ sub processNewAlarmsInFork {
           main::Debug(1, "hook end returned with text:$resTxt  json:$resJsonString exit:$hookResult");
 
           $alarm->{End}->{Cause}         = $resTxt;
-          $alarm->{End}->{DetectionJson} = decode_json($resJsonString);
+          ( $alarm->{End}->{DetectionJson}, $resJsonString ) = _decode_detect_json($resJsonString);
 
           if ($hooks_config{event_end_hook_notify_userscript}) {
-            my $user_cmd =
-                $hooks_config{event_end_hook_notify_userscript} . ' '
-              . $hookResult . ' '
-              . $eid . ' '
-              . $mid . ' ' . '"'
-              . $alarm->{MonitorName} . '" ' . '"'
-              . $resTxt . '" ' . '"'
-              . $resJsonString . '" ';
-
-            $user_cmd = appendImagePath($user_cmd, $eid) if $hooks_config{hook_pass_image_path};
-            main::Debug(1, "invoking user end notification script $user_cmd");
-            my $user_res = `$user_cmd`;
+            _run_cmd( 'invoking user end notification script',
+              $hooks_config{event_end_hook_notify_userscript}, $eid,
+              $hookResult, $eid, $mid, $alarm->{MonitorName}, $resTxt, $resJsonString );
           } # user notify script
 
           if ($hooks_config{use_hook_description} &&
               ($hookResult == 0) && (index($resTxt,'detected:') != -1)) {
             main::Debug(1, "Event end: overwriting notes with $resTxt");
             $alarm->{End}->{Cause} = $resTxt . ' ' . $alarm->{End}->{Cause};
-            $alarm->{End}->{DetectionJson} = decode_json($resJsonString);
+            ( $alarm->{End}->{DetectionJson}, $resJsonString ) = _decode_detect_json($resJsonString);
 
             print main::WRITER 'active_event_update--TYPE--'
               . $mid
@@ -644,7 +645,12 @@ sub processNewAlarmsInFork {
         _run_api_push($temp_alarm_obj, $eid, $mid, 'event_end', $hookResult);
 
         main::Debug(1, 'Matching alarm to connection rules...');
-        foreach (@main::active_connections) {
+        # Same mute as the start path (shouldSendEventToConn)
+        my $muted = $escontrol_config{enabled}
+          && getNotificationStatusEsControl($mid) == ESCONTROL_FORCE_MUTE;
+        main::Debug(1, "ESCONTROL: Notifications are muted for Monitor:$mname($mid), not sending end notification")
+          if $muted;
+        foreach ( $muted ? () : @main::active_connections ) {
           if ( isInList( $_->{monlist}, $temp_alarm_obj->{MonitorId} ) ) {
             sendEvent( $temp_alarm_obj, $_, 'event_end', $hookResult );
           } else {

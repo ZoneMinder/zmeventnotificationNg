@@ -160,6 +160,17 @@ Perl test reference
        (listener setup incl. ``network.address`` without SSL, fatal SSL bind
        failure, connect/message/disconnect handlers, handler exceptions
        contained), ``restartES`` (keeps command-line arguments)
+   * - ``t/23-process-jobs.t``
+     - ``processJobs`` (the parent's job-pipe consumer in
+       ``zmeventnotification.pl``), run from the script source via
+       ``t/lib/PlSource.pm`` against a real pipe: every job type
+   * - ``t/24-fork-hook-limit.t``
+     - The parent's per-tick fork loop (from the script source) and the
+       ``max_parallel_hooks`` gate, including a burst of events in one tick
+   * - ``t/25-hook-fork-flow.t``
+     - ``processNewAlarmsInFork`` end to end with a stub hook script: exact
+       argv of hooks, user scripts and the API push script, hook exit
+       code/stdout handling, notifications sent, job-pipe lines
 
 
 Python unit / integration reference
