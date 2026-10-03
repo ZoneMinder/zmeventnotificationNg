@@ -316,3 +316,10 @@ class TestBuildYamlEndToEnd:
         # but the expanded value survives nested inside ml_sequence
         nested = output["ml"]["ml_sequence"]["object"]["general"]
         assert nested["object_detection_pattern"] == "(person|car)"
+
+    def test_plain_monitor_override_kept_and_globals_untouched(self, tmp_path):
+        cp = make_cp(SAMPLE_INI + "\n[monitor-2]\nwait=5\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["monitors"][2] == {"wait": 5}
+        nested = output["ml"]["ml_sequence"]["object"]["general"]
+        assert nested["object_detection_pattern"] == "(person|car)"
