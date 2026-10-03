@@ -101,7 +101,12 @@ ARGS_SCRIPT = ('cmd_args=({args}); check_args; '
     ("", "prompt prompt yes"),
     ("--install-hook --install-config", "yes prompt yes"),
     ("--no-hook-config-upgrade", "prompt prompt no"),
-    ("--no-install-hook", "no prompt yes"),
+    # Skipping the hook config also skips the legacy INI upgrade/rename,
+    # unless --hook-config-upgrade is given explicitly.
+    ("--no-install-hook", "no prompt no"),
+    ("--no-install-config", "no no no"),
+    ("--no-install-hook-config", "no prompt no"),
+    ("--no-install-hook --hook-config-upgrade", "no prompt yes"),
     ("--no-install-hook --install-hook-config", "yes prompt yes"),
     ("--no-install-es", "prompt no yes"),
 ])

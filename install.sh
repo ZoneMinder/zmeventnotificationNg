@@ -855,6 +855,7 @@ display_help() {
         --hook-config-upgrade: Upgrades legacy objectconfig.ini and migrates to objectconfig.yml
         You will need to manually review the migrated config
         --no-hook-config-upgrade: skips above process
+        (default: upgrade, except when hook config install is skipped by flag)
 
         --install-birdnet: Install birdnet-analyzer for audio bird species detection
         --no-install-birdnet: Skip BirdNET installation (default)
@@ -911,6 +912,7 @@ check_args() {
     PY_SUDO='sudo -H'
     DOWNLOAD_MODELS='yes'
     HOOK_CONFIG_UPGRADE='yes'
+    HOOK_CONFIG_UPGRADE_EXPLICIT='no'
 
     local i=0
     while [[ $i -lt ${#cmd_args[@]} ]]; do
@@ -943,9 +945,11 @@ check_args() {
             ;;
         --no-hook-config-upgrade)
             HOOK_CONFIG_UPGRADE='no'
+            HOOK_CONFIG_UPGRADE_EXPLICIT='yes'
             ;;
         --hook-config-upgrade)
             HOOK_CONFIG_UPGRADE='yes'
+            HOOK_CONFIG_UPGRADE_EXPLICIT='yes'
             ;;
         --install-config)
             INSTALL_HOOK_CONFIG='yes'
@@ -1003,6 +1007,12 @@ check_args() {
     if [[ ${INSTALL_HOOK_CONFIG_EXPLICIT} == 'no' ]]; then
         [[ ${INSTALL_HOOK} == 'no' ]] && INSTALL_HOOK_CONFIG='no'
         [[ ${INSTALL_HOOK} == 'prompt' && ${INSTALL_HOOK_CONFIG} == 'yes' ]] && INSTALL_HOOK_CONFIG='prompt'
+    fi
+
+    # Skipping the hook config also skips migrating/renaming objectconfig.ini,
+    # unless the upgrade was asked for explicitly
+    if [[ ${HOOK_CONFIG_UPGRADE_EXPLICIT} == 'no' && ${INSTALL_HOOK_CONFIG} == 'no' ]]; then
+        HOOK_CONFIG_UPGRADE='no'
     fi
 }
 
