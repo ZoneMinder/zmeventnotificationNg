@@ -279,3 +279,11 @@ def test_check_deps_requires_pip_without_venv(sandbox):
     assert r.returncode == 1
     assert "reached" not in r.stdout
     assert "/nonexistent/pip3 is not installed" in r.stdout
+
+
+def test_check_deps_no_global_pip_needed_with_venv(sandbox):
+    # The venv bootstraps its own pip (python3-venv / ensurepip).
+    r = run(sandbox, "INSTALL_ES=no; INSTALL_HOOK=yes; check_deps; echo reached",
+            USE_VENV="yes", PIP="/nonexistent/pip3")
+    assert r.returncode == 0, r.stdout
+    assert "reached" in r.stdout

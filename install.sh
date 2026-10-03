@@ -1042,7 +1042,8 @@ check_deps() {
         fi
     fi
 
-    if [[ ${INSTALL_HOOK} != 'no' ]]; then
+    # With a venv, ensure_venv bootstraps pip into it; a global pip is not used
+    if [[ ${INSTALL_HOOK} != 'no' && ${USE_VENV} != 'yes' ]]; then
         if ! command -v ${PIP} >/dev/null 2>&1; then
             print_error "${PIP} is not installed."
             echo "       Install it with: sudo ${INSTALLER} install python3-pip"
