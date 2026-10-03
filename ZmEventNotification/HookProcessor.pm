@@ -317,6 +317,17 @@ sub _tag_detected_objects {
   main::Error("tagEventObjects ($label): $@") if $@;
 }
 
+# Hook output is not trusted: invalid detection JSON is logged and treated
+# as no detections ([]) instead of killing the fork.
+# Returns (decoded, json string to pass on).
+sub _decode_detect_json {
+  my $str = shift;
+  my $ref = eval { decode_json($str) };
+  return ( $ref, $str ) if !$@;
+  main::Error("Could not parse hook detection JSON [$str]: $@");
+  return ( [], '[]' );
+}
+
 sub _build_alarm_obj {
   my ($mname, $mid, $eid, $cause, $detectJson, $rulesObject) = @_;
   return {
@@ -448,7 +459,7 @@ sub processNewAlarmsInFork {
 
           if ( $hooks_config{use_hook_description} && $hookResult == 0 ) {
             $alarm->{Start}->{Cause} = $resTxt . ' ' . $alarm->{Start}->{Cause};
-            $alarm->{Start}->{DetectionJson} = decode_json($resJsonString);
+            ( $alarm->{Start}->{DetectionJson}, $resJsonString ) = _decode_detect_json($resJsonString);
 
             print main::WRITER 'active_event_update--TYPE--'
               . $mid
@@ -550,7 +561,7 @@ sub processNewAlarmsInFork {
           main::Debug(1, "hook end returned with text:$resTxt  json:$resJsonString exit:$hookResult");
 
           $alarm->{End}->{Cause}         = $resTxt;
-          $alarm->{End}->{DetectionJson} = decode_json($resJsonString);
+          ( $alarm->{End}->{DetectionJson}, $resJsonString ) = _decode_detect_json($resJsonString);
 
           if ($hooks_config{event_end_hook_notify_userscript}) {
             _run_cmd( 'invoking user end notification script',
@@ -562,7 +573,7 @@ sub processNewAlarmsInFork {
               ($hookResult == 0) && (index($resTxt,'detected:') != -1)) {
             main::Debug(1, "Event end: overwriting notes with $resTxt");
             $alarm->{End}->{Cause} = $resTxt . ' ' . $alarm->{End}->{Cause};
-            $alarm->{End}->{DetectionJson} = decode_json($resJsonString);
+            ( $alarm->{End}->{DetectionJson}, $resJsonString ) = _decode_detect_json($resJsonString);
 
             print main::WRITER 'active_event_update--TYPE--'
               . $mid

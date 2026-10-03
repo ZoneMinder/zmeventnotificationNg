@@ -86,8 +86,15 @@ sub isAllowedInRules {
         ? $rule_ref->{time_format}
         : "%I:%M %p";
       main::Debug(2, "rules: parsing rule $from/$to using format:$format");
-      my $d_from = Time::Piece->strptime( $from, $format );
-      my $d_to   = Time::Piece->strptime( $to,   $format );
+      my ( $d_from, $d_to );
+      eval {
+        $d_from = Time::Piece->strptime( $from, $format );
+        $d_to   = Time::Piece->strptime( $to,   $format );
+      };
+      if ($@) {
+        main::Error("rules: (eid: $eid) skipping rule $rulecnt, cannot parse from/to $from/$to with format $format: $@");
+        next;
+      }
       main::Debug(2, "rules: parsed time from: $d_from and to:$d_to");
 
       $rule_ref->{parsed_from} = $d_from;
@@ -132,7 +139,11 @@ sub isAllowedInRules {
         . $rule_ref->{cause_has}
         . "<- is part of ->$cause<-");
     if ( exists( $rule_ref->{cause_has} ) ) {
-      my $re = qr/$rule_ref->{cause_has}/i;
+      my $re = eval { qr/$rule_ref->{cause_has}/i };
+      if ( !$re ) {
+        main::Error("rules: (eid: $eid) skipping rule $rulecnt, invalid cause_has $rule_ref->{cause_has}: $@");
+        next;
+      }
       if ( lc($cause) !~ /$re/) {
         main::Debug(1, "rules: (eid: $eid) Skipping this rule as "
             . $rule_ref->{cause_has}

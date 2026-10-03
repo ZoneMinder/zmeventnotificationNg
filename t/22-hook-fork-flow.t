@@ -270,4 +270,16 @@ subtest 'user script receives the detection JSON as one intact argument' => sub 
     is(scalar(@$u), 8, 'argument count unchanged');
 };
 
+subtest 'invalid detection JSON from a hook does not kill the fork' => sub {
+    set_hooks();
+    local $ENV{ZMT_OUT_start} = 'detected:person--SPLIT--{not json';
+    local $ENV{ZMT_OUT_end}   = 'detected:car--SPLIT--{not json';
+    my $lines = eval { run_event() };
+    is($@, '', 'fork did not die');
+    is($lines->[-1], 'active_event_delete--TYPE--5--SPLIT--100', 'active_event_delete still sent');
+    ok((grep { $_ eq 'active_event_update--TYPE--5--SPLIT--100--SPLIT--Start--SPLIT--Cause--SPLIT--detected:person Motion All--JSON--[]' } @$lines),
+        'parent gets [] instead of the invalid JSON');
+    is_deeply([ map { $_->[0] } @sent ], [ 'event_start', 'event_end' ], 'start and end still notified');
+};
+
 done_testing();
