@@ -598,8 +598,16 @@ sub processJobs {
         foreach (@active_connections) {
           next unless defined $_->{token};
           if ( $_->{token} eq $token ) {
-            $_->{badge} = $badge;
-            $_->{invocations} = {count=>$count, at=>$at};
+            # Each child computes badge/count from its fork-time copy, so
+            # concurrent children send the same values. Count here instead.
+            $_->{badge} = ( $_->{badge} // 0 ) + 1;
+            my $inv = $_->{invocations};
+            if ( ref($inv) eq 'HASH' && ( $inv->{at} // -1 ) == $at ) {
+              $_->{invocations} = { count => ( $inv->{count} // 0 ) + 1, at => $at };
+            } else {
+              # new month (the child reset it) or no counter yet
+              $_->{invocations} = { count => $count, at => $at };
+            }
           }
         }
       } elsif ( $job eq 'event_description' ) {
