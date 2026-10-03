@@ -4,6 +4,7 @@ use warnings;
 use Exporter 'import';
 use JSON;
 use POSIX qw(strftime);
+use Time::HiRes ();
 use Fcntl qw(:flock O_RDWR O_CREAT);
 use ZmEventNotification::Constants qw(:all);
 use ZmEventNotification::Config qw(:all);
@@ -368,15 +369,62 @@ sub _end_notify_skip_reason {
 # and are never parsed by the shell. Appends the event path when
 # hook_pass_image_path is on. Returns (stdout, exit code) like backticks
 # and $? >> 8.
+# With hook_timeout > 0 the command runs in its own process group. If its
+# stdout is not closed within hook_timeout seconds, the whole group gets TERM,
+# then KILL after HOOK_KILL_GRACE seconds, and ('', 1) is returned. The group
+# kill matters: the hook's children (e.g. python zm_detect.py) hold stdout.
+use constant HOOK_KILL_GRACE => 2;
+
 sub _run_cmd {
   my ( $label, $cmd, $eid, @args ) = @_;
   appendImagePath( \@args, $eid ) if $hooks_config{hook_pass_image_path};
   main::Debug(1, "$label:$cmd " . join( ' ', map {"\"$_\""} @args ));
+  my $timeout = $hooks_config{hook_timeout} // 0;
+  return _run_cmd_timeout( $label, $cmd, $timeout, @args ) if $timeout > 0;
   open( my $fh, '-|', '/bin/sh', '-c', $cmd . ' "$@"', 'sh', @args )
     or do { main::Error("$label: could not run $cmd: $!"); return ( '', 1 ); };
   my $out = do { local $/; <$fh> } // '';
   close($fh);
   return ( $out, $? >> 8 );
+}
+
+sub _run_cmd_timeout {
+  my ( $label, $cmd, $timeout, @args ) = @_;
+  my $pid = open( my $fh, '-|' );
+  if ( !defined($pid) ) {
+    main::Error("$label: could not run $cmd: $!");
+    return ( '', 1 );
+  }
+  if ( !$pid ) {
+    setpgrp( 0, 0 );
+    { exec( '/bin/sh', '-c', $cmd . ' "$@"', 'sh', @args ) };
+    POSIX::_exit(127);
+  }
+  setpgrp( $pid, $pid );    # also here, so the kill below cannot race the child's
+  my $deadline = Time::HiRes::time() + $timeout;
+  my $out = '';
+  my $rin = '';
+  vec( $rin, fileno($fh), 1 ) = 1;
+  while ( ( my $left = $deadline - Time::HiRes::time() ) > 0 ) {
+    next if select( my $rout = $rin, undef, undef, $left ) <= 0;
+    my $n = sysread( $fh, $out, 65536, length($out) );
+    next if !defined($n) && $!{EINTR};
+    if ( !$n ) {
+      close($fh);
+      return ( $out, $? >> 8 );
+    }
+  }
+  main::Error("$label: $cmd timed out after ${timeout}s, killing its process group");
+  kill( 'TERM', -$pid );
+  my $grace_end = Time::HiRes::time() + HOOK_KILL_GRACE;
+  while ( Time::HiRes::time() < $grace_end ) {
+    waitpid( $pid, POSIX::WNOHANG() );
+    last if !kill( 0, -$pid );
+    select( undef, undef, undef, 0.1 );
+  }
+  kill( 'KILL', -$pid ) if kill( 0, -$pid );
+  close($fh);
+  return ( '', 1 );
 }
 
 sub _run_api_push {

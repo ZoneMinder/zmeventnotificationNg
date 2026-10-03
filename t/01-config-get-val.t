@@ -85,5 +85,11 @@ is($@, '', 'loadEsConfigSettings does not die');
 is($ZmEventNotification::Config::server_config{port}, 9000, 'server_config port loaded');
 is($ZmEventNotification::Config::auth_config{enabled}, 1, 'auth enabled loaded');
 is($ZmEventNotification::Config::hooks_config{enabled}, 1, 'hooks enabled loaded');
+is($ZmEventNotification::Config::hooks_config{hook_timeout}, 0, 'hook_timeout defaults to 0 when absent');
+{
+    local $cfg->{hook}{hook_timeout} = 45;
+    loadEsConfigSettings($cfg);
+    is($ZmEventNotification::Config::hooks_config{hook_timeout}, 45, 'hook_timeout read from hook section');
+}
 
 done_testing();

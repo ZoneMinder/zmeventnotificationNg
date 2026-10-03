@@ -317,4 +317,55 @@ subtest 'hook_timeout 0 or unset, or a fast hook under a timeout: same argv, out
     is_deeply($run->(30), $base, 'fast hook under hook_timeout 30 behaves as unset');
 };
 
+# Hung start hooks. Each writes its process group id to $pgf, then hangs
+# in a way the real sh -> zm_event_start.sh -> python chain can.
+my $pgf = "$dir/pgid";
+my %hang = (
+    'hook itself sleeps'                   => 'sleep 30',
+    'hook exits, grandchild holds stdout'  => 'sleep 30 & exit 0',
+    'grandchild ignores TERM'              => q{trap '' TERM; sleep 30 & wait},
+);
+for my $case (sort keys %hang) {
+    subtest "hook_timeout kills a hung hook: $case" => sub {
+        my $script = "$dir/hang.sh";
+        open(my $h, '>', $script) or die $!;
+        print $h "ps -o pgid= -p \$\$ | tr -d ' \\n' > '$pgf'\necho detected:person\n$hang{$case}\n";
+        close($h);
+        set_hooks();
+        local $hooks_config{hook_timeout} = 1;
+        local $hooks_config{event_start_hook} = "sh $script";
+        my @errors;
+        no warnings 'redefine';
+        local *main::Error = sub { push @errors, $_[0] };
+        unlink $pgf;
+
+        my $t0 = time();
+        my $lines = eval {
+            local $SIG{ALRM} = sub { die "hung\n" };
+            alarm 15;
+            my $l = run_event();
+            alarm 0;
+            $l;
+        };
+        my $took = time() - $t0;
+        is($@, '', 'run_event returned (hook did not block the fork)');
+        cmp_ok($took, '<=', 5, "returned within timeout + grace (took ${took}s)");
+
+        my $log = argv_log();
+        is($log->{ustart}[0][1], 1, 'user script receives hook result 1');
+        is($log->{ustart}[0][5], '', 'partial output is discarded');
+        is_deeply(\@sent, [], 'treated as failure: no start push, end gated on start success');
+        is_deeply($log->{api}, undef, 'api push not allowed on failure');
+        is(scalar(grep { $_ eq 'update_parallel_hooks--TYPE--del' } @$lines), 2, 'del sent for both hooks');
+        ok((grep { /timed out after 1s/ && /hang\.sh/ } @errors), 'error names the command and timeout')
+            or diag explain \@errors;
+
+        chomp(my $pgid = do { open(my $p, '<', $pgf) or die $!; <$p> });
+        ok($pgid > 1 && $pgid != getpgrp(), "hook ran in its own process group ($pgid)");
+        my $alive = 1;
+        for (1 .. 20) { last if !($alive = kill(0, -$pgid)); select(undef, undef, undef, 0.1) }
+        ok(!$alive, 'no process left in the hook process group');
+    };
+}
+
 done_testing();
