@@ -77,6 +77,13 @@ def test_credentials_read_from_secrets_by_default(h):
     assert post['files'] is None
 
 
+def test_token_in_script_user_from_secrets(h):
+    # was `if not token or user:` -> secrets skipped, user sent as None
+    post = h.run(ARGS, token='file-token')
+    assert post['data']['token'] == 'file-token'
+    assert post['data']['user'] == 'sec-user'
+
+
 def test_event_end_title(h):
     post = h.run(ARGS[:4] + ['event_end'])
     assert post['data']['title'] == 'Ended:Front Alarm (42)'
@@ -89,3 +96,10 @@ def test_objdetect_image_attached(h, tmp_path):
     assert name == 'image.jpg'
     assert fh.name == str(tmp_path / 'objdetect.jpg')
     assert ctype == 'image/jpeg'
+
+
+def test_both_credentials_in_script_skip_secrets(h):
+    post = h.run(ARGS, token='file-token', user='file-user')
+    assert h.secrets_reads == 0
+    assert post['data']['token'] == 'file-token'
+    assert post['data']['user'] == 'file-user'

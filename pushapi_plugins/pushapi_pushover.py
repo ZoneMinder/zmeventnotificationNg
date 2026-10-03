@@ -106,7 +106,7 @@ if len(sys.argv) == 7:
     }
 
 
-if not param_dict['token'] or param_dict['user']:
+if not param_dict['token'] or not param_dict['user']:
     # read from secrets
     secrets = read_secrets()
     if not param_dict['token']:
