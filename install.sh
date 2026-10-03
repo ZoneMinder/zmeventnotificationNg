@@ -559,6 +559,7 @@ install_hook() {
 
     print_section 'Installing Hooks'
     mkdir -p "${TARGET_DATA}/bin" 2>/dev/null
+    mkdir -p "${TARGET_BIN_HOOK}" 2>/dev/null
     rm -fr  "${TARGET_DATA}/bin/*" 2>/dev/null
 
     #don't delete contrib so custom user files remain

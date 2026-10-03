@@ -258,6 +258,14 @@ def test_install_hook_default_layout(sandbox):
     assert 'CONFIG_FILE="{}/objectconfig.yml"'.format(sandbox["env"]["TARGET_CONFIG"]) in start
 
 
+def test_install_hook_custom_bin_dir_created(sandbox):
+    bin_hook = str(sandbox["tmp"] / "custom" / "hookbin")
+    r = run(sandbox, "PY_SUDO=''; install_hook", TARGET_BIN_HOOK=bin_hook, **HOOK_ENV)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for name in HOOK_FILES:
+        assert os.access(os.path.join(bin_hook, name), os.X_OK), name
+
+
 # ── check_deps ──────────────────────────────────────────────────────────
 
 def test_check_deps_requires_pip_without_venv(sandbox):
