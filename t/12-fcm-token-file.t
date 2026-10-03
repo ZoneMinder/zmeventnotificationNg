@@ -8,6 +8,7 @@ use lib "$FindBin::Bin/lib";
 use Test::More;
 use File::Temp qw(tempfile tempdir);
 use JSON;
+use POSIX ();
 
 require StubZM;
 
@@ -311,6 +312,54 @@ my $tmpdir = tempdir(CLEANUP => 1);
     writeTokenFile({ tokens => { a => { platform => 'ios' } } });
     is((stat $tf)[2] & 07777, 0640, 'mode preserved');
     is(_read_file($tf), '{"tokens":{"a":{"platform":"ios"}}}', 'content is plain encode_json');
+}
+
+{
+    # The new content replaces the file by rename (new inode), so a reader
+    # never sees it truncated; no temp file is left behind.
+    my $dir = "$tmpdir/atomic";
+    mkdir $dir;
+    my $tf = "$dir/tokens.txt";
+    _write_file($tf, '{"tokens":{"old":{}}}');
+    my $ino = (stat $tf)[1];
+    local $fcm_config{token_file} = $tf;
+    writeTokenFile({ tokens => { new => {} } });
+    isnt((stat $tf)[1], $ino, 'file replaced, not rewritten in place');
+    is(_read_file($tf), '{"tokens":{"new":{}}}', 'new content');
+    opendir(my $dh, $dir) or die;
+    my @left = grep { !/^\.\.?$/ && $_ ne 'tokens.txt' } readdir $dh;
+    is_deeply(\@left, [], 'no temp file left behind');
+}
+
+{
+    # A token file that does not exist yet gets the mode open() would give
+    my $tf = "$tmpdir/fresh_tokens.txt";
+    local $fcm_config{token_file} = $tf;
+    my $old = umask 022;
+    writeTokenFile({ tokens => {} });
+    umask $old;
+    is((stat $tf)[2] & 07777, 0644, 'new file is 0644 under umask 022');
+}
+
+{
+    # A reader polling during repeated writes never sees an empty or
+    # partial file
+    my $tf = "$tmpdir/reader.txt";
+    my $big = { tokens => { map { ("tok_$_" => { platform => 'android', monlist => '1,2,3' }) } 1 .. 300 } };
+    local $fcm_config{token_file} = $tf;
+    writeTokenFile($big);
+    my $pid = fork();
+    die "fork: $!" if !defined $pid;
+    if (!$pid) {
+        writeTokenFile($big) for 1 .. 300;
+        exit 0;
+    }
+    my $bad = 0;
+    while (waitpid($pid, POSIX::WNOHANG()) == 0) {
+        my $c = _read_file($tf);
+        $bad++ if !eval { decode_json($c); 1 };
+    }
+    is($bad, 0, 'no truncated or partial reads during writes');
 }
 
 SKIP: {

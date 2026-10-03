@@ -20,10 +20,12 @@ use ZmEventNotification::Util qw(getConnFields);
 # ---- stubs for what the extracted subs call ----
 our (@exec_args, @logged_errors, @processed_msgs);
 our %shm;    # monitor id -> { state, last_event, trigger_cause, trigger_text, alarm_cause }
+our ($token_saves, $monitor_loads) = (0, 0);
 
 sub main::STATE_ALARM () { 2 }
 sub main::STATE_ALERT () { 3 }
 sub main::zmMemInvalidate { }
+sub main::saveTokenInvocations { $token_saves++ }
 sub main::getNotesFromEventDB { '' }
 sub main::zmMemRead {
   my ($monitor, $fields) = @_;
@@ -35,6 +37,7 @@ sub main::zmMemRead {
   no warnings 'redefine', 'once';
   *main::Error = sub { push @logged_errors, $_[0] };
   *main::processIncomingMessage = sub { push @processed_msgs, $_[1] };
+  *main::loadMonitors = sub { $monitor_loads++ };    # StubZM's version is a no-op
 }
 
 {
@@ -93,6 +96,7 @@ my $code = join "\n",
   'my $zmdc_active = 0;',
   'sub _t_set_zmdc { $zmdc_active = shift }',
   'sub _t_reset_events { %active_events = () }',
+  'sub _t_reload_due { $monitor_reload_time = 0 }',
   map( { pl_sub($_) } qw(checkNewEvents initSocketServer restartES) ),
   '1;';
 eval $code or die "compiling extracted subs failed: $@";
@@ -182,6 +186,23 @@ subtest 'checkNewEvents: trigger_cause does not stick to later events' => sub {
 
 # ===== initSocketServer =====
 %main::monitors = ();
+
+subtest 'checkNewEvents: monitor reload saves token counters (FCM on) and reloads monitors' => sub {
+  %main::monitors = ();
+  ( $token_saves, $monitor_loads ) = ( 0, 0 );
+  local $fcm_config{enabled} = 1;
+  _t_reload_due();
+  checkNewEvents();
+  is( $token_saves,   1, 'token counters written back on reload' );
+  is( $monitor_loads, 1, 'monitors reloaded' );
+
+  ( $token_saves, $monitor_loads ) = ( 0, 0 );
+  $fcm_config{enabled} = 0;
+  _t_reload_due();
+  checkNewEvents();
+  is( $token_saves,   0, 'no token file write with FCM off' );
+  is( $monitor_loads, 1, 'monitors still reloaded' );
+};
 
 subtest 'initSocketServer: plain WS with default address listens on port only' => sub {
   local $ssl_config{enabled} = 0;
