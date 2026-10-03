@@ -107,6 +107,8 @@ When hooks are enabled, the script invoked on a new event is defined by ``event_
 
 The ES does not interpret the hook script's logic — it only checks the return value. A return of ``0`` means the hook succeeded; any non-zero value means it failed. This return code determines whether a notification is sent, as described below.
 
+By default the ES waits for the hook as long as it takes. If you set ``hook_timeout`` (seconds) in the ``hook`` section, a hook still running after that long is killed along with all of its child processes and counts as a failure (exit code ``1``, no detection text).
+
 3.2: Will the ES send a notification?
 ********************************************
 So at this stage, we have a new event and we need to decide if the ES will send out a notification. The following factors matter:

@@ -98,9 +98,21 @@ The file is organized into these sections:
   ``tag_detected_objects``, and user scripts
 
 ``max_parallel_hooks`` (default ``0`` = unlimited) limits how many hook child
-processes can run concurrently. When the limit is reached, new events wait until a
-slot is free. This is useful for resource-constrained systems where too many
-simultaneous ML detections can cause OOM or GPU contention.
+processes can run concurrently. When the limit is reached, new events are
+dropped (logged as an error); they are not queued. This is useful for
+resource-constrained systems where too many simultaneous ML detections can
+cause OOM or GPU contention.
+
+``hook_timeout`` (default ``0`` = no timeout) is the number of seconds a hook,
+user notify script, or ``api_push_script`` may run. Without it, a hook that
+never returns blocks its event forever and keeps its ``max_parallel_hooks``
+slot. When the timeout is hit, the ES sends ``TERM`` to the command and every
+process it started (the command runs in its own process group), sends
+``KILL`` 2 seconds later to whatever is left, and logs an error naming the
+command. The run counts as a hook failure: exit code ``1`` and no output, so
+``event_start_notify_on_hook_fail`` / ``event_end_notify_on_hook_fail`` apply
+and ``event_end_notify_if_start_success`` suppresses the end notification.
+Set it well above your slowest normal detection.
 
 .. _es_config_reference:
 
@@ -376,6 +388,9 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
    * - ``max_parallel_hooks``
      - ``0``
      - Maximum concurrent hook processes (``0`` = unlimited)
+   * - ``hook_timeout``
+     - ``0``
+     - Seconds a hook, user notify script or API push script may run before it and its child processes are killed and the run counts as a failure (``0`` = no timeout)
    * - ``event_start_hook``
      - *none*
      - Script to run when an event starts

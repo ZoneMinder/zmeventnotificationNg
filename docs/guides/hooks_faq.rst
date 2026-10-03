@@ -181,6 +181,10 @@ How do I solve this issue?
 - Fix your zone triggers. This is really the right way. If you use object detection, re-look at how your zone triggers to be able to capture the object of interest as soon as possible. If you do that, chances are high that by the time the script runs, the image containing the object will be written to disk.
 
 
+A hook hangs and the event never finishes
+-------------------------------------------
+If a hook never returns (for example a stuck remote ML request), the fork for that event waits forever and the hook keeps its ``max_parallel_hooks`` slot. Set ``hook_timeout`` in the ``hook`` section of ``zmeventnotification.yml`` to a number of seconds well above your slowest normal detection. A hook that runs longer is killed together with every process it started, the ES logs ``timed out after <N>s``, and the run is treated as a hook failure. The default, ``0``, means no timeout.
+
 I am trying to use YoloV4 and I see errors in OpenCV
 -----------------------------------------------------
 - If you plan to use YoloV4 (full or Tiny) the minimum version requirement OpenCV 4.4.

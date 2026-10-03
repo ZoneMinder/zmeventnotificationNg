@@ -170,7 +170,9 @@ Perl test reference
    * - ``t/25-hook-fork-flow.t``
      - ``processNewAlarmsInFork`` end to end with a stub hook script: exact
        argv of hooks, user scripts and the API push script, hook exit
-       code/stdout handling, notifications sent, job-pipe lines
+       code/stdout handling, notifications sent, job-pipe lines,
+       ``hook_timeout`` (unchanged behavior at 0; hung hooks and their
+       process group killed and treated as failure)
 
 
 Python unit / integration reference
