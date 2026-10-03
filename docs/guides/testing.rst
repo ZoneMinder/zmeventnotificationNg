@@ -152,6 +152,10 @@ Perl test reference
    * - ``t/19-fork-orchestration.t``
      - HookProcessor fork helpers: ``_build_alarm_obj``,
        ``_tag_detected_objects`` (both JSON shapes), ``_run_api_push`` gating
+   * - ``t/22-hook-fork-flow.t``
+     - ``processNewAlarmsInFork`` end to end with a stub hook script: exact
+       argv of hooks, user scripts and the API push script, hook exit
+       code/stdout handling, notifications sent, job-pipe lines
 
 
 Python unit / integration reference
