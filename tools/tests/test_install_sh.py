@@ -298,3 +298,55 @@ def test_check_deps_no_global_pip_needed_with_venv(sandbox):
             USE_VENV="yes", PIP="/nonexistent/pip3")
     assert r.returncode == 0, r.stdout
     assert "reached" in r.stdout
+
+
+# ── paths with spaces / symlinked configs ───────────────────────────────
+
+def test_config_tools_run_from_venv_path_with_space(sandbox):
+    # ensure_venv points PYTHON/PIP into ZM_VENV, which may contain a space.
+    vbin = sandbox["tmp"] / "my venv" / "bin"
+    vbin.mkdir(parents=True)
+    os.symlink(shutil.which("python3"), vbin / "python")
+    log = sandbox["tmp"] / "pip.log"
+    (vbin / "pip").write_text('#!/bin/sh\necho "$@" >> "{}"\n'.format(log))
+    (vbin / "pip").chmod(0o755)
+    target = sandbox["env"]["TARGET_CONFIG"]
+    write_es_configs(sandbox, target)
+    os.remove(cfg(sandbox, "secrets.yml"))
+    with open(cfg(sandbox, "secrets.ini"), "w") as f:
+        f.write("[secrets]\nzm_user=me\n")
+    r = run(sandbox, "PY_SUDO=''; install_es_config",
+            PYTHON=str(vbin / "python"), PIP=str(vbin / "pip"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "install pyyaml" in log.read_text()
+    assert "ZM_USER: me" in open(cfg(sandbox, "secrets.yml")).read()
+    # upgrade ran: a key from zmeventnotification.example.yml was added
+    assert "upgrade failed" not in r.stdout
+    assert "fcm:" in open(cfg(sandbox, "zmeventnotification.yml")).read()
+
+
+def test_symlinked_configs_edited_through_the_link(sandbox):
+    # e.g. configs kept in a git repo or on a mounted volume and linked in.
+    target = sandbox["env"]["TARGET_CONFIG"]
+    write_es_configs(sandbox, target)
+    with open(cfg(sandbox, "objectconfig.yml"), "w") as f:
+        f.write("general:\n  secrets: /etc/zm/secrets.ini\n")
+    with open(cfg(sandbox, "zmeventnotification.yml"), "w") as f:
+        f.write("general:\n  secrets: /etc/zm/secrets.ini\n")
+    real = sandbox["tmp"] / "real"
+    real.mkdir()
+    names = ("zmeventnotification.yml", "objectconfig.yml", "secrets.yml", "es_rules.yml")
+    for name in names:
+        shutil.move(cfg(sandbox, name), str(real / name))
+        os.symlink(str(real / name), cfg(sandbox, name))
+    r = run(sandbox, "PY_SUDO=''; install_es_config; install_hook_config",
+            DOWNLOAD_MODELS="no")
+    assert r.returncode == 0, r.stdout + r.stderr
+    for name in names:
+        assert os.path.islink(cfg(sandbox, name)), name
+        assert os.readlink(cfg(sandbox, name)) == str(real / name), name
+    for name in ("zmeventnotification.yml", "objectconfig.yml"):
+        text = (real / name).read_text()
+        assert "secrets: {}/secrets.yml".format(target) in text, name
+    assert "fcm:" in (real / "zmeventnotification.yml").read_text()
+    assert "ml:" in (real / "objectconfig.yml").read_text()

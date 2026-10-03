@@ -368,3 +368,26 @@ class TestMigrateMonitorZonePatternQuotes:
         cp = make_cp('[monitor-1]\nyard_zone_detection_pattern="(car)"\n', tmp_path)
         assert migrate_monitor(cp, "monitor-1") == {
             "zones": {"yard": {"detection_pattern": "(car)"}}}
+
+
+class TestInlineCommentsMatchLegacyHook:
+    """The legacy hook read objectconfig.ini with
+    ConfigParser(inline_comment_prefixes='#'): ' #...' was a comment, ';'
+    after a value was not. The migration must hand the new hook the same
+    value the legacy hook saw.
+    """
+
+    def test_hash_after_whitespace_is_a_comment(self, tmp_path):
+        cp = make_cp("[general]\nbase_data_path = /var/lib/zm # data dir\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["general"]["base_data_path"] == "/var/lib/zm"
+
+    def test_semicolon_after_value_is_kept(self, tmp_path):
+        cp = make_cp("[general]\nwait = 0 ; inline comment\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["general"]["wait"] == "0 ; inline comment"
+
+    def test_hash_without_whitespace_is_kept(self, tmp_path):
+        cp = make_cp("[general]\npassword = abc#def\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["general"]["password"] == "abc#def"

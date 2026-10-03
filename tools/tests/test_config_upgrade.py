@@ -294,3 +294,36 @@ class TestMainBugs:
         after = yaml.safe_load(user.read_text())
         assert "monitors" not in after
         assert "ml" in after  # real schema sections still merged
+
+
+class TestMainStandardTags:
+    def test_explicit_core_tags_load_the_same(self, tmp_path, monkeypatch):
+        import yaml
+        user_text = "a:\n  s: !!str 5\n  i: !!int '7'\n  q: !!str yes\n"
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, "a:\n  s: x\n  new: 1\n")
+        after = yaml.safe_load(user.read_text())
+        assert after["a"].pop("new") == 1
+        assert after == yaml.safe_load(user_text)
+
+
+class TestMainUnknownTags:
+    # 'user: !ZM_USER' (unquoted) is a YAML tag, not a secret token.
+    # YAML::XS ignores unknown tags; PyYAML safe_load rejects the file.
+    USER = ("secrets:\n"
+            "  ZM_USER: !ZM_USER\n"
+            "  EMPTY: !EMPTY\n"
+            "  NAME: !NAME bob\n"
+            "  S: !seq [a, b]\n"
+            "  M: !map {x: 1}\n")
+
+    def test_upgrade_keeps_tags_verbatim(self, tmp_path, monkeypatch):
+        import yaml
+        user = _run_upgrade(tmp_path, monkeypatch, self.USER,
+                            "secrets:\n  ZM_USER: x\n  NEW: y\n")
+        text = user.read_text()
+        for tag in ("!ZM_USER", "!EMPTY", "!NAME", "!seq", "!map"):
+            assert tag in text, tag
+        raw = lambda t: yaml.load(t, Loader=yaml.BaseLoader)
+        after = raw(text)
+        assert after["secrets"].pop("NEW") == "y"
+        assert after == raw(self.USER)

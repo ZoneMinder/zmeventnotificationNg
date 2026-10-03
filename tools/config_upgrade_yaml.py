@@ -64,6 +64,39 @@ RawDumper.add_representer(
     lambda dumper, data: dumper.represent_scalar(data.tag, str(data), style=data.style))
 
 
+class RawSeq(list):
+    """A sequence with an unknown tag, kept so it is written back as-is."""
+
+
+class RawMap(dict):
+    """A mapping with an unknown tag, kept so it is written back as-is."""
+
+
+def _construct_unknown(loader, node):
+    """Unknown tags (e.g. an unquoted 'user: !ZM_USER') are kept verbatim.
+
+    YAML::XS ignores such tags; safe_load rejects the file. Writing the tag
+    back unchanged keeps what each reader sees.
+    """
+    if isinstance(node, yaml.ScalarNode):
+        return RawScalar(node.value, node.tag, node.style)
+    if isinstance(node, yaml.SequenceNode):
+        obj = RawSeq(loader.construct_sequence(node, deep=True))
+    else:
+        obj = RawMap(loader.construct_mapping(node, deep=True))
+    obj.tag, obj.flow_style = node.tag, node.flow_style
+    return obj
+
+
+RawLoader.add_constructor(None, _construct_unknown)
+RawDumper.add_representer(
+    RawSeq,
+    lambda dumper, data: dumper.represent_sequence(data.tag, data, flow_style=data.flow_style))
+RawDumper.add_representer(
+    RawMap,
+    lambda dumper, data: dumper.represent_mapping(data.tag, data, flow_style=data.flow_style))
+
+
 def deep_merge(base, override):
     """Recursively merge *base* into *override* (in-place).
 
