@@ -55,7 +55,7 @@ config_vals = {
         },
         'image_path':{
             'section': 'general',
-            'default': '/var/lib/zmeventnotification/images',
+            'default': '${base_data_path}/images',
             'type': 'string'
         },
         

@@ -311,6 +311,12 @@ class TestMonitorIdInjection:
     def test_image_path_default_with_default_base(self, tmp_path, ctx):
         assert self._image_path_for(tmp_path, ctx) == "/var/lib/zmeventnotification/images"
 
+    def test_image_path_default_follows_base_data_path(self, tmp_path, ctx):
+        # docs/guides/config.rst: default is ${base_data_path}/images, and
+        # install.sh creates ${TARGET_DATA}/images
+        assert self._image_path_for(
+            tmp_path, ctx, base_data_path="/data/zmes") == "/data/zmes/images"
+
     def test_explicit_image_path_kept(self, tmp_path, ctx):
         assert self._image_path_for(
             tmp_path, ctx, base_data_path="/data/zmes", image_path="/srv/img") == "/srv/img"
