@@ -436,7 +436,9 @@ sub checkNewEvents() {
 
     next if !$current_event;    # skip monitors that have never recorded an event
 
-    my $alarm_cause = zmMemRead($monitor, 'shared_data:alarm_cause')
+    # declare separately: 'my ... if' keeps the previous iteration's value
+    my $alarm_cause;
+    $alarm_cause = zmMemRead($monitor, 'shared_data:alarm_cause')
       if ($notify_config{read_alarm_cause});
     $alarm_cause = $trigger_cause
       if ( defined($trigger_cause)

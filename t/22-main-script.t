@@ -167,6 +167,19 @@ subtest 'checkNewEvents: read_alarm_cause off uses trigger_cause' => sub {
   is( $ev[0]{Alarm}{Start}{Cause}, 'Forced Web', 'trigger_cause used when alarm cause not read' );
 };
 
+subtest 'checkNewEvents: trigger_cause does not stick to later events' => sub {
+  _t_reset_events();
+  local $notify_config{read_alarm_cause} = 0;
+  alarm_on( 1, 500, trigger_cause => 'Forced Web' );
+  my @a = checkNewEvents();
+  is( $a[0]{Alarm}{Start}{Cause}, 'Forced Web', 'first event has trigger cause' );
+  alarm_on( 2, 600, trigger_cause => '' );
+  my @b = checkNewEvents();
+  is( scalar @b, 1, 'second event reported' );
+  ok( !$b[0]{Alarm}{Start}{Cause}, 'second event has no stale cause' )
+    or diag( 'got cause: ' . $b[0]{Alarm}{Start}{Cause} );
+};
+
 # ===== initSocketServer =====
 %main::monitors = ();
 
