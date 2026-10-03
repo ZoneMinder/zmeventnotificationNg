@@ -6,6 +6,9 @@ use JSON;
 use MIME::Base64;
 use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday);
+use Fcntl qw(:flock);
+use File::Temp qw(tempfile);
+use File::Basename qw(dirname);
 use ZmEventNotification::Constants qw(:all);
 use ZmEventNotification::Config qw(:all);
 use ZmEventNotification::Util qw(uniq rsplit buildPictureUrl maskPassword getFrameId);
@@ -34,12 +37,54 @@ sub readTokenFile {
   return $hr;
 }
 
+# Writes a temp file in the same directory and renames it over the token
+# file, so a reader never sees a truncated file and a failed write leaves
+# the old one. The old file's mode and owner are kept; if that is not
+# possible (directory not writable, symlink, cannot chown) the file is
+# rewritten in place as before.
 sub writeTokenFile {
   my $tokens_data = shift;
-  open(my $fh, '>', $fcm_config{token_file})
-    or do { main::Error("Error writing tokens file $fcm_config{token_file}: $!"); return; };
-  print $fh encode_json($tokens_data);
-  close($fh);
+  my $file = $fcm_config{token_file};
+  my $json = encode_json($tokens_data);
+
+  my @st = stat($file);
+  my ( $tfh, $tmp );
+  ( $tfh, $tmp ) = eval { tempfile( '.tokens.XXXXXX', DIR => dirname($file) ) } if !-l $file;
+  if ( $tfh && @st
+    && !( chmod( $st[2] & 07777, $tmp ) && chown( $st[4], $st[5], $tmp ) ) ) {
+    close($tfh);
+    unlink($tmp);
+    $tfh = undef;
+  }
+  if ( !$tfh ) {
+    open( my $fh, '>', $file )
+      or do { main::Error("Error writing tokens file $file: $!"); return; };
+    print $fh $json;
+    close($fh) or main::Error("Error writing tokens file $file: $!");
+    return;
+  }
+  # tempfile creates 0600; a new token file gets the mode open() would give
+  chmod( 0666 & ~umask, $tmp ) if !@st;
+  my $ok = print $tfh $json;
+  $ok = close($tfh) && $ok;
+  if ( !$ok || !rename( $tmp, $file ) ) {
+    main::Error("Error writing tokens file $file: $!");
+    unlink($tmp);
+  }
+}
+
+# Serializes read-modify-write of the token file between the parent and
+# event forks. Keep the returned handle while reading and writing; the lock
+# is released when it is closed or goes out of scope. Returns undef (no
+# lock, as before) if the lock file cannot be opened.
+sub _lockTokenFile {
+  my $lockfile = $fcm_config{token_file} . '.lock';
+  open( my $fh, '>>', $lockfile ) or do {
+    main::Debug(1, "Cannot open $lockfile: $!. Updating tokens without a lock");
+    return undef;
+  };
+  flock( $fh, LOCK_EX );
+  return $fh;
 }
 
 sub _check_monthly_limit {
@@ -78,6 +123,7 @@ sub _base64url_encode {
 sub deleteFCMToken {
   my $dtoken = shift;
   main::Debug(2, 'DeleteToken called with ...' . substr( $dtoken, -10 ));
+  my $lock = _lockTokenFile();
   my $hr = readTokenFile();
   return if !$hr;
   delete $hr->{tokens}->{$dtoken} if exists $hr->{tokens}->{$dtoken};
@@ -536,6 +582,7 @@ sub saveFCMTokens {
 
   main::Debug(2, "SaveTokens called with:monlist=$smonlist, intlist=$sintlist, platform=$splatform, push=$spushstate");
 
+  my $lock = _lockTokenFile();
   my $tokens_data = readTokenFile();
   return if !$tokens_data;
 

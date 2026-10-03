@@ -266,4 +266,54 @@ my $tmpdir = tempdir(CLEANUP => 1);
     is($@, '', 'no error on missing file');
 }
 
+# ===== writeTokenFile =====
+
+{
+    # Rewrite keeps the file's permission bits and exact JSON format
+    my $tf = "$tmpdir/mode.txt";
+    _write_file($tf, '{"tokens":{}}');
+    chmod 0640, $tf;
+    local $fcm_config{token_file} = $tf;
+    writeTokenFile({ tokens => { a => { platform => 'ios' } } });
+    is((stat $tf)[2] & 07777, 0640, 'mode preserved');
+    is(_read_file($tf), '{"tokens":{"a":{"platform":"ios"}}}', 'content is plain encode_json');
+}
+
+SKIP: {
+    skip 'root ignores directory permissions', 1 if $> == 0;
+    # A writable token file in a read-only directory is still updated
+    my $ro = "$tmpdir/ro";
+    mkdir $ro;
+    my $tf = "$ro/tokens.txt";
+    _write_file($tf, '{"tokens":{}}');
+    chmod 0555, $ro;
+    local $fcm_config{token_file} = $tf;
+    local $fcm_config{enabled} = 1;
+    saveFCMTokens('tok_ro', '1', '0', 'ios', 'enabled', undef);
+    chmod 0755, $ro;
+    ok(exists decode_json(_read_file($tf))->{tokens}{tok_ro}, 'token saved in place');
+}
+
+{
+    # Parallel read-modify-write (parent saving a token while event forks
+    # update the file) must not lose entries or expose a truncated file.
+    my $tf = "$tmpdir/race.txt";
+    _write_file($tf, '{"tokens":{}}');
+    local $fcm_config{token_file} = $tf;
+    local $fcm_config{enabled} = 1;
+    my @pids;
+    for my $w (1 .. 3) {
+        my $pid = fork();
+        die "fork: $!" if !defined $pid;
+        if (!$pid) {
+            saveFCMTokens("tok_${w}_$_", '1', '0', 'android', 'enabled', undef) for 1 .. 40;
+            exit 0;
+        }
+        push @pids, $pid;
+    }
+    waitpid($_, 0) for @pids;
+    my $data = decode_json(_read_file($tf));
+    is(scalar(keys %{ $data->{tokens} }), 120, 'all 120 tokens saved by 3 parallel writers');
+}
+
 done_testing();
