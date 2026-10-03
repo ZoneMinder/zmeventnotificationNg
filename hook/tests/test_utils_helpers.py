@@ -78,3 +78,12 @@ class TestFindWholeWord:
     def test_prefix_of_zone_does_not_match(self):
         assert findWholeWord("Drive")("Motion: Driveway") is None
         assert findWholeWord("Zone_1")("Motion: Zone_12") is None
+
+    # ZM zone names are literal text, not regexes
+    def test_regex_metachars_in_zone_name_are_literal(self):
+        assert findWholeWord("Yard[1]")("Motion: Yard1") is None
+        assert findWholeWord("Yard[1]")("Motion: Yard[1]") is not None
+        assert findWholeWord("Gate (east)")("Motion: Gate (east)") is not None
+
+    def test_unbalanced_zone_name_does_not_raise(self):
+        assert findWholeWord("Door(")("Motion: Door(") is not None
