@@ -322,8 +322,9 @@ class TestMonitorIdInjection:
             tmp_path, ctx, base_data_path="/data/zmes", image_path="/srv/img") == "/srv/img"
 
     def test_output_path_overrides_image_path(self, tmp_path, ctx):
+        out = str(tmp_path / "out")
         assert self._image_path_for(
-            tmp_path, ctx, args={"output_path": "/tmp/out"}) == "/tmp/out"
+            tmp_path, ctx, args={"output_path": out}) == out
 
     def test_output_path_existing_dir_untouched(self, tmp_path, ctx):
         out = tmp_path / "out"
@@ -334,6 +335,22 @@ class TestMonitorIdInjection:
         assert g.config["write_debug_image"] == "yes"
         assert os.listdir(str(out)) == ["keep.jpg"]
         assert g.logger.error == []
+
+    def test_output_path_missing_dir_created(self, tmp_path, ctx):
+        out = tmp_path / "nonexistent" / "out"
+        assert self._image_path_for(
+            tmp_path, ctx, args={"output_path": str(out)}) == str(out)
+        assert out.is_dir()
+        assert g.logger.error == []
+
+    def test_output_path_uncreatable_logs_error(self, tmp_path, ctx):
+        blocker = tmp_path / "file"
+        blocker.write_text("x")
+        out = str(blocker / "out")
+        assert self._image_path_for(
+            tmp_path, ctx, args={"output_path": out}) == out
+        assert len(g.logger.error) == 1
+        assert out in g.logger.error[0]
 
 
 # ===========================================================================

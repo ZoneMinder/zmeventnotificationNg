@@ -544,6 +544,10 @@ def process_config(args, ctx):
         g.logger.Debug(1, 'Output path modified to {}'.format(args.get('output_path')))
         g.config['image_path'] = args.get('output_path')
         g.config['write_debug_image'] = 'yes'
+        try:
+            os.makedirs(g.config['image_path'], exist_ok=True)
+        except OSError as e:
+            g.logger.Error('Could not create output path {}: {}'.format(g.config['image_path'], e))
 
     # Apply CLI overrides last — highest priority
     if args.get('override'):
