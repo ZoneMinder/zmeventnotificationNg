@@ -300,4 +300,21 @@ subtest 'invalid detection JSON from a hook does not kill the fork' => sub {
     is_deeply([ map { $_->[0] } @sent ], [ 'event_start', 'event_end' ], 'start and end still notified');
 };
 
+subtest 'hook_timeout 0 or unset, or a fast hook under a timeout: same argv, output, exit and pipe' => sub {
+    my $run = sub {
+        my ($t) = @_;
+        set_hooks();
+        local $hooks_config{hook_timeout} = $t;
+        my %r = (lines => run_event(), argv => argv_log(), sent => [@sent]);
+        local $ENV{ZMT_EXIT_start} = 3;
+        $r{fail_lines} = run_event();
+        $r{fail_argv}  = argv_log();
+        return \%r;
+    };
+    my $base = $run->(undef);
+    is($base->{fail_argv}{ustart}[0][1], 3, 'baseline: hook exit code 3 reaches the user script');
+    is_deeply($run->(0),  $base, 'hook_timeout 0 behaves as unset');
+    is_deeply($run->(30), $base, 'fast hook under hook_timeout 30 behaves as unset');
+};
+
 done_testing();
