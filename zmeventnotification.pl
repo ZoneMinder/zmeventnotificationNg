@@ -163,6 +163,8 @@ Usage: zmeventnotification.pl [OPTION]...
 
 USAGE
 
+our @original_argv = @ARGV;    # restartES re-execs with these; GetOptions consumes @ARGV
+
 GetOptions(
   'help'         => \$help,
   'config=s'     => \$config_file,
@@ -668,7 +670,7 @@ sub restartES {
     Debug(1, 'Self exec-ing as zmdc is not tracking me');
 
     Info("restarting $0");
-    exec($0);
+    exec($0, @original_argv);
   }
 }
 

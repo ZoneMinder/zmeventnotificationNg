@@ -329,4 +329,15 @@ subtest 'restartES: standalone with no args re-execs $0' => sub {
   is_deeply( \@exec_args, [$0], 'exec($0)' );
 };
 
+subtest 'restartES: standalone re-exec keeps the original command line' => sub {
+  $main::wss = FakeWSS->new;
+  @exec_args = ();
+  @main::original_argv = ( '--config', '/etc/zm/custom.yml', '--debug' );
+  my $err = run_catching { restartES() };
+  is( $err, "EXEC\n", 'exec called' );
+  is_deeply( \@exec_args, [ $0, '--config', '/etc/zm/custom.yml', '--debug' ],
+    'original arguments passed again' );
+  @main::original_argv = ();
+};
+
 done_testing();
