@@ -91,6 +91,15 @@ def test_direct_run_still_reaches_main(sandbox):
     assert "--install-es" in r.stdout
 
 
+@pytest.mark.skipif(not shutil.which("dash"), reason="dash not installed")
+def test_run_under_dash_still_fails_loudly(sandbox):
+    # install.sh is bash-only. Under dash it used to stop with a syntax
+    # error; the source guard must not turn that into a silent exit 0.
+    r = subprocess.run(["dash", "./install.sh", "--help"], cwd=sandbox["repo"],
+                       env=sandbox["env"], capture_output=True, text=True, timeout=60)
+    assert r.returncode != 0
+
+
 # ── check_args ──────────────────────────────────────────────────────────
 
 ARGS_SCRIPT = ('cmd_args=({args}); check_args; '

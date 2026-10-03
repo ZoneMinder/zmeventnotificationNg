@@ -855,7 +855,7 @@ display_help() {
         --hook-config-upgrade: Upgrades legacy objectconfig.ini and migrates to objectconfig.yml
         You will need to manually review the migrated config
         --no-hook-config-upgrade: skips above process
-        (default: upgrade, except when hook config install is skipped by flag)
+        (default: upgrade, except when neither the hook nor its config is installed)
 
         --install-birdnet: Install birdnet-analyzer for audio bird species detection
         --no-install-birdnet: Skip BirdNET installation (default)
@@ -1063,7 +1063,8 @@ check_deps() {
 ###################################################
 
 # When sourced (tools/tests/test_install_sh.py), only define the functions.
-(return 0 2>/dev/null) && return 0
+# BASH_VERSION check: under dash, (return 0) succeeds at top level too.
+if [ -n "${BASH_VERSION}" ] && (return 0 2>/dev/null); then return 0; fi
 
 cmd_args=("$@") # because we need a function to access them
 check_args
