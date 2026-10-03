@@ -254,7 +254,9 @@ Tools test reference
        rewrites, hook install layout, dependency checks
    * - ``tools/tests/test_make_release.py``
      - ``scripts/make_release.sh`` preflight (throwaway repo, local bare
-       origin, stub ``gh``/``git-cliff``/``curl``): aborts before any push
+       origin, stub ``gh``/``git-cliff``/``curl``): aborts before any push;
+       pyzm pin sync (incl. ``pyzm[ml]>=``); existing tag: 1 = new version,
+       2 = overwrite
 
 
 e2e test reference

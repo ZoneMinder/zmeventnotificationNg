@@ -103,17 +103,11 @@ if git rev-parse "v${VER}" &>/dev/null; then
     BUMPED="${MAJOR}.${MINOR}.$((PATCH + 1))"
 
     echo "Tag v${VER} already exists."
-    echo "  1) Overwrite existing release (v${VER})"
-    echo "  2) Bump version: v${VER} -> v${BUMPED}"
+    echo "  1) Bump version: v${VER} -> v${BUMPED}"
+    echo "  2) Overwrite existing release (v${VER})"
     read -p "Choose [1/2] or anything else to abort: " choice
     case "$choice" in
         1)
-            echo "  Deleting old release and tag v${VER} ..."
-            gh release delete "v${VER}" --repo "$GH_REPO" --yes 2>/dev/null || true
-            git tag -d "v${VER}"
-            git push --no-verify origin --delete "v${VER}" 2>/dev/null || true
-            ;;
-        2)
             echo "  Bumping version: v${VER} -> v${BUMPED}"
             VER="$BUMPED"
             echo "$VER" > VERSION
@@ -122,6 +116,12 @@ if git rev-parse "v${VER}" &>/dev/null; then
             git commit -m "chore: bump version to v${VER}"
             git push --no-verify origin master
             echo "  Done."
+            ;;
+        2)
+            echo "  Deleting old release and tag v${VER} ..."
+            gh release delete "v${VER}" --repo "$GH_REPO" --yes 2>/dev/null || true
+            git tag -d "v${VER}"
+            git push --no-verify origin --delete "v${VER}" 2>/dev/null || true
             ;;
         *)
             echo "Aborted."

@@ -148,3 +148,35 @@ def test_pyzm_pin_already_current_no_prompt(release):
     r = release["run"]()
     assert "latest on PyPI" not in r.stdout
     assert "could not find" not in r.stdout
+
+
+# ── existing tag: option 1 is a new version, option 2 overwrites ──────────
+
+def _tag_exists(release, tag):
+    r = subprocess.run(["git", "rev-parse", "-q", "--verify", "refs/tags/" + tag],
+                       cwd=release["work"], capture_output=True)
+    return r.returncode == 0
+
+
+def test_existing_tag_option_1_bumps_to_new_version(release):
+    release["git"]("tag", "v1.2.3")
+    r = release["run"](answers="1\n")
+    assert "1) Bump version: v1.2.3 -> v1.2.4" in r.stdout
+    assert (release["work"] / "VERSION").read_text().strip() == "1.2.4"
+    assert _tag_exists(release, "v1.2.3"), "the published tag must be kept"
+
+
+def test_existing_tag_option_2_overwrites(release):
+    release["git"]("tag", "v1.2.3")
+    r = release["run"](answers="2\n")
+    assert "2) Overwrite existing release (v1.2.3)" in r.stdout
+    assert (release["work"] / "VERSION").read_text().strip() == "1.2.3"
+    assert not _tag_exists(release, "v1.2.3")
+
+
+def test_existing_tag_other_answer_aborts(release):
+    release["git"]("tag", "v1.2.3")
+    r = release["run"](answers="x\n")
+    assert "Aborted." in r.stdout
+    assert (release["work"] / "VERSION").read_text().strip() == "1.2.3"
+    assert _tag_exists(release, "v1.2.3")
