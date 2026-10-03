@@ -220,6 +220,10 @@ Tools test reference
      - ``config_edit`` parse/apply, comment-out, ``_global_`` cross-section
    * - ``tools/tests/test_install_doctor.py``
      - ``install_doctor`` model discovery, OpenCV-version + model classification
+   * - ``tools/tests/test_install_sh.py``
+     - ``install.sh`` functions (sourced in a sandboxed repo copy, no system
+       paths): flag parsing, venv handling, config install/upgrade, path
+       rewrites, hook install layout, dependency checks
 
 
 e2e test reference

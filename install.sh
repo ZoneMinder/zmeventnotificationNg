@@ -1036,6 +1036,10 @@ check_deps() {
 ###################################################
 # script main
 ###################################################
+
+# When sourced (tools/tests/test_install_sh.py), only define the functions.
+(return 0 2>/dev/null) && return 0
+
 cmd_args=("$@") # because we need a function to access them
 check_args
 DISTRO=$(get_distro)
