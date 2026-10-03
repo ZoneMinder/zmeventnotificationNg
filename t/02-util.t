@@ -89,6 +89,27 @@ ZmEventNotification::Util->import(':all');
         'https://zm.example.com/zm/index.php?view=image&eid=EVENTID&fid=objdetect&width=600';
     my $url_fail = buildPictureUrl(999, 'motion', 1, 'test', 'alarm');
     like($url_fail, qr/fid=snapshot/, 'buildPictureUrl: objdetect -> snapshot on hook fail');
+
+    # Hook success: objdetect is kept
+    like(buildPictureUrl(999, 'detected:person', 0, 'test', 'alarm'), qr/fid=objdetect&/,
+        'buildPictureUrl: objdetect kept when the hook succeeded');
+
+    # No start hook / hooks disabled: no objdetect image is ever written, so
+    # every objdetect form must become snapshot
+    for my $fid (qw(objdetect objdetect_jpg objdetect_gif)) {
+        local $ZmEventNotification::Config::notify_config{picture_url} =
+            "https://zm.example.com/zm/index.php?view=image&eid=EVENTID&fid=$fid&width=600";
+        {
+            local $ZmEventNotification::Config::hooks_config{enabled} = 0;
+            like(buildPictureUrl(999, 'motion', 0, 'test', ''), qr/fid=snapshot&/,
+                "buildPictureUrl: fid=$fid -> snapshot when hooks are disabled");
+        }
+        {
+            local $ZmEventNotification::Config::hooks_config{event_start_hook} = '';
+            like(buildPictureUrl(999, 'motion', 0, 'test', ''), qr/fid=snapshot&/,
+                "buildPictureUrl: fid=$fid -> snapshot without a start hook");
+        }
+    }
 }
 
 # ===== getFrameId =====

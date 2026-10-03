@@ -156,7 +156,7 @@ sub buildPictureUrl {
 
   if (!$hooks_config{event_start_hook} || !$hooks_config{enabled}) {
     main::Debug(2, "$label: no start hook or hooks disabled, not using objdetect in url");
-    $pic = $pic =~ s/objdetect(_...)/snapshot/gr;
+    $pic = $pic =~ s/objdetect(_...)?/snapshot/gr;
   }
 
   $pic .= '&username=' . $notify_config{picture_portal_username} if $notify_config{picture_portal_username};
