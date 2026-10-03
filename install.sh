@@ -178,7 +178,7 @@ create_venv() {
 
     echo "Creating venv at ${ZM_VENV} ..."
     mkdir -p "$(dirname "${ZM_VENV}")"
-    ${PYTHON} -m venv "${ZM_VENV}"
+    "${PYTHON}" -m venv "${ZM_VENV}"
 
     # Bootstrap pip ourselves if the distro still didn't. Safe here because the
     # venv can't yet see a system pip (no --system-site-packages above).
@@ -200,7 +200,7 @@ create_venv() {
     # (system OpenCV, etc.) without shadowing the venv's own pip.
     enable_system_site_packages
 
-    print_success "Venv created (Python: $(${ZM_VENV}/bin/python --version))"
+    print_success "Venv created (Python: $("${ZM_VENV}/bin/python" --version))"
 }
 
 # Install the OS package that lets `python3 -m venv` bootstrap pip. `venv --help`
@@ -614,8 +614,8 @@ install_hook() {
     
 
     print_section 'Installing Python hook package'
-    ${PY_SUDO} ${PIP} uninstall -y zmes-hooks ${PIP_COMPAT} >/dev/null 2>&1
-    ${PY_SUDO} ${PIP} uninstall -y zmes_hook_helpers ${PIP_COMPAT} >/dev/null 2>&1
+    ${PY_SUDO} "${PIP}" uninstall -y zmes-hooks ${PIP_COMPAT} >/dev/null 2>&1
+    ${PY_SUDO} "${PIP}" uninstall -y zmes_hook_helpers ${PIP_COMPAT} >/dev/null 2>&1
 
     ZM_DETECT_VERSION=$(cat VERSION | tr -d '[:space:]')
     if [ "$ZM_DETECT_VERSION" == "" ]; then
@@ -626,10 +626,10 @@ install_hook() {
     fi
 
     PYZM_PREINSTALLED=false
-    ${PIP} show pyzm &>/dev/null && PYZM_PREINSTALLED=true
+    "${PIP}" show pyzm &>/dev/null && PYZM_PREINSTALLED=true
 
     echo "Running: ${PY_SUDO} ${PIP} -v install hook/ ${PIP_COMPAT}"
-    run_dimmed ${PY_SUDO} ${PIP} -v install hook/ ${PIP_COMPAT} && print_opencv_message || print_error "python hooks setup failed"
+    run_dimmed ${PY_SUDO} "${PIP}" -v install hook/ ${PIP_COMPAT} && print_opencv_message || print_error "python hooks setup failed"
 
     print_section 'Installing package dependencies'
     run_dimmed ${INSTALLER} install -y gifsicle -qq
@@ -650,12 +650,12 @@ rewrite_etc_zm_paths() {
 # move ES config files
 install_es_config() {
     # Ensure pyyaml is installed for config migration/upgrade scripts
-    run_dimmed ${PY_SUDO} ${PIP} install pyyaml ${PIP_COMPAT}
+    run_dimmed ${PY_SUDO} "${PIP}" install pyyaml ${PIP_COMPAT}
 
     # Auto-migrate from INI to YAML if needed
     if [ -f "${TARGET_CONFIG}/zmeventnotification.ini" ] && [ ! -f "${TARGET_CONFIG}/zmeventnotification.yml" ]; then
         echo "Found existing zmeventnotification.ini but no zmeventnotification.yml - running migration..."
-        if ${PYTHON} tools/es_config_migrate_yaml.py -c "${TARGET_CONFIG}/zmeventnotification.ini" -o "${TARGET_CONFIG}/zmeventnotification.yml"; then
+        if "${PYTHON}" tools/es_config_migrate_yaml.py -c "${TARGET_CONFIG}/zmeventnotification.ini" -o "${TARGET_CONFIG}/zmeventnotification.yml"; then
             print_success "ES config migration complete"
             mv "${TARGET_CONFIG}/zmeventnotification.ini" "${TARGET_CONFIG}/zmeventnotification.ini.migrated"
             print_important "Renamed old zmeventnotification.ini to zmeventnotification.ini.migrated"
@@ -665,7 +665,7 @@ install_es_config() {
     fi
     if [ -f "${TARGET_CONFIG}/secrets.ini" ] && [ ! -f "${TARGET_CONFIG}/secrets.yml" ]; then
         echo "Found existing secrets.ini but no secrets.yml - running migration..."
-        if ${PYTHON} tools/es_config_migrate_yaml.py --secrets -c "${TARGET_CONFIG}/secrets.ini" -o "${TARGET_CONFIG}/secrets.yml"; then
+        if "${PYTHON}" tools/es_config_migrate_yaml.py --secrets -c "${TARGET_CONFIG}/secrets.ini" -o "${TARGET_CONFIG}/secrets.yml"; then
             print_success "secrets migration complete"
             chown "${WEB_OWNER}:${WEB_GROUP}" "${TARGET_CONFIG}/secrets.yml"
             chmod 640 "${TARGET_CONFIG}/secrets.yml"
@@ -682,7 +682,7 @@ install_es_config() {
             print_success "config copied" || print_error "could not copy config"
     else
         echo "Upgrading existing ES config with any new keys..."
-        ${PYTHON} tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/zmeventnotification.yml" -e zmeventnotification.example.yml -m managed_defaults.yml -s zmeventnotification &&
+        "${PYTHON}" tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/zmeventnotification.yml" -e zmeventnotification.example.yml -m managed_defaults.yml -s zmeventnotification &&
             print_success "ES config upgraded" || print_warning "ES config upgrade failed"
     fi
     if [ ! -f "${TARGET_CONFIG}/secrets.yml" ]; then
@@ -691,7 +691,7 @@ install_es_config() {
             print_success "secrets copied" || print_error "could not copy secrets"
     else
         echo "Upgrading existing secrets with any new keys..."
-        ${PYTHON} tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/secrets.yml" -e secrets.example.yml &&
+        "${PYTHON}" tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/secrets.yml" -e secrets.example.yml &&
             print_success "secrets upgraded" || print_warning "secrets upgrade failed"
     fi
 
@@ -709,7 +709,7 @@ install_es_config() {
     # Migrate es_rules.json to YAML if needed
     if [ -f "${TARGET_CONFIG}/es_rules.json" ] && [ ! -f "${TARGET_CONFIG}/es_rules.yml" ]; then
         echo "Found existing es_rules.json but no es_rules.yml - converting..."
-        if ${PYTHON} -c "
+        if "${PYTHON}" -c "
 import json, yaml, sys
 with open('${TARGET_CONFIG}/es_rules.json') as f:
     data = json.load(f)
@@ -731,7 +731,7 @@ with open('${TARGET_CONFIG}/es_rules.yml', 'w') as f:
             print_success "rules copied" || print_error "could not copy rules"
     else
         echo "Upgrading existing rules with any new keys..."
-        ${PYTHON} tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/es_rules.yml" -e es_rules.example.yml &&
+        "${PYTHON}" tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/es_rules.yml" -e es_rules.example.yml &&
             print_success "rules upgraded" || print_warning "rules upgrade failed"
     fi
 
@@ -748,7 +748,7 @@ install_hook_config() {
     # Auto-migrate from INI to YAML if needed
     if [ -f "${TARGET_CONFIG}/objectconfig.ini" ] && [ ! -f "${TARGET_CONFIG}/objectconfig.yml" ]; then
         echo "Found existing objectconfig.ini but no objectconfig.yml - running migration..."
-        if ${PYTHON} tools/config_migrate_yaml.py -c "${TARGET_CONFIG}/objectconfig.ini" -o "${TARGET_CONFIG}/objectconfig.yml"; then
+        if "${PYTHON}" tools/config_migrate_yaml.py -c "${TARGET_CONFIG}/objectconfig.ini" -o "${TARGET_CONFIG}/objectconfig.yml"; then
             print_success "migration complete"
             mv "${TARGET_CONFIG}/objectconfig.ini" "${TARGET_CONFIG}/objectconfig.ini.migrated"
             print_important "Renamed old objectconfig.ini to objectconfig.ini.migrated"
@@ -763,7 +763,7 @@ install_hook_config() {
             print_success "hook config copied" || print_error "could not copy hook config"
     else
         echo "Upgrading existing hook config with any new keys and managed defaults..."
-        ${PYTHON} tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/objectconfig.yml" -e hook/objectconfig.example.yml -m managed_defaults.yml -s objectconfig &&
+        "${PYTHON}" tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/objectconfig.yml" -e hook/objectconfig.example.yml -m managed_defaults.yml -s objectconfig &&
             print_success "hook config upgraded" || print_warning "hook config upgrade failed"
     fi
 
@@ -807,7 +807,7 @@ run_doctor_checks() {
 
     print_section 'Post-install diagnostic checks'
 
-    ${PYTHON} tools/install_doctor.py \
+    "${PYTHON}" tools/install_doctor.py \
         --hook-config "$hook_config" \
         --es-config "$es_config" \
         --web-owner "${WEB_OWNER}" \
@@ -1045,7 +1045,7 @@ check_deps() {
 
     # With a venv, ensure_venv bootstraps pip into it; a global pip is not used
     if [[ ${INSTALL_HOOK} != 'no' && ${USE_VENV} != 'yes' ]]; then
-        if ! command -v ${PIP} >/dev/null 2>&1; then
+        if ! command -v "${PIP}" >/dev/null 2>&1; then
             print_error "${PIP} is not installed."
             echo "       Install it with: sudo ${INSTALLER} install python3-pip"
             missing=1
@@ -1163,7 +1163,7 @@ fi
 if [ "${INSTALL_BIRDNET}" == "yes" ]
 then
     print_section 'Installing BirdNET audio detection (birdnet-analyzer)'
-    run_dimmed ${PY_SUDO} ${PIP} install birdnet-analyzer ${PIP_COMPAT} -q
+    run_dimmed ${PY_SUDO} "${PIP}" install birdnet-analyzer ${PIP_COMPAT} -q
     print_success "birdnet-analyzer installed"
 fi
 
@@ -1173,7 +1173,7 @@ then
     # If old INI exists, migrate to YAML
     if [ -f "${TARGET_CONFIG}/objectconfig.ini" ] && [ ! -f "${TARGET_CONFIG}/objectconfig.yml" ]; then
         echo "Migrating objectconfig.ini to objectconfig.yml..."
-        if ${PYTHON} tools/config_migrate_yaml.py -c "${TARGET_CONFIG}/objectconfig.ini" -o "${TARGET_CONFIG}/objectconfig.yml"; then
+        if "${PYTHON}" tools/config_migrate_yaml.py -c "${TARGET_CONFIG}/objectconfig.ini" -o "${TARGET_CONFIG}/objectconfig.yml"; then
             print_success "YAML migration complete"
             mv "${TARGET_CONFIG}/objectconfig.ini" "${TARGET_CONFIG}/objectconfig.ini.migrated"
             print_important "Renamed old objectconfig.ini to objectconfig.ini.migrated"
