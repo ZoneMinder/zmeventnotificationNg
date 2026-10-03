@@ -648,6 +648,96 @@ subtest 'processIncomingMessage - badge without top-level token warns nothing' =
     is($main::active_connections[0]{badge}, 0, 'badge untouched on the non-matching connection');
 };
 
+# ===== characterization: token registration / filter / escontrol auth =====
+subtest 'processIncomingMessage - token re-registered from new connection replaces stored entry' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    local $auth_config{enabled} = 1;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        # entry restored from the token file: no conn
+        { type => FCM, state => INVALID_CONNECTION, token => 'tokT', badge => 0,
+          invocations => { count => 5, at => 1 } },
+        { conn => $mock_conn, state => VALID_CONNECTION, type => WEB, token => '',
+          monlist => '', intlist => '', badge => 0 },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'push',
+        data => { type => 'token', token => 'tokT', platform => 'android',
+                  monlist => '1,2', intlist => '0,0', state => 'enabled' } }));
+
+    is($main::active_connections[0]{state}, PENDING_DELETE, 'stored entry marked for delete');
+    is($main::active_connections[1]{token}, 'tokT', 'token moved to the live connection');
+    is($main::active_connections[1]{type}, FCM, 'live connection becomes FCM');
+    is($main::active_connections[1]{invocations}{count}, 5, 'invocation count carried over');
+    is(scalar @save_fcm_tokens_calls, 1, 'token saved once');
+    is($save_fcm_tokens_calls[0][0], 'tokT', 'saved token');
+};
+
+subtest 'processIncomingMessage - same connection re-sends token, entry updated in place' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    local $auth_config{enabled} = 1;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        { conn => $mock_conn, state => VALID_CONNECTION, type => FCM, token => 'tokT',
+          monlist => '1', intlist => '0', badge => 0, invocations => { count => 1, at => 1 } },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'push',
+        data => { type => 'token', token => 'tokT', platform => 'ios',
+                  monlist => '3', intlist => '60', state => 'disabled' } }));
+
+    is($main::active_connections[0]{state}, VALID_CONNECTION, 'entry kept');
+    is($main::active_connections[0]{monlist}, '3', 'monlist updated');
+    is($main::active_connections[0]{pushstate}, 'disabled', 'pushstate updated');
+    is($main::active_connections[0]{platform}, 'ios', 'platform updated');
+    is(scalar @save_fcm_tokens_calls, 1, 'token saved');
+};
+
+subtest 'processIncomingMessage - badge on authenticated connection' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    local $auth_config{enabled} = 1;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        { conn => $mock_conn, state => VALID_CONNECTION, type => FCM, token => 'tokT', badge => 3 },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'push', data => { type => 'badge', badge => 0 } }));
+    is($main::active_connections[0]{badge}, 0, 'badge reset');
+};
+
+subtest 'processIncomingMessage - control filter updates own connection' => sub {
+    reset_state();
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    my $other = MockConn->new('192.168.1.9', 999);
+    @main::active_connections = (
+        { conn => $other, state => VALID_CONNECTION, type => FCM, token => 'tokO', monlist => '9', intlist => '9' },
+        { conn => $mock_conn, state => VALID_CONNECTION, type => FCM, token => 'tokT', monlist => '1', intlist => '0', pushstate => '' },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'control',
+        data => { type => 'filter', monlist => '4,5', intlist => '0,30' } }));
+    is($main::active_connections[1]{monlist}, '4,5', 'own monlist updated');
+    is($main::active_connections[1]{intlist}, '0,30', 'own intlist updated');
+    is($main::active_connections[0]{monlist}, '9', 'other connection untouched');
+    is(scalar @save_fcm_tokens_calls, 1, 'saved once');
+    is($save_fcm_tokens_calls[0][0], 'tokT', 'saved own token');
+};
+
+subtest 'processIncomingMessage - escontrol auth with configured password' => sub {
+    reset_state();
+    local $escontrol_config{enabled} = 1;
+    local $escontrol_config{password} = 'adminpass';
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        { conn => $mock_conn, state => PENDING_AUTH, type => WEB, token => '', category => 'normal' },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'auth', category => 'escontrol',
+        data => { user => 'x', password => 'adminpass' } }));
+    my $response = decode_json($mock_conn->{sent}[0]);
+    is($response->{status}, 'Success', 'escontrol auth succeeds');
+    is($main::active_connections[0]{category}, 'escontrol', 'category escontrol');
+    is($main::active_connections[0]{state}, VALID_CONNECTION, 'connection valid');
+};
+
 done_testing();
 
 # Mock connection class
