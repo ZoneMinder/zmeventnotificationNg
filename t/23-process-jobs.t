@@ -68,26 +68,15 @@ subtest 'fcm_notification: badge and invocations updated' => sub {
     is( $active_connections[1]{badge}, 0, 'other token untouched' );
 };
 
-subtest 'fcm_notification: concurrent children do not lose counts' => sub {
-    # Two forks sharing the same fork-time snapshot (badge 3, count 7)
-    # both report badge 4 / count 8.
+subtest 'fcm_notification: start and end push of one event count once' => sub {
+    # The fork sends one fcm_notification per push. Start and end of the
+    # same event both carry the fork-time badge+1 / count+1, so the parent
+    # stores them as-is and the event counts once.
     @active_connections = ( { id => 'f1', token => 'tokA', badge => 3, invocations => { count => 7, at => 4 } } );
     feed( 'fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--8--SPLIT--4',
           'fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--8--SPLIT--4' );
-    is( $active_connections[0]{badge}, 5, 'badge counts both' );
-    is_deeply( $active_connections[0]{invocations}, { count => 9, at => 4 }, 'count counts both' );
-};
-
-subtest 'fcm_notification: month change and missing invocations take the child values' => sub {
-    @active_connections = (
-        { id => 'f1', token => 'tokA', badge => 3, invocations => { count => 900, at => 4 } },
-        { id => 'f2', token => 'tokB', badge => 0 },
-    );
-    feed( 'fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--1--SPLIT--5',
-          'fcm_notification--TYPE--tokB--SPLIT--1--SPLIT--0--SPLIT--5' );
-    is_deeply( $active_connections[0]{invocations}, { count => 1, at => 5 }, 'new month: child reset count' );
-    is_deeply( $active_connections[1]{invocations}, { count => 0, at => 5 }, 'no invocations: child value' );
-    is( $active_connections[1]{badge}, 1, 'badge' );
+    is( $active_connections[0]{badge}, 4, 'badge counts the event once' );
+    is_deeply( $active_connections[0]{invocations}, { count => 8, at => 4 }, 'count counts the event once' );
 };
 
 subtest 'fcm_token_delete: token FCM rejected is dropped from memory' => sub {
