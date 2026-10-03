@@ -294,3 +294,13 @@ class TestMainBugs:
         after = yaml.safe_load(user.read_text())
         assert "monitors" not in after
         assert "ml" in after  # real schema sections still merged
+
+
+class TestMainStandardTags:
+    def test_explicit_core_tags_load_the_same(self, tmp_path, monkeypatch):
+        import yaml
+        user_text = "a:\n  s: !!str 5\n  i: !!int '7'\n  q: !!str yes\n"
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, "a:\n  s: x\n  new: 1\n")
+        after = yaml.safe_load(user.read_text())
+        assert after["a"].pop("new") == 1
+        assert after == yaml.safe_load(user_text)
