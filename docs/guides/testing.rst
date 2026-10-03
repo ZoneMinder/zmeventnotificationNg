@@ -173,6 +173,9 @@ Python unit / integration reference
      - ``send_push_notifications``: monitor filtering, throttle, cross-process
        push lock, picture-URL
        rewrite, Android/iOS payloads, invalid-token deletion heuristic
+   * - ``tests/test_pushapi_pushover.py``
+     - ``pushapi_plugins/pushapi_pushover.py`` run as a script: credentials from
+       the script or secrets, title/message, image attachment selection
    * - ``tests/test_cli_overrides.py``
      - ``-O`` dot-notation overrides: coercion, ``[index]`` / ``[name]`` paths,
        error/edge cases
@@ -192,8 +195,9 @@ Python unit / integration reference
        patterns onto ZM zone geometry
    * - ``tests/test_pyzm_contract.py``
      - The shape ES consumes from the REAL pyzm: ``DetectionResult`` keys,
-       ``detect_event`` signature, and ``ml_sequence.general.zone_match_strategy``
-       still reaching ``DetectorConfig``
+       ``detect_event`` signature, ``ml_sequence.general.zone_match_strategy``
+       still reaching ``DetectorConfig``, and ``ZMClientConfig`` deriving the
+       portal URL from ``api_url``
    * - ``tests/test_zm_detect.py``
      - CLI argparse early-exits (version, missing config)
 
