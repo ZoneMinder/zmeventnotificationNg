@@ -142,7 +142,9 @@ Perl test reference
    * - ``t/15-websocket-handler.t``
      - WebSocket message handling and **``validateAuth`` password comparison**
        (bcrypt ``$2b$``/``$2y$`` normalization, MySQL ``password41``, ``-ZM-``
-       guard)
+       guard), malformed-message rejection, push requires auth, escontrol
+       login without a configured password, per-connection matching by
+       object identity (reverse-proxy ip:port reuse)
    * - ``t/16-fcm-auth.t``
      - Google service-account JWT / access token
    * - ``t/17-version.t``
@@ -152,6 +154,12 @@ Perl test reference
    * - ``t/19-fork-orchestration.t``
      - HookProcessor fork helpers: ``_build_alarm_obj``,
        ``_tag_detected_objects`` (both JSON shapes), ``_run_api_push`` gating
+   * - ``t/22-main-script.t``
+     - Subs extracted from ``zmeventnotification.pl``: ``checkNewEvents``
+       (alarm/trigger cause, no stale cause across events), ``initSocketServer``
+       (listener setup incl. ``network.address`` without SSL, fatal SSL bind
+       failure, connect/message/disconnect handlers, handler exceptions
+       contained), ``restartES`` (keeps command-line arguments)
 
 
 Python unit / integration reference
