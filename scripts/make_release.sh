@@ -264,7 +264,7 @@ validate_install() {
     fi
 
     # 7. ES Perl script compiles against installed modules (advisory)
-    if perl -c "${bin_es}/zmeventnotification.pl" >/dev/null 2>&1; then
+    if sudo -u "$web_owner" perl -c "${bin_es}/zmeventnotification.pl" >/dev/null 2>&1; then
         echo "  OK   zmeventnotification.pl compiles"
     else
         echo "  WARN zmeventnotification.pl did not compile (check Perl deps)"
