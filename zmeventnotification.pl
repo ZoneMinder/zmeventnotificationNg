@@ -134,6 +134,7 @@ if (version->parse($Net::WebSocket::Server::VERSION) < version->parse('0.004000'
 }
 
 if ( !try_use('IO::Socket::SSL') )  { Fatal('IO::Socket::SSL missing'); }
+if ( !try_use('IO::Socket::IP') )   { Fatal('IO::Socket::IP missing'); }
 if ( !try_use('IO::Handle') )       { Fatal('IO::Handle'); }
 if ( !try_use('YAML::XS') )         { Fatal('YAML::XS missing (install libyaml-libyaml-perl)'); }
 if ( !try_use('Getopt::Long') )     { Fatal('Getopt::Long missing'); }
@@ -673,11 +674,11 @@ sub restartES {
 
 sub initSocketServer {
   checkNewEvents();
-  my $ssl_server;
+  my $listen_socket;
   if ($ssl_config{enabled}) {
     Debug(2, 'About to start listening to socket');
     eval {
-      $ssl_server = IO::Socket::SSL->new(
+      $listen_socket = IO::Socket::SSL->new(
         Listen        => 10,
         LocalPort     => $server_config{port},
         LocalAddr     => $server_config{address},
@@ -690,18 +691,33 @@ sub initSocketServer {
       );
     };
     # new() returns undef on failure (e.g. bind error) rather than dying
-    if ($@ || !$ssl_server) {
+    if ($@ || !$listen_socket) {
       Error('Failed starting server: ' . ($@ || IO::Socket::SSL::errstr() . " ($!)"));
       exit(-1);
     }
     Info('Secure WS(WSS) is enabled...');
   } else {
     Info('Secure WS is disabled...');
+    # with the default address, Net::WebSocket::Server binds the port itself
+    # (all IPv4 interfaces); otherwise bind the configured address
+    if ( $server_config{address} && $server_config{address} ne DEFAULT_ADDRESS ) {
+      $listen_socket = IO::Socket::IP->new(
+        Listen    => 10,
+        LocalPort => $server_config{port},
+        LocalAddr => $server_config{address},
+        Proto     => 'tcp',
+        ReuseAddr => 1,
+      );
+      if ( !$listen_socket ) {
+        Error("Failed starting server on $server_config{address}:$server_config{port}: $@");
+        exit(-1);
+      }
+    }
   }
   Info('Web Socket Event Server listening on port ' . $server_config{port});
 
   $wss = Net::WebSocket::Server->new(
-    listen => $ssl_config{enabled} ? $ssl_server : $server_config{port},
+    listen => $listen_socket // $server_config{port},
     tick_period => $server_config{event_check_interval},
     on_tick     => sub {
       if ($es_terminate) {
