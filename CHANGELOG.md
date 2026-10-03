@@ -3,11 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.33] - 2026-10-03
+
+### Bug Fixes
+
+- make interval check atomic and stop end notifications moving it ([0d0006f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0d0006f609532aa4444fd903da033a4f953aa69c))
+- serialize zm_detect push sends so token interval holds ([1c2edba](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1c2edba7292a89528a6c886981af17463efc3743))
+- enforce per-monitor notification interval across event forks ([1365e15](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1365e152f4e11345c3c840ae3208e4459acfb6fe))
+- give each loaded token a unique connection id ([82a64fa](https://github.com/ZoneMinder/zmeventnotificationNg/commit/82a64fa85102362a19e7a64a3908dfeb3753af1a))
+
+### Miscellaneous
+
+- bump version to v7.0.33 ([b055267](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b055267e4f52db3b69f1a77b967c8edbb13aa18d))
+
 ## [7.0.32] - 2026-09-25
 
 ### Bug Fixes
 
 - handle time windows that cross midnight ([e67cc0f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e67cc0f2c593574819560359af179a5a0aac23bd))
+
+### Documentation
+
+- update CHANGELOG for v7.0.32 ([486b212](https://github.com/ZoneMinder/zmeventnotificationNg/commit/486b2125d8d33439209acd6dbdc6dfc778505d73))
 
 ### Miscellaneous
 
