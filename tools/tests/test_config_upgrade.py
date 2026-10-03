@@ -230,6 +230,35 @@ class TestMainBugs:
         assert len(backups) == 1
         assert backups[0].read_text() == text
 
+    def test_scalars_keep_their_text_for_perl_and_python(self, tmp_path, monkeypatch):
+        # The ES (Perl YAML::XS, untyped scalars) reads es_rules.yml and
+        # zmeventnotification.yml. PyYAML's YAML 1.1 round-trip rewrote
+        # 21:30 -> 1290, yes -> true, 0123 -> 83. BaseLoader yields the raw
+        # scalar text, which is what an untyped reader sees.
+        import yaml
+        user_text = (
+            "rules:\n"
+            "  from: 21:30\n"
+            "  to: 1:30:00\n"
+            "  enable: yes\n"
+            "  off: no\n"
+            "  pin: 0123\n"
+            "  hex: 0x1F\n"
+            "  date: 2024-1-1\n"
+            "  quoted: '800'\n"
+            "  real_bool: true\n"
+            "  nothing: ~\n"
+        )
+        user = _run_upgrade(tmp_path, monkeypatch, user_text,
+                            "rules:\n  from: x\n  new_key: added\n")
+        after_text = user.read_text()
+        raw_after = yaml.load(after_text, Loader=yaml.BaseLoader)
+        assert raw_after["rules"].pop("new_key") == "added"
+        assert raw_after == yaml.load(user_text, Loader=yaml.BaseLoader)
+        typed_after = yaml.safe_load(after_text)
+        del typed_after["rules"]["new_key"]
+        assert typed_after == yaml.safe_load(user_text)
+
     def test_example_monitor_entries_not_merged_into_es_rules(self, tmp_path, monkeypatch):
         import yaml
         repo = os.path.join(os.path.dirname(__file__), "..", "..")

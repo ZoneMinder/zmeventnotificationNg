@@ -28,6 +28,41 @@ except ImportError:
 DATA_MAP_KEYS = ('monitors',)
 
 
+class RawScalar(str):
+    """A scalar kept as its source text, tag and quoting style.
+
+    The ES (Perl YAML::XS) and the hook (PyYAML, YAML 1.1) resolve plain
+    scalars differently: PyYAML reads 21:30 as 1290 and yes as True. Writing
+    back each scalar exactly as the user wrote it keeps both readers seeing
+    the same values after an upgrade.
+    """
+
+    def __new__(cls, value, tag, style):
+        obj = super().__new__(cls, value)
+        obj.tag = tag
+        obj.style = style
+        return obj
+
+    def __reduce__(self):  # for copy.deepcopy
+        return (RawScalar, (str(self), self.tag, self.style))
+
+
+class RawLoader(yaml.SafeLoader):
+    pass
+
+
+class RawDumper(yaml.SafeDumper):
+    pass
+
+
+for _tag in ('str', 'int', 'float', 'bool', 'null', 'timestamp'):
+    RawLoader.add_constructor('tag:yaml.org,2002:' + _tag,
+                              lambda loader, node: RawScalar(node.value, node.tag, node.style))
+RawDumper.add_representer(
+    RawScalar,
+    lambda dumper, data: dumper.represent_scalar(data.tag, str(data), style=data.style))
+
+
 def deep_merge(base, override):
     """Recursively merge *base* into *override* (in-place).
 
@@ -137,9 +172,9 @@ def main():
     args = parser.parse_args()
 
     with open(args.example) as f:
-        example = yaml.safe_load(f)
+        example = yaml.load(f, Loader=RawLoader)
     with open(args.config) as f:
-        user = yaml.safe_load(f)
+        user = yaml.load(f, Loader=RawLoader)
 
     if not example:
         print("Example file is empty or invalid YAML", file=sys.stderr)
@@ -198,8 +233,8 @@ def main():
         shutil.copy2(args.config, backup)
         print("Backup of original config: {}".format(backup))
     with open(out_path, 'w') as f:
-        yaml.dump(user, f, default_flow_style=False, sort_keys=False,
-                  allow_unicode=True)
+        yaml.dump(user, f, Dumper=RawDumper, default_flow_style=False,
+                  sort_keys=False, allow_unicode=True)
 
     print("\nUpdated config written to: {}".format(out_path))
 
