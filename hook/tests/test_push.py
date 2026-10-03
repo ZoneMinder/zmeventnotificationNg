@@ -7,6 +7,7 @@ monkeypatched requests.post so no real network calls happen.
 The module is exercised through g.config (common_params) exactly as the
 production caller supplies it.
 """
+import fcntl
 import json
 import sys
 import os
@@ -134,6 +135,13 @@ def install_post(monkeypatch, recorder):
     monkeypatch.setattr(push.requests, 'post', recorder)
 
 
+@pytest.fixture(autouse=True)
+def _private_lock_dir(tmp_path, monkeypatch):
+    """Keep push.lock out of the real /var/lib/zmeventnotification."""
+    (tmp_path / 'misc').mkdir()
+    monkeypatch.setattr(push, 'DEFAULT_BASE_DATA_PATH', str(tmp_path))
+
+
 def run(zm, notif=None, monitor_id=5, event_id=42, monitor_name='Front',
         cause='person detected', no_match=False):
     """Invoke send_push_notifications with g.config and g.logger from conftest."""
@@ -226,6 +234,37 @@ class TestThrottle:
         notif = FakeNotification(throttled=False)
         run(FakeZM([notif]))
         assert rec.call_count == 1
+
+    def test_fetch_and_update_hold_cross_process_lock(self, monkeypatch, tmp_path):
+        # Parallel zm_detect runs must not all read LastNotifiedAt before any
+        # of them updates it (#56): the token fetch and the LastNotifiedAt
+        # update must happen while push.lock is held.
+        lock_path = tmp_path / 'misc' / 'push.lock'
+        seen = []
+
+        def lock_held():
+            with open(lock_path, 'a') as other:
+                try:
+                    fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return True
+                return False
+
+        class LockCheckingZM(FakeZM):
+            def notifications(self):
+                seen.append(('fetch', lock_held()))
+                return super().notifications()
+
+        class LockCheckingNotification(FakeNotification):
+            def update_last_sent(self, badge=None):
+                seen.append(('update', lock_held()))
+                super().update_last_sent(badge)
+
+        install_post(monkeypatch, PostRecorder())
+        g.config = {'push': base_push_cfg(), 'base_data_path': str(tmp_path)}
+        run(LockCheckingZM([LockCheckingNotification()]))
+        assert seen == [('fetch', True), ('update', True)]
+        assert lock_held() is False
 
 
 # ---------------------------------------------------------------------------

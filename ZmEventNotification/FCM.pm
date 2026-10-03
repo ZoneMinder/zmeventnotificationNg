@@ -478,6 +478,8 @@ sub initFCMTokens {
 
   %main::fcm_tokens_map = %tokens_data;
   @main::active_connections = ();
+  my $load_time = int scalar gettimeofday();
+  my $seq = 0;
   foreach my $key ( keys %{ $tokens_data{tokens} } ) {
     my $token      = $key;
     my $token_data = $tokens_data{tokens}->{$key} // {};
@@ -492,14 +494,13 @@ sub initFCMTokens {
     push @main::active_connections,
       {
       type         => FCM,
-      id           => int scalar gettimeofday(),
+      id           => 'fcm-' . $load_time . '-' . $seq++,
       token        => $token,
       state        => INVALID_CONNECTION,
       time         => time(),
       badge        => 0,
       monlist      => $monlist,
       intlist      => $intlist,
-      last_sent    => {},
       platform     => $platform,
       extra_fields => '',
       pushstate    => $pushstate,

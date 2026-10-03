@@ -4,7 +4,7 @@ use warnings;
 use Exporter 'import';
 use JSON;
 use POSIX qw(strftime);
-use Time::HiRes qw(gettimeofday);
+use Fcntl qw(:flock O_RDWR O_CREAT);
 use ZmEventNotification::Constants qw(:all);
 use ZmEventNotification::Config qw(:all);
 use ZmEventNotification::Util qw(getConnectionIdentity isInList getInterval parseDetectResults buildPictureUrl appendImagePath getFrameId);
@@ -77,7 +77,6 @@ sub sendEvent {
 
   my $hook = $event_type eq 'event_start' ? $hooks_config{event_start_hook} : $hooks_config{event_end_hook};
 
-  my $t   = gettimeofday;
   my $str = encode_json(
     { event  => 'alarm',
       type   => '',
@@ -85,6 +84,8 @@ sub sendEvent {
       events => [$alarm]
     }
   );
+
+  my $send;
 
   if ( $ac->{type} == FCM
     && $ac->{pushstate} ne 'disabled'
@@ -98,7 +99,7 @@ sub sendEvent {
       || !$hooks_config{enabled} )
     {
       main::Info("Sending $event_type notification over FCM");
-      sendOverFCM( $alarm, $ac, $event_type, $resCode );
+      $send = \&sendOverFCM;
     } else {
       main::Info(
         "Not sending over FCM as notify filters are on_success:$hooks_config{event_start_notify_on_hook_success} and on_fail:$hooks_config{event_end_notify_on_hook_fail}"
@@ -116,7 +117,7 @@ sub sendEvent {
       main::Info( "Sending $event_type notification for EID:"
           . $alarm->{EventId}
           . 'over web' );
-      sendOverWebSocket( $alarm, $ac, $event_type, $resCode );
+      $send = \&sendOverWebSocket;
     } else {
       main::Info(
         "Not sending over Web as notify filters are on_success:$hooks_config{event_start_notify_on_hook_success} and on_fail:$hooks_config{event_start_notify_on_hook_fail}"
@@ -131,7 +132,7 @@ sub sendEvent {
       main::Info( "Sending $event_type notification for EID:"
           . $alarm->{EventId}
           . ' over MQTT' );
-      sendOverMQTTBroker( $alarm, $ac, $event_type, $resCode );
+      $send = \&sendOverMQTTBroker;
     } else {
       main::Info(
         "Not sending over MQTT as notify filters are on_success:$hooks_config{event_start_notify_on_hook_success} and on_fail:$hooks_config{event_start_notify_on_hook_fail}"
@@ -139,14 +140,86 @@ sub sendEvent {
     }
   }
 
-  print main::WRITER 'timestamp--TYPE--'
-    . ($ac->{id} // '')
-    . '--SPLIT--'
-    . ($alarm->{MonitorId} // '')
-    . '--SPLIT--'
-    . $t . "\n";
+  return unless $send;
 
-  main::Debug(2, 'child finished writing to parent');
+  # The interval applies to start notifications only. It is checked again
+  # here, under the lock, because another fork may have sent since
+  # shouldSendEventToConn looked.
+  if ( $event_type eq 'event_start' ) {
+    my $forced = $escontrol_config{enabled}
+      && getNotificationStatusEsControl( $alarm->{MonitorId} ) == ESCONTROL_FORCE_NOTIFY;
+    my $mint = $forced ? 0 : getInterval( $ac->{intlist}, $ac->{monlist}, $alarm->{MonitorId} );
+    return unless _claimSend( $ac, $alarm->{MonitorId}, $mint );
+  }
+  $send->( $alarm, $ac, $event_type, $resCode );
+}
+
+# Last-sent times are shared through a file, not kept in active_connections:
+# each event is handled in its own fork, and a fork's copy of
+# active_connections is stale as soon as another fork sends.
+# Returns ($fh, \%times) with $fh locked, or () if the file cannot be opened.
+sub _openLastSent {
+  my $lock = shift;
+  my $file = $server_config{base_data_path} . '/push/last_sent.json';
+  my $fh;
+  if ( !sysopen( $fh, $file, O_RDWR | O_CREAT, 0600 ) ) {
+    main::Error("Cannot open $file: $!. Notification intervals are not enforced");
+    return;
+  }
+  flock( $fh, $lock );
+  my $raw = do { local $/; <$fh> };
+  my $times = eval { decode_json($raw) } // {};
+  return ( $fh, $times );
+}
+
+# Device tokens are stable; other connections are keyed by their
+# per-connection id, prefixed so they can be pruned.
+sub _lastSentKey {
+  my $ac = shift;
+  return $ac->{token} ? $ac->{token} : 'conn-' . ( $ac->{id} // '' );
+}
+
+sub _lastSentTime {
+  my ( $ac, $mid ) = @_;
+  my ( $fh, $times ) = _openLastSent(LOCK_SH);
+  return undef if !$fh;
+  close($fh);
+  return $times->{ _lastSentKey($ac) }->{$mid};
+}
+
+# Records the send time unless one was recorded within the last $mint
+# seconds. Check and record happen under one lock, so parallel forks
+# cannot both pass. Returns 1 if the caller should send.
+sub _claimSend {
+  my ( $ac, $mid, $mint ) = @_;
+  my ( $fh, $times ) = _openLastSent(LOCK_EX);
+  return 1 if !$fh;
+  my $now  = time();
+  my $key  = _lastSentKey($ac);
+  my $last = $times->{$key}->{$mid};
+  if ( $last && ( $now - $last ) < ( $mint // 0 ) ) {
+    close($fh);
+    main::Debug(1, "Monitor $mid: last notification was "
+        . ( $now - $last )
+        . "s ago, within interval of $mint. Not sending");
+    return 0;
+  }
+  $times->{$key}->{$mid} = $now;
+
+  # Connection ids change on every reconnect, so their entries are dropped
+  # after a day without a send. Device tokens are kept. A websocket client
+  # connected for over a day with a longer interval may get one early send.
+  foreach my $k ( grep { /^conn-/ } keys %$times ) {
+    my $mids = $times->{$k};
+    delete $mids->{$_} for grep { $now - $mids->{$_} > 86400 } keys %$mids;
+    delete $times->{$k} if !%$mids;
+  }
+
+  seek( $fh, 0, 0 );
+  truncate( $fh, 0 );
+  print $fh encode_json($times);
+  close($fh);
+  return 1;
 }
 
 sub isAllowedChannel {
@@ -177,7 +250,6 @@ sub shouldSendEventToConn {
 
   my $monlist   = $ac->{monlist};
   my $intlist   = $ac->{intlist};
-  my $last_sent = $ac->{last_sent};
 
   if ($escontrol_config{enabled}) {
     my $id   = $alarm->{MonitorId};
@@ -199,8 +271,9 @@ sub shouldSendEventToConn {
 
   if ( isInList( $monlist, $alarm->{MonitorId} ) ) {
     my $mint = getInterval( $intlist, $monlist, $alarm->{MonitorId} );
-    if ( $last_sent->{ $alarm->{MonitorId} } ) {
-      my $elapsed = time() - $last_sent->{ $alarm->{MonitorId} };
+    my $last_sent = _lastSentTime( $ac, $alarm->{MonitorId} );
+    if ( $last_sent ) {
+      my $elapsed = time() - $last_sent;
       if ( $elapsed >= $mint ) {
         main::Debug(1, 'Monitor '
             . $alarm->{MonitorId}

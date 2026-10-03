@@ -31,13 +31,6 @@ use ZmEventNotification::Util qw(parse_job_line);
   is_deeply(\@f, ['conn7', 'hello world'], 'message: id,message');
 }
 
-# timestamp--TYPE--<id>--SPLIT--<mid>--SPLIT--<timeval>
-{
-  my ($job, @f) = parse_job_line('timestamp--TYPE--id9--SPLIT--3--SPLIT--1700000000');
-  is($job, 'timestamp', 'timestamp: job key');
-  is_deeply(\@f, ['id9', '3', '1700000000'], 'timestamp: id,mid,timeval');
-}
-
 # event_description--TYPE--<mid>--SPLIT--<eid>--SPLIT--<desc>
 {
   my ($job, @f) = parse_job_line('event_description--TYPE--3--SPLIT--555--SPLIT--detected:person');

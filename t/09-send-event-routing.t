@@ -8,6 +8,8 @@ use lib "$FindBin::Bin/lib";
 use Test::More;
 use YAML::XS;
 use File::Spec;
+use File::Temp qw(tempdir);
+use JSON;
 
 require StubZM;
 
@@ -20,6 +22,10 @@ my $cfg = YAML::XS::LoadFile(File::Spec->catfile($fixtures, 'test_es.yml'));
 my $sec = YAML::XS::LoadFile(File::Spec->catfile($fixtures, 'test_secrets.yml'));
 $ZmEventNotification::Config::secrets = $sec;
 loadEsConfigSettings($cfg);
+
+my $data_dir = tempdir(CLEANUP => 1);
+mkdir "$data_dir/push" or die "mkdir: $!";
+$server_config{base_data_path} = $data_dir;
 
 # Spy counters (our so BEGIN block can see them)
 our %spy;
@@ -203,7 +209,6 @@ $hooks_config{event_end_notify_on_hook_fail} = 'none';
         # no conn key
     };
     sendEvent($alarm, $ac, 'event_start', 0);
-    # Should only have timestamp line, no message line
     unlike($pipe_output, qr/message--TYPE--11--SPLIT--/, 'WEB: NOT sent when no conn');
 }
 
@@ -259,8 +264,10 @@ $hooks_config{event_end_notify_on_hook_fail} = 'none';
     };
     sendEvent($alarm, $ac, 'event_end', 0);
     is($spy{fcm}, 0, 'event_end blocked when send_event_end_notification=no');
-    # No timestamp written either since function returns early
-    unlike($pipe_output, qr/timestamp/, 'no timestamp when event_end blocked');
+    # No send time recorded either since function returns early
+    my $store = "$data_dir/push/last_sent.json";
+    my $times = -s $store ? decode_json(do { local (@ARGV, $/) = $store; <> }) : {};
+    ok(!exists $times->{tok_end_block_1234567890}, 'no send time recorded when event_end blocked');
 }
 
 # ===== send_event_start_notification=no blocks all event_start sends =====
@@ -279,7 +286,7 @@ $hooks_config{event_end_notify_on_hook_fail} = 'none';
     is($spy{fcm}, 0, 'event_start blocked when send_event_start_notification=no');
 }
 
-# ===== timestamp line always written to WRITER =====
+# ===== send time recorded in the shared last-sent store =====
 {
     $pipe_output = '';
     my $ac = {
@@ -290,7 +297,9 @@ $hooks_config{event_end_notify_on_hook_fail} = 'none';
         token     => 'tok_ts_test_1234567890',
     };
     sendEvent($alarm, $ac, 'event_start', 0);
-    like($pipe_output, qr/timestamp--TYPE--40--SPLIT--1--SPLIT--/, 'timestamp line written with mid');
+    open(my $fh, '<', "$data_dir/push/last_sent.json") or die "read store: $!";
+    my $times = decode_json(do { local $/; <$fh> });
+    ok(time() - $times->{tok_ts_test_1234567890}{1} < 5, 'send time recorded for token and mid');
 }
 
 done_testing();
