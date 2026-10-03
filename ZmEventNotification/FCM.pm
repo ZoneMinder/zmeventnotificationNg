@@ -253,8 +253,10 @@ sub _prepare_fcm_common {
   my $count = defined($obj->{invocations}) ? $obj->{invocations}->{count} + 1 : 0;
   my $at = (localtime)[4];
 
+  # eid lets the parent count each event once (start and end pushes of an
+  # event carry the same values)
   print main::WRITER 'fcm_notification--TYPE--' . $obj->{token} . '--SPLIT--' . $badge
-                .'--SPLIT--' . $count .'--SPLIT--' . $at . "\n";
+                .'--SPLIT--' . $count .'--SPLIT--' . $at . '--SPLIT--' . $eid . "\n";
 
   my $title = $mname . ' Alarm';
   $title = $title . ' (' . $eid . ')' if $notify_config{tag_alarm_event_id};

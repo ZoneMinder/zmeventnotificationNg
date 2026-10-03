@@ -583,14 +583,28 @@ sub processJobs {
         } # end foreach active connection
       } elsif ( $job eq 'fcm_notification' ) {
         # Update badge count of active connection
-        my ( $token, $badge, $count, $at ) = @fields;
+        my ( $token, $badge, $count, $at, $eid ) = @fields;
         Debug(2, "GOT JOB==> update badge to $badge, count to $count for: $token, at: $at");
         foreach (@active_connections) {
           next unless defined $_->{token};
-          if ( $_->{token} eq $token ) {
+          next if $_->{token} ne $token;
+          if ( !defined $eid ) {
             $_->{badge} = $badge;
             $_->{invocations} = {count=>$count, at=>$at};
+            next;
           }
+          # Forks send badge/count computed from their fork-time copy, so
+          # overlapping events would overwrite each other. Count each event
+          # once here instead; start and end pushes of one event share an eid.
+          next if $_->{fcm_counted}{$eid}++;
+          my @ids = sort { $a <=> $b } keys %{ $_->{fcm_counted} };
+          delete @{ $_->{fcm_counted} }{ @ids[ 0 .. $#ids - 50 ] } if @ids > 50;
+          $_->{badge} = ( $_->{badge} // 0 ) + 1;
+          my $inv = $_->{invocations};
+          $_->{invocations} =
+            ( ref($inv) eq 'HASH' && ( $inv->{at} // -1 ) == $at )
+            ? { count => ( $inv->{count} // 0 ) + 1, at => $at }
+            : { count => $count, at => $at };    # new month (fork reset it) or no counter yet
         }
       } elsif ( $job eq 'fcm_token_delete' ) {
         # FCM rejected this token; the child already removed it from the

@@ -24,6 +24,13 @@ use ZmEventNotification::Util qw(parse_job_line);
     'fcm: token,badge,count,at in order');
 }
 
+# current forks add the event id: ...--SPLIT--<at>--SPLIT--<eid>
+{
+  my ($job, @f) = parse_job_line(
+    'fcm_notification--TYPE--tok123--SPLIT--5--SPLIT--2--SPLIT--4--SPLIT--777');
+  is_deeply(\@f, ['tok123', '5', '2', '4', '777'], 'fcm: token,badge,count,at,eid in order');
+}
+
 # message--TYPE--<id>--SPLIT--<message>
 {
   my ($job, @f) = parse_job_line('message--TYPE--conn7--SPLIT--hello world');

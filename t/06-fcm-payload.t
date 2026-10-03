@@ -387,7 +387,13 @@ $fcm_config{log_message_id} = 'NONE';
     my @lines = split /\n/, $pipe_output;
     my $fcm_line = $lines[0];
     my @parts = split /--SPLIT--/, $fcm_line;
-    is(scalar @parts, 4, 'fcm_notification has 4 --SPLIT-- parts');
+    is(scalar @parts, 5, 'fcm_notification has 5 --SPLIT-- parts');
+    # the in-memory pipe keeps its write offset after $pipe_output = '', so
+    # earlier output shows up as leading NULs
+    like($parts[0], qr/(?:^|\0)fcm_notification--TYPE--tok_pipe_test_1234567890\z/, 'token');
+    is($parts[1], 3, 'badge is fork-time badge + 1');
+    is($parts[2], 51, 'count is fork-time count + 1');
+    is($parts[4], $alarm_base->{EventId}, 'event id last');
 }
 
 # ===== Proxy mode: picture URL inclusion/exclusion =====

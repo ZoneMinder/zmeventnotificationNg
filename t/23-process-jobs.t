@@ -79,6 +79,47 @@ subtest 'fcm_notification: start and end push of one event count once' => sub {
     is_deeply( $active_connections[0]{invocations}, { count => 8, at => 4 }, 'count counts the event once' );
 };
 
+# Lines from current forks carry the event id as a 5th field.
+subtest 'fcm_notification with eid: start and end of one event count once' => sub {
+    @active_connections = ( { id => 'f1', token => 'tokA', badge => 3, invocations => { count => 7, at => 4 } } );
+    feed( 'fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--8--SPLIT--4--SPLIT--100',
+          'fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--8--SPLIT--4--SPLIT--100' );
+    is( $active_connections[0]{badge}, 4, 'badge +1' );
+    is_deeply( $active_connections[0]{invocations}, { count => 8, at => 4 }, 'count +1' );
+};
+
+subtest 'fcm_notification with eid: overlapping events both count' => sub {
+    # Two forks with the same fork-time snapshot (badge 3, count 7) report
+    # badge 4 / count 8 each, for start and end, interleaved.
+    @active_connections = ( { id => 'f1', token => 'tokA', badge => 3, invocations => { count => 7, at => 4 } } );
+    feed( map { "fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--8--SPLIT--4--SPLIT--$_" } 100, 101, 100, 101 );
+    is( $active_connections[0]{badge}, 5, 'badge counts both events' );
+    is_deeply( $active_connections[0]{invocations}, { count => 9, at => 4 }, 'count counts both events' );
+};
+
+subtest 'fcm_notification with eid: new month or no counter take the fork values' => sub {
+    @active_connections = (
+        { id => 'f1', token => 'tokA', badge => 3, invocations => { count => 900, at => 4 } },
+        { id => 'f2', token => 'tokB' },
+    );
+    # the fork reset the count for the new month (at 5) / sent 0 with no counter
+    feed( 'fcm_notification--TYPE--tokA--SPLIT--4--SPLIT--1--SPLIT--5--SPLIT--100',
+          'fcm_notification--TYPE--tokB--SPLIT--1--SPLIT--0--SPLIT--5--SPLIT--100' );
+    is_deeply( $active_connections[0]{invocations}, { count => 1, at => 5 }, 'new month' );
+    is( $active_connections[0]{badge}, 4, 'badge +1' );
+    is_deeply( $active_connections[1]{invocations}, { count => 0, at => 5 }, 'no counter yet' );
+    is( $active_connections[1]{badge}, 1, 'badge from undef' );
+};
+
+subtest 'fcm_notification with eid: remembered events stay bounded' => sub {
+    @active_connections = ( { id => 'f1', token => 'tokA', badge => 0, invocations => { count => 0, at => 4 } } );
+    feed( map { "fcm_notification--TYPE--tokA--SPLIT--1--SPLIT--1--SPLIT--4--SPLIT--$_" } 1 .. 200 );
+    is( $active_connections[0]{badge}, 200, 'each event counted' );
+    cmp_ok( scalar keys %{ $active_connections[0]{fcm_counted} }, '<=', 50, 'at most 50 event ids kept' );
+    feed('fcm_notification--TYPE--tokA--SPLIT--1--SPLIT--1--SPLIT--4--SPLIT--200');
+    is( $active_connections[0]{badge}, 200, 'a recent event is still not counted twice' );
+};
+
 subtest 'fcm_token_delete: token FCM rejected is dropped from memory' => sub {
     my $c = MockConn->new;
     @active_connections = (
