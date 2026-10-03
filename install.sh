@@ -641,7 +641,9 @@ install_hook() {
 # Idempotent: paths already under TARGET_CONFIG (which may itself be under
 # /etc/zm/) are matched first and left as they are.
 rewrite_etc_zm_paths() {
-    local file="${TARGET_CONFIG}/$1"
+    # Resolve symlinks: perl -i would replace a link with a regular file
+    local file
+    file=$(readlink -f "${TARGET_CONFIG}/$1")
     [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${file}" ] || return 0
     T="${TARGET_CONFIG}" perl -pi -e 's{\Q$ENV{T}\E/|/etc/zm/}{$ENV{T}/}g' "${file}"
     print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in $1"
@@ -698,7 +700,7 @@ install_es_config() {
     # Fix stale secrets.ini reference in config if secrets.yml exists
     if [ -f "${TARGET_CONFIG}/zmeventnotification.yml" ] && [ -f "${TARGET_CONFIG}/secrets.yml" ]; then
         if grep -q 'secrets\.ini' "${TARGET_CONFIG}/zmeventnotification.yml"; then
-            sed -i 's|secrets\.ini|secrets.yml|g' "${TARGET_CONFIG}/zmeventnotification.yml"
+            sed -i --follow-symlinks 's|secrets\.ini|secrets.yml|g' "${TARGET_CONFIG}/zmeventnotification.yml"
             print_success "Updated secrets path from .ini to .yml in zmeventnotification.yml"
         fi
     fi
@@ -770,7 +772,7 @@ install_hook_config() {
     # Fix stale secrets.ini reference in objectconfig if secrets.yml exists
     if [ -f "${TARGET_CONFIG}/objectconfig.yml" ] && [ -f "${TARGET_CONFIG}/secrets.yml" ]; then
         if grep -q 'secrets\.ini' "${TARGET_CONFIG}/objectconfig.yml"; then
-            sed -i 's|secrets\.ini|secrets.yml|g' "${TARGET_CONFIG}/objectconfig.yml"
+            sed -i --follow-symlinks 's|secrets\.ini|secrets.yml|g' "${TARGET_CONFIG}/objectconfig.yml"
             print_success "Updated secrets path from .ini to .yml in objectconfig.yml"
         fi
     fi
