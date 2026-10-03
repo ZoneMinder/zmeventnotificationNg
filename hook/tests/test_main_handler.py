@@ -296,6 +296,14 @@ def test_zmclient_gets_credentials_and_ssl(harness, monkeypatch, tmp_path):
     assert kw['verify_ssl'] is False
 
 
+def test_empty_portal_passed_as_none(harness, monkeypatch, tmp_path):
+    # pyzm ZMClientConfig derives portal_url from api_url only when
+    # portal_url is None; '' (the config default) would block that.
+    harness.cfg['portal'] = ''
+    _run(monkeypatch, tmp_path, ['-e', '55555', '-m', '7'])
+    assert FakeZMClient.last.init_kwargs['portal_url'] is None
+
+
 # ---------------------------------------------------------------------------
 # --debug log elevation  (recent fix: 6abdfbc)
 # ---------------------------------------------------------------------------
