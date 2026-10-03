@@ -196,7 +196,7 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - ``no`` (default): notifications stack and the event id is carried in the Android notification tag so the app can recover it. ``yes``: collapse to a single notification (each push replaces the previous)
    * - ``token_file``
      - ``${base_data_path}/push/tokens.txt``
-     - File to persist registered FCM tokens
+     - File to persist registered FCM tokens. A ``<token_file>.lock`` file next to it serializes updates
    * - ``date_format``
      - ``%I:%M %p, %d-%b``
      - strftime format for notification timestamps

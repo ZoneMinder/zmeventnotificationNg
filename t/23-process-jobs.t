@@ -90,6 +90,21 @@ subtest 'fcm_notification: month change and missing invocations take the child v
     is( $active_connections[1]{badge}, 1, 'badge' );
 };
 
+subtest 'fcm_token_delete: token FCM rejected is dropped from memory' => sub {
+    my $c = MockConn->new;
+    @active_connections = (
+        { id => 'f1', type => FCM, token => 'tokDead', state => INVALID_CONNECTION },
+        { id => 'f2', type => FCM, token => 'tokLive', state => INVALID_CONNECTION },
+        { id => 'w1', type => FCM, token => 'tokDead', state => VALID_CONNECTION, conn => $c },
+    );
+    @errors = ();
+    feed('fcm_token_delete--TYPE--tokDead');
+    is_deeply( \@errors, [], 'job recognized' );
+    is( $active_connections[0]{state}, PENDING_DELETE, 'push-only entry marked for removal' );
+    is( $active_connections[1]{state}, INVALID_CONNECTION, 'other token untouched' );
+    is( $active_connections[2]{state}, VALID_CONNECTION, 'live websocket connection left alone' );
+};
+
 subtest 'event_description: written to the ZM DB' => sub {
     @db_updates = ();
     feed('event_description--TYPE--3--SPLIT--555--SPLIT--detected:person');

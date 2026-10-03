@@ -377,23 +377,13 @@ sub checkNewEvents() {
   if ((time() - $monitor_reload_time) > $server_config{monitor_reload_interval}) {
 
     # use this time to keep token counters updated
-    my $update_tokens = 0;
-    my $tokens_data;
-    if ($fcm_config{enabled}) {
-      $tokens_data = readTokenFile();
-      $update_tokens = 1 if $tokens_data;
-    }
+    saveTokenInvocations() if $fcm_config{enabled};
 
     # this means we have hit the reload monitor timeframe
     my $len = scalar @active_connections;
     Debug(1, 'Total event client connections: ' . $len . "\n");
     my $ndx = 1;
     foreach (@active_connections) {
-      if ($update_tokens and ($_->{type} == FCM)) {
-        $tokens_data->{tokens}->{$_->{token}}->{invocations}=
-        defined($_->{invocations})? $_->{invocations} : {count=>0, at=>(localtime)[4]};
-      }
-
       Debug(1, '-->checkNewEvents: Connection '
           . $ndx
           . ': ID->'
@@ -406,10 +396,6 @@ sub checkNewEvents() {
           . ' Push:'
           . $_->{pushstate});
       $ndx++;
-    }
-
-    if ($update_tokens && $fcm_config{enabled}) {
-      writeTokenFile($tokens_data);
     }
 
     foreach my $monitor ( values(%monitors) ) {
@@ -609,6 +595,15 @@ sub processJobs {
               $_->{invocations} = { count => $count, at => $at };
             }
           }
+        }
+      } elsif ( $job eq 'fcm_token_delete' ) {
+        # FCM rejected this token; the child already removed it from the
+        # token file. Drop push-only entries so they are not used again.
+        my ($token) = @fields;
+        Debug(1, 'Job: dropping FCM token ...' . substr( $token, -10 ));
+        foreach (@active_connections) {
+          $_->{state} = PENDING_DELETE
+            if $_->{type} == FCM && ( $_->{token} // '' ) eq $token && !exists $_->{conn};
         }
       } elsif ( $job eq 'event_description' ) {
       # hook script result will be updated in ZM DB

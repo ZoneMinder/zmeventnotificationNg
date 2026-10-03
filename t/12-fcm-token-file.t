@@ -266,6 +266,40 @@ my $tmpdir = tempdir(CLEANUP => 1);
     is($@, '', 'no error on missing file');
 }
 
+{
+    # deleteFCMToken tells the parent, which holds the authoritative list
+    my $tf = "$tmpdir/del_notify.txt";
+    _write_file($tf, '{"tokens":{"tok_gone":{}}}');
+    local $fcm_config{token_file} = $tf;
+    @main::active_connections = ();
+    my $pipe = '';
+    open(my $w, '>', \$pipe) or die;
+    local *main::WRITER = $w;
+    deleteFCMToken('tok_gone');
+    close($w);
+    is($pipe, "fcm_token_delete--TYPE--tok_gone\n", 'parent notified over the job pipe');
+}
+
+# ===== saveTokenInvocations =====
+
+{
+    my $tf = "$tmpdir/inv.txt";
+    _write_file($tf, encode_json({ tokens => {
+        tok_a => { platform => 'ios', monlist => '1', invocations => { count => 1, at => 2 } },
+    }}));
+    local $fcm_config{token_file} = $tf;
+    @main::active_connections = (
+        { type => FCM, token => 'tok_a', invocations => { count => 9, at => 2 } },
+        { type => FCM, token => 'tok_deleted', invocations => { count => 3, at => 2 } },
+        { type => WEB, id => 'w' },
+    );
+    saveTokenInvocations();
+    my $data = decode_json(_read_file($tf));
+    is_deeply($data->{tokens}{tok_a}, { platform => 'ios', monlist => '1', invocations => { count => 9, at => 2 } },
+        'counter of a token in the file updated, other fields kept');
+    ok(!exists $data->{tokens}{tok_deleted}, 'token deleted from the file is not recreated');
+}
+
 # ===== writeTokenFile =====
 
 {

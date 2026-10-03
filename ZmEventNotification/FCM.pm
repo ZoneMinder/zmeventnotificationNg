@@ -17,7 +17,7 @@ our @EXPORT_OK = qw(
   deleteFCMToken get_google_access_token
   sendOverFCM sendOverFCMV1
   migrateTokens initFCMTokens saveFCMTokens
-  readTokenFile writeTokenFile
+  readTokenFile writeTokenFile saveTokenInvocations
 );
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
@@ -128,11 +128,28 @@ sub deleteFCMToken {
   return if !$hr;
   delete $hr->{tokens}->{$dtoken} if exists $hr->{tokens}->{$dtoken};
   writeTokenFile($hr);
+  # Runs in an event fork; the parent drops the token from its own list.
+  print main::WRITER 'fcm_token_delete--TYPE--' . $dtoken . "\n";
 
   foreach (@main::active_connections) {
     next if ( $_ eq '' || $_->{token} ne $dtoken );
     $_->{state} = INVALID_CONNECTION;
   }
+}
+
+# Parent: store the in-memory monthly counters back into the token file.
+# Only tokens still in the file are updated, so a token deleted meanwhile
+# (FCM rejected it) is not recreated.
+sub saveTokenInvocations {
+  my $lock = _lockTokenFile();
+  my $tokens_data = readTokenFile();
+  return if !$tokens_data;
+  foreach (@main::active_connections) {
+    next if $_->{type} != FCM || !defined( $_->{token} ) || !exists $tokens_data->{tokens}->{ $_->{token} };
+    $tokens_data->{tokens}->{ $_->{token} }->{invocations} =
+      defined( $_->{invocations} ) ? $_->{invocations} : { count => 0, at => (localtime)[4] };
+  }
+  writeTokenFile($tokens_data);
 }
 
 sub get_google_access_token {
