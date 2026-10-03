@@ -21,19 +21,31 @@ except ImportError:
     sys.exit(1)
 
 
+# Maps keyed by monitor id. Example entries under them are samples, not schema,
+# so they are never merged into a user config.
+DATA_MAP_KEYS = ('monitors',)
+
+
 def deep_merge(base, override):
     """Recursively merge *base* into *override* (in-place).
 
     - Keys in *override* are kept as-is (user values win).
     - Keys in *base* that are missing from *override* are added.
     - When both sides have a dict for the same key, recurse.
+    - Keys in DATA_MAP_KEYS (per-monitor data) are never merged.
 
     Returns a list of dotted key-paths that were added.
     """
     added = []
     for key, base_val in base.items():
+        if key in DATA_MAP_KEYS:
+            continue
         if key not in override:
-            override[key] = copy.deepcopy(base_val)
+            if isinstance(base_val, dict):
+                override[key] = {}
+                deep_merge(base_val, override[key])
+            else:
+                override[key] = copy.deepcopy(base_val)
             added.append(str(key))
         elif isinstance(base_val, dict) and isinstance(override[key], dict):
             sub_added = deep_merge(base_val, override[key])

@@ -219,3 +219,32 @@ class TestMainCharacterization:
         user = _run_upgrade(tmp_path, monkeypatch, text, "a: 2\n")
         assert user.read_text() == text
         assert sorted(p.name for p in tmp_path.iterdir()) == ["example.yml", "user.yml"]
+
+
+class TestMainBugs:
+    def test_example_monitor_entries_not_merged_into_es_rules(self, tmp_path, monkeypatch):
+        import yaml
+        repo = os.path.join(os.path.dirname(__file__), "..", "..")
+        example = open(os.path.join(repo, "es_rules.example.yml")).read()
+        user_text = (
+            "notifications:\n"
+            "  monitors:\n"
+            "    5:\n"
+            "      rules:\n"
+            "        - from: '9 pm'\n"
+            "          to: '1 am'\n"
+            "          action: mute\n"
+        )
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, example)
+        assert yaml.safe_load(user.read_text()) == yaml.safe_load(user_text)
+
+    def test_example_monitor_not_merged_into_objectconfig(self, tmp_path, monkeypatch):
+        import yaml
+        repo = os.path.join(os.path.dirname(__file__), "..", "..")
+        example = open(os.path.join(repo, "hook", "objectconfig.example.yml")).read()
+        # User deliberately removed the sample monitors section.
+        user_text = "general:\n  base_data_path: /var/lib/zmeventnotification\n"
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, example)
+        after = yaml.safe_load(user.read_text())
+        assert "monitors" not in after
+        assert "ml" in after  # real schema sections still merged
