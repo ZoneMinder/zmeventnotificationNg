@@ -470,14 +470,22 @@ class TestTokenDeletion:
         assert notif.deleted is True
         assert notif.update_last_sent_called is False
 
-    def test_4xx_without_token_error_still_deletes(self, monkeypatch):
-        # 4xx alone (client error) removes the token even without body match
-        rec = PostRecorder(FakeResponse(404, 'Not Found'))
+    @pytest.mark.parametrize('status,body', [
+        (401, 'Unauthorized'),          # wrong fcm_v1_key
+        (403, 'Forbidden'),
+        (429, 'Too Many Requests'),     # proxy rate limit
+        (404, 'Not Found'),             # wrong fcm_v1_url path
+    ])
+    def test_4xx_without_token_error_keeps_token(self, monkeypatch, status, body):
+        # A 4xx that does not name an invalid token is a config/proxy problem
+        # that applies to every token; deleting would wipe all devices.
+        rec = PostRecorder(FakeResponse(status, body))
         install_post(monkeypatch, rec)
         g.config = {'push': base_push_cfg()}
         notif = FakeNotification(token='aaaabbbbccccdddd')
         run(FakeZM([notif]))
-        assert notif.deleted is True
+        assert notif.deleted is False
+        assert notif.update_last_sent_called is False
 
     def test_5xx_does_not_delete(self, monkeypatch):
         # Server error is transient -> keep the token
