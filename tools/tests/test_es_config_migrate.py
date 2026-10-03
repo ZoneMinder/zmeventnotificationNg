@@ -131,3 +131,19 @@ class TestMainLegacyValues:
         out = _migrate(tmp_path, monkeypatch,
                        '[secrets]\nzm_password = "secret"\n', secrets=True)
         assert out == {"secrets": {"ZM_PASSWORD": "secret"}}
+
+    def test_secrets_hash_after_whitespace_still_a_comment(self, tmp_path, monkeypatch):
+        # The legacy readers disagreed here (ES: whole text, hook and
+        # pushapi_pushover: cut at ' #'); the migration keeps the hook's view.
+        out = _migrate(tmp_path, monkeypatch,
+                       "[secrets]\nZM_PORTAL = https://zm/zm # my portal\n", secrets=True)
+        assert out == {"secrets": {"ZM_PORTAL": "https://zm/zm"}}
+
+    def test_es_hash_after_value_is_kept(self, tmp_path, monkeypatch):
+        # Config::IniFiles has no inline comments: the legacy ES saw the
+        # whole text, so a migration that cut ' # ...' changed the value.
+        out = _migrate(tmp_path, monkeypatch,
+                       "[general]\nescontrol_interface_password = ab #cd\n"
+                       "skip_monitors = #1\n")
+        assert out == {"general": {"escontrol_interface_password": "ab #cd",
+                                   "skip_monitors": "#1"}}

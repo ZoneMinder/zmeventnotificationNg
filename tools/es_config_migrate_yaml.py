@@ -18,9 +18,14 @@ except ImportError:
     sys.exit(1)
 
 
-def parse_ini(config_path):
-    """Read INI file and return ConfigParser object."""
-    cp = ConfigParser(interpolation=None, inline_comment_prefixes='#')
+def parse_ini(config_path, inline_comment_prefixes=None):
+    """Read INI file and return ConfigParser object.
+
+    The legacy ES read its INI files with Config::IniFiles, which has no
+    inline comments (' # x' and ' ; x' stay in the value). The legacy hook
+    read secrets.ini with inline_comment_prefixes='#'.
+    """
+    cp = ConfigParser(interpolation=None, inline_comment_prefixes=inline_comment_prefixes)
     cp.read(config_path)
     return cp
 
@@ -76,7 +81,7 @@ def main():
                         help='Migrate a secrets.ini file instead of zmeventnotification.ini')
     args = parser.parse_args()
 
-    cp = parse_ini(args.config)
+    cp = parse_ini(args.config, '#' if args.secrets else None)
 
     if args.secrets:
         yaml_data = migrate_secrets(cp)
