@@ -87,3 +87,19 @@ def test_clean_master_reaches_confirmation(release):
     assert "ERROR" not in r.stdout
     assert _origin_refs(release) == ""  # stopped at the prompt, nothing pushed
 
+
+def test_gh_auth_failure_aborts_before_any_step(release):
+    _stub(release["stubs"] / "gh", "exit 1")
+    r = release["run"]()
+    assert r.returncode != 0
+    assert "gh auth login" in r.stdout
+    assert SUMMARY not in r.stdout
+
+
+def test_non_master_branch_aborts_before_any_push(release):
+    release["git"]("checkout", "-q", "-b", "feature")
+    r = release["run"]()
+    assert r.returncode != 0
+    assert "must be run on master" in r.stdout
+    assert SUMMARY not in r.stdout
+    assert _origin_refs(release) == ""

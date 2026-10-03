@@ -31,7 +31,18 @@ if ! command -v gh &>/dev/null; then
     echo "ERROR: gh CLI not found. Install it from https://cli.github.com"
     exit 1
 fi
-export GITHUB_TOKEN=$(gh auth token)
+# `export X=$(cmd)` hides cmd's failure from set -e; check it explicitly so a
+# missing login stops here, not after the tag is pushed.
+if ! GITHUB_TOKEN=$(gh auth token) || [ -z "$GITHUB_TOKEN" ]; then
+    echo "ERROR: gh is not authenticated. Run: gh auth login"
+    exit 1
+fi
+export GITHUB_TOKEN
+# Every push below targets origin master; refuse to run from another branch.
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]; then
+    echo "ERROR: make_release.sh must be run on master (current: $(git rev-parse --abbrev-ref HEAD))"
+    exit 1
+fi
 
 # --- Keep pyzm dependency pin in sync with latest PyPI release ---
 if command -v curl &>/dev/null && command -v python3 &>/dev/null; then
