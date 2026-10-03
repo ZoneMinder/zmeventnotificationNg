@@ -792,6 +792,64 @@ subtest 'processIncomingMessage - push commands need an authenticated connection
     is($response->{reason}, 'NOAUTH', 'reason NOAUTH');
 };
 
+# Behind a reverse proxy every client has the proxy's IP, and a new socket can
+# reuse the source port of a closed one whose entry is still kept (token set,
+# INVALID_CONNECTION). Messages must only act on their own connection.
+sub stale_and_new {
+    my $stale_conn = MockConn->new('127.0.0.1', 40000);
+    my $new_conn   = MockConn->new('127.0.0.1', 40000);
+    @main::active_connections = (
+        { conn => $stale_conn, state => INVALID_CONNECTION, type => FCM, token => 'staletok',
+          monlist => '1', intlist => '0', pushstate => 'enabled', badge => 5,
+          invocations => { count => 2, at => 1 } },
+        { conn => $new_conn, state => VALID_CONNECTION, type => WEB, token => '',
+          monlist => '', intlist => '', pushstate => '', badge => 0 },
+    );
+    return $new_conn;
+}
+
+subtest 'processIncomingMessage - auth on new socket does not touch stale entry with same ip:port' => sub {
+    reset_state();
+    local $auth_config{enabled} = 0;
+    my $c = stale_and_new();
+    $main::active_connections[1]{state} = PENDING_AUTH;
+    processIncomingMessage($c, encode_json({ event => 'auth', data => { user => 'u', password => 'p' } }));
+    is($main::active_connections[0]{token}, 'staletok', 'stale token kept');
+    is($main::active_connections[0]{state}, INVALID_CONNECTION, 'stale state kept');
+    is($main::active_connections[1]{state}, VALID_CONNECTION, 'new connection authenticated');
+    is(scalar @{ $c->{sent} }, 1, 'one auth reply');
+};
+
+subtest 'processIncomingMessage - filter/version/badge on new socket ignore stale entry' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    my $c = stale_and_new();
+    processIncomingMessage($c, encode_json({ event => 'control',
+        data => { type => 'filter', monlist => '7', intlist => '9' } }));
+    is($main::active_connections[0]{monlist}, '1', 'stale monlist untouched by filter');
+    is($main::active_connections[1]{monlist}, '7', 'own monlist updated');
+    ok(!grep({ $_->[0] eq 'staletok' } @save_fcm_tokens_calls), 'stale token not re-saved');
+
+    processIncomingMessage($c, encode_json({ event => 'push', data => { type => 'badge', badge => 0 } }));
+    is($main::active_connections[0]{badge}, 5, 'stale badge untouched');
+
+    local $main::app_version = '7.0.0';
+    my $stale_conn = $main::active_connections[0]{conn};
+    processIncomingMessage($c, encode_json({ event => 'control', data => { type => 'version' } }));
+    is(scalar @{ $stale_conn->{sent} }, 0, 'version reply not sent to the stale socket');
+};
+
+subtest 'processIncomingMessage - token from new socket on same ip:port moves token off stale entry' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    my $c = stale_and_new();
+    processIncomingMessage($c, encode_json({ event => 'push',
+        data => { type => 'token', token => 'staletok', platform => 'android', state => 'enabled' } }));
+    is($main::active_connections[0]{state}, PENDING_DELETE, 'stale entry marked for delete');
+    is($main::active_connections[1]{token}, 'staletok', 'token now on the live connection');
+    is($main::active_connections[1]{invocations}{count}, 2, 'invocations carried over');
+};
+
 subtest 'processIncomingMessage - push token accepted before auth when auth is off' => sub {
     reset_state();
     local $fcm_config{enabled} = 1;

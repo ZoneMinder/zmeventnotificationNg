@@ -294,6 +294,20 @@ subtest 'initSocketServer: connect, message, disconnect handlers' => sub {
     'connection with token kept but invalidated on disconnect' );
 };
 
+subtest 'initSocketServer: disconnect only affects its own connection, not one with same ip:port' => sub {
+  local $ssl_config{enabled} = 0;
+  local $server_config{port} = 9130;
+  local $server_config{address} = DEFAULT_ADDRESS;
+  @main::active_connections = ();
+  initSocketServer();
+  my $old = connect_client( '127.0.0.1', 40000 );
+  $main::active_connections[0]{state} = VALID_CONNECTION;
+  my $new = connect_client( '127.0.0.1', 40000 );
+  $new->{h}{disconnect}->( $new, 1000, '' );
+  is( $main::active_connections[1]{state}, PENDING_DELETE, 'disconnected connection marked' );
+  is( $main::active_connections[0]{state}, VALID_CONNECTION, 'other connection untouched' );
+};
+
 subtest 'initSocketServer: an exception while handling a message does not escape' => sub {
   local $ssl_config{enabled} = 0;
   local $server_config{port} = 9126;

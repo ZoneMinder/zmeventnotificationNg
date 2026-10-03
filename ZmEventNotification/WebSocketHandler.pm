@@ -327,8 +327,7 @@ sub processIncomingMessage {
       foreach (@main::active_connections) {
         if (
           (    ( exists $_->{conn} )
-            && ( $_->{conn}->ip() eq $conn->ip() )
-            && ( $_->{conn}->port() eq $conn->port() )
+            && ( $_->{conn} == $conn )
           )
           || ( defined $json_string->{token}
             && $_->{token} eq $json_string->{token} )
@@ -366,8 +365,7 @@ sub processIncomingMessage {
         if ($_->{token} eq $data->{token}) {
           if (
             ( !exists $_->{conn} )
-            || ( $_->{conn}->ip() ne $conn->ip()
-              || $_->{conn}->port() ne $conn->port() )
+            || ( $_->{conn} != $conn )
             )
           {
             my $existing_token = substr( $_->{token}, -10 );
@@ -407,8 +405,7 @@ sub processIncomingMessage {
           }
         }
         elsif ( ( exists $_->{conn} )
-          && ( $_->{conn}->ip() eq $conn->ip() )
-          && ( $_->{conn}->port() eq $conn->port() )
+          && ( $_->{conn} == $conn )
           && ( $_->{token} ne $data->{token} ) )
         {
           my $existing_token = substr( $_->{token}, -10 );
@@ -475,8 +472,7 @@ sub processIncomingMessage {
       }
       foreach (@main::active_connections) {
         if ( ( exists $_->{conn} )
-          && ( $_->{conn}->ip() eq $conn->ip() )
-          && ( $_->{conn}->port() eq $conn->port() ) )
+          && ( $_->{conn} == $conn ) )
         {
           $_->{monlist} = $data->{monlist};
           $_->{intlist} = $data->{intlist};
@@ -498,8 +494,7 @@ sub processIncomingMessage {
     } elsif ( $data->{type} eq 'version' ) {
       foreach (@main::active_connections) {
         if ( ( exists $_->{conn} )
-          && ( $_->{conn}->ip() eq $conn->ip() )
-          && ( $_->{conn}->port() eq $conn->port() ) )
+          && ( $_->{conn} == $conn ) )
         {
           my $str = encode_json(
             { event   => 'control',
@@ -535,8 +530,7 @@ sub processIncomingMessage {
 
     foreach (@main::active_connections) {
       if ( ( exists $_->{conn} )
-        && ( $_->{conn}->ip() eq $conn->ip() )
-        && ( $_->{conn}->port() eq $conn->port() ) )
+        && ( $_->{conn} == $conn ) )
 
         # && ( $_->{state} == PENDING_AUTH ) ) # lets allow multiple auths
       {

@@ -861,8 +861,7 @@ sub initSocketServer {
               . getConnFields($conn));
           foreach (@active_connections) {
             if ( ( exists $_->{conn} )
-              && ( $_->{conn}->ip() eq $conn->ip() )
-              && ( $_->{conn}->port() eq $conn->port() ) )
+              && ( $_->{conn} == $conn ) )
             {
 
               # mark this for deletion only if device token
