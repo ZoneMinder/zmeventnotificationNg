@@ -297,6 +297,23 @@ sub processIncomingMessage {
 #-----------------------------------------------------------------------------------
   elsif ( ( $json_string->{event} eq 'push' ) && $fcm_config{enabled} ) {
 
+    # push commands write the token file and touch other devices' entries,
+    # so they need a connection that has authenticated
+    if ( $auth_config{enabled} ) {
+      my $obj = getObjectForConn($conn);
+      if ( !$obj || $obj->{state} != VALID_CONNECTION ) {
+        my $str = encode_json(
+          { event  => 'push',
+            type   => '',
+            status => 'Fail',
+            reason => 'NOAUTH'
+          }
+        );
+        _safe_send($conn, $str);
+        return;
+      }
+    }
+
 # sets the unread event count of events for a specific connection
 # the server keeps a tab of # of events it pushes out per connection
 # but won't know when the client has read them, so the client call tell the server

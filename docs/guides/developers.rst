@@ -217,6 +217,13 @@ if Push is disabled it will send back
 
     {"event":"push", "type":"", "status":"Fail", "reason": "PUSHDISABLED"}
 
+When auth is enabled, ``push`` messages (token and badge) are only accepted
+after the connection has authenticated. Before that, the server replies
+
+::
+
+    {"event":"push", "type":"", "status":"Fail", "reason": "NOAUTH"}
+
 Badge reset
 +++++++++++++
 

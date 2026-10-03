@@ -755,6 +755,44 @@ subtest 'processIncomingMessage - non-object JSON or non-object data is rejected
     }
 };
 
+subtest 'processIncomingMessage - push commands need an authenticated connection when auth is on' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    local $auth_config{enabled} = 1;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        { type => FCM, state => INVALID_CONNECTION, token => 'victim', badge => 4 },
+        { conn => $mock_conn, state => PENDING_AUTH, type => WEB, token => '', badge => 0 },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'push',
+        data => { type => 'token', token => 'victim', platform => 'android', state => 'enabled' } }));
+    processIncomingMessage($mock_conn, encode_json({ event => 'push', token => 'victim',
+        data => { type => 'badge', badge => 0 } }));
+
+    is(scalar @save_fcm_tokens_calls, 0, 'no token written');
+    is($main::active_connections[0]{state}, INVALID_CONNECTION, 'stored token not marked for delete');
+    is($main::active_connections[0]{badge}, 4, 'stored badge untouched');
+    is($main::active_connections[1]{token}, '', 'unauthenticated connection got no token');
+    my $response = decode_json($mock_conn->{sent}[0] // '{}');
+    is($response->{event}, 'push', 'push reply');
+    is($response->{status}, 'Fail', 'rejected');
+    is($response->{reason}, 'NOAUTH', 'reason NOAUTH');
+};
+
+subtest 'processIncomingMessage - push token accepted before auth when auth is off' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    local $auth_config{enabled} = 0;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        { conn => $mock_conn, state => PENDING_AUTH, type => WEB, token => '', badge => 0 },
+    );
+    processIncomingMessage($mock_conn, encode_json({ event => 'push',
+        data => { type => 'token', token => 'tokN', platform => 'android', state => 'enabled' } }));
+    is(scalar @save_fcm_tokens_calls, 1, 'token written');
+    is($main::active_connections[0]{token}, 'tokN', 'token stored');
+};
+
 done_testing();
 
 # Mock connection class
