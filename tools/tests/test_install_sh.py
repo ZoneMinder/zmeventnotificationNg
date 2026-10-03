@@ -35,7 +35,7 @@ exec python3 "$@"
 def sandbox(tmp_path):
     repo = tmp_path / "repo"
     shutil.copytree(REPO, repo, ignore=shutil.ignore_patterns(
-        ".git", ".claude", "__pycache__", ".pytest_cache"))
+        ".git", ".claude", ".codegraph", "*.sock", "__pycache__", ".pytest_cache"))
     fake_py = tmp_path / "fakepython"
     fake_py.write_text(FAKE_PYTHON)
     fake_py.chmod(0o755)
@@ -101,11 +101,13 @@ ARGS_SCRIPT = ('cmd_args=({args}); check_args; '
     ("", "prompt prompt yes"),
     ("--install-hook --install-config", "yes prompt yes"),
     ("--no-hook-config-upgrade", "prompt prompt no"),
-    # Skipping the hook config also skips the legacy INI upgrade/rename,
+    # Not installing the hook also skips the legacy INI upgrade/rename,
     # unless --hook-config-upgrade is given explicitly.
     ("--no-install-hook", "no prompt no"),
-    ("--no-install-config", "no no no"),
-    ("--no-install-hook-config", "no prompt no"),
+    # The hook is still installed and reads only objectconfig.yml, so the
+    # INI -> YAML migration must keep running when only config is skipped.
+    ("--no-install-config", "no no yes"),
+    ("--no-install-hook-config", "no prompt yes"),
     ("--no-install-hook --hook-config-upgrade", "no prompt yes"),
     ("--no-install-hook --install-hook-config", "yes prompt yes"),
     ("--no-install-es", "prompt no yes"),

@@ -1009,9 +1009,10 @@ check_args() {
         [[ ${INSTALL_HOOK} == 'prompt' && ${INSTALL_HOOK_CONFIG} == 'yes' ]] && INSTALL_HOOK_CONFIG='prompt'
     fi
 
-    # Skipping the hook config also skips migrating/renaming objectconfig.ini,
-    # unless the upgrade was asked for explicitly
-    if [[ ${HOOK_CONFIG_UPGRADE_EXPLICIT} == 'no' && ${INSTALL_HOOK_CONFIG} == 'no' ]]; then
+    # Not installing the hook also skips migrating/renaming objectconfig.ini,
+    # unless the upgrade was asked for explicitly. With the hook installed the
+    # migration must still run: the new hook reads only objectconfig.yml.
+    if [[ ${HOOK_CONFIG_UPGRADE_EXPLICIT} == 'no' && ${INSTALL_HOOK} == 'no' && ${INSTALL_HOOK_CONFIG} == 'no' ]]; then
         HOOK_CONFIG_UPGRADE='no'
     fi
 }
