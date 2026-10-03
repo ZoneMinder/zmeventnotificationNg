@@ -150,6 +150,27 @@ def test_ensure_venv_creates_missing_venv(sandbox):
     assert os.access(venv / "bin" / "pip", os.X_OK)
 
 
+def test_ensure_venv_refuses_populated_non_venv_dir(sandbox):
+    # e.g. --venv-path pointed at /opt by mistake: never rm -rf it.
+    venv = sandbox["tmp"] / "venv"
+    venv.mkdir()
+    (venv / "important.txt").write_text("data")
+    r = run(sandbox, _venv_script() + "echo reached", USE_VENV="yes",
+            PYTHON=sandbox["fake_python"])
+    assert r.returncode == 1
+    assert "reached" not in r.stdout
+    assert (venv / "important.txt").read_text() == "data"
+    assert not (venv / "bin").exists()
+
+
+def test_ensure_venv_uses_existing_empty_dir(sandbox):
+    venv = sandbox["tmp"] / "venv"
+    venv.mkdir()
+    r = run(sandbox, _venv_script(), USE_VENV="yes", PYTHON=sandbox["fake_python"])
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert os.access(venv / "bin" / "pip", os.X_OK)
+
+
 # ── config install / upgrade ────────────────────────────────────────────
 
 def test_install_hook_config_rewrites_etc_zm_paths(sandbox):

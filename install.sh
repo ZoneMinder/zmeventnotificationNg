@@ -133,9 +133,15 @@ ensure_venv() {
     if [[ -d "${ZM_VENV}" && -x "${ZM_VENV}/bin/python" && -x "${ZM_VENV}/bin/pip" ]]; then
         print_success "Venv already exists at ${ZM_VENV}"
     else
-        if [[ -d "${ZM_VENV}" ]]; then
+        # Only delete what is clearly a venv; never rm -rf an arbitrary
+        # populated directory (e.g. a mistyped --venv-path).
+        if [[ -f "${ZM_VENV}/pyvenv.cfg" ]]; then
             print_warning "Existing venv at ${ZM_VENV} has no pip — recreating"
             rm -rf "${ZM_VENV}"
+        elif [[ -d "${ZM_VENV}" && -n "$(ls -A "${ZM_VENV}")" ]]; then
+            print_error "${ZM_VENV} exists, is not empty and is not a Python venv (no pyvenv.cfg)."
+            print_error "Refusing to delete it. Remove it yourself or pick another --venv-path."
+            exit 1
         fi
         create_venv
     fi
