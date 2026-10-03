@@ -106,9 +106,10 @@ class TestCollectEnabledModels:
             {"name": "on", "enabled": True}, {"name": "off", "enabled": False}]}}}}
         assert collect_enabled_models(cfg) == [("object", {"name": "on", "enabled": True})]
 
-    def test_default_disabled_when_no_enabled_key(self):
+    def test_default_enabled_when_no_enabled_key(self):
+        # pyzm ModelConfig: enabled=_bool(seq.get("enabled", True), default=True)
         cfg = {"ml": {"ml_sequence": {"object": {"sequence": [{"name": "x"}]}}}}
-        assert collect_enabled_models(cfg) == []
+        assert collect_enabled_models(cfg) == [("object", {"name": "x"})]
 
 
 # ── check_opencv_version ────────────────────────────────────────────────

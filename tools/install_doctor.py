@@ -71,7 +71,8 @@ def collect_enabled_models(cfg):
         for model in section.get("sequence", []):
             if not isinstance(model, dict):
                 continue
-            if str(model.get("enabled", "no")).lower() in ("yes", "true", "1"):
+            # pyzm treats a model with no `enabled` key as enabled
+            if str(model.get("enabled", "yes")).lower() in ("yes", "true", "1"):
                 enabled.append((section_key, model))
     return enabled
 
