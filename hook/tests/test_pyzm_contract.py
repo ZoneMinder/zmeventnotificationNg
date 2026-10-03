@@ -158,3 +158,25 @@ def test_zone_match_strategy_reaches_pyzm_from_ml_sequence():
         "pyzm no longer honours ml_sequence.general.zone_match_strategy; the "
         "value ES documents is being ignored."
     )
+
+
+def test_zmclientconfig_derives_portal_only_from_none():
+    """zm_detect.py passes portal_url=None when ``portal`` is empty so pyzm
+    derives it from api_url. pyzm only derives when portal_url is None."""
+    _real_pyzm_or_skip()
+    import importlib
+
+    saved = {k: v for k, v in list(sys.modules.items())
+             if k == "pyzm" or k.startswith("pyzm.")}
+    for k in saved:
+        del sys.modules[k]
+    try:
+        config_mod = importlib.import_module("pyzm.models.config")
+        derived = config_mod.ZMClientConfig(
+            api_url="https://zm.example/zm/api", portal_url=None).portal_url
+    finally:
+        for k in [k for k in sys.modules if k == "pyzm" or k.startswith("pyzm.")]:
+            del sys.modules[k]
+        sys.modules.update(saved)
+
+    assert derived == "https://zm.example/zm"

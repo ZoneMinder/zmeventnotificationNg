@@ -9,8 +9,12 @@ import json
 import os
 import requests
 from datetime import datetime
+from urllib.parse import quote
 
 DEFAULT_BASE_DATA_PATH = '/var/lib/zmeventnotification'
+# FCM errors that mean the token itself is invalid (INVALID_ARGUMENT,
+# UNREGISTERED, legacy NotRegistered).
+FCM_INVALID_TOKEN_MARKERS = ('not a valid FCM', 'entity was not found', 'UNREGISTERED', 'NotRegistered')
 
 
 def send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cause, logger, no_match=False):
@@ -78,7 +82,14 @@ def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cau
             logger.Debug(2, 'push: skipping token ...{} (monitor {} not in filter)'.format(token_suffix, mid))
             continue
 
-        if notif.is_throttled():
+        try:
+            throttled = notif.is_throttled()
+        except Exception as e:
+            # e.g. pyzm raises TypeError on a tz-aware LastNotifiedAt. Send
+            # rather than drop the alarm or abort the remaining tokens.
+            logger.Error('push: throttle check failed for token ...{}, sending anyway: {}'.format(token_suffix, e))
+            throttled = False
+        if throttled:
             logger.Debug(2, 'push: skipping token ...{} (throttled, interval={}s)'.format(token_suffix, notif.interval))
             continue
 
@@ -115,9 +126,9 @@ def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cau
                 pic_user = push_cfg.get('picture_portal_username', '')
                 pic_pass = push_cfg.get('picture_portal_password', '')
                 if pic_user:
-                    image_url += '&username={}'.format(pic_user)
+                    image_url += '&username={}'.format(quote(str(pic_user), safe=''))
                 if pic_pass:
-                    image_url += '&password={}'.format(pic_pass)
+                    image_url += '&password={}'.format(quote(str(pic_pass), safe=''))
                 payload['image_url'] = image_url
                 logger.Debug(1, 'push: image_url={}'.format(image_url.split('&password=')[0]))
             else:
@@ -185,10 +196,11 @@ def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cau
                 sent_count += 1
             else:
                 logger.Error('push: FCM proxy error for token ...{}: {}'.format(token_suffix, body_text))
-                # Remove token on client errors (4xx) or any token-specific
-                # error in the body. Don't remove on server errors (5xx) or
-                # network issues — those are transient.
-                if has_token_error or (not resp.ok and 400 <= resp.status_code < 500):
+                # Remove the token only when the error names it as invalid
+                # (FCM.pm matches the same markers). A bare 4xx such as 401
+                # (bad fcm_v1_key) or 429 applies to every token, so deleting
+                # on status alone would wipe all registered devices.
+                if has_token_error or any(m in body_text for m in FCM_INVALID_TOKEN_MARKERS):
                     logger.Debug(1, 'push: removing invalid token ...{}'.format(token_suffix))
                     try:
                         notif.delete()

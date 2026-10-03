@@ -96,7 +96,10 @@ class FakeResult:
         self.annotate_calls = []
 
     def to_dict(self):
-        return dict(self._data)
+        # pyzm DetectionResult.to_dict() carries the result image under 'image'
+        d = dict(self._data)
+        d.setdefault('image', self.image)
+        return d
 
     def annotate(self, **kw):
         self.annotate_calls.append(kw)
@@ -293,6 +296,14 @@ def test_zmclient_gets_credentials_and_ssl(harness, monkeypatch, tmp_path):
     assert kw['verify_ssl'] is False
 
 
+def test_empty_portal_passed_as_none(harness, monkeypatch, tmp_path):
+    # pyzm ZMClientConfig derives portal_url from api_url only when
+    # portal_url is None; '' (the config default) would block that.
+    harness.cfg['portal'] = ''
+    _run(monkeypatch, tmp_path, ['-e', '55555', '-m', '7'])
+    assert FakeZMClient.last.init_kwargs['portal_url'] is None
+
+
 # ---------------------------------------------------------------------------
 # --debug log elevation  (recent fix: 6abdfbc)
 # ---------------------------------------------------------------------------
@@ -318,13 +329,15 @@ class _Resp:
 
 
 def test_url_mode_fetch_uses_zmapi_and_annotates(harness, monkeypatch, tmp_path):
-    # gateway/URL mode: detector returns boxes but NO image
+    # gateway/URL mode: pyzm _detect_event_url runs the pipeline on a blank
+    # np.zeros frame of monitor size, and pipeline.run returns that blank
+    # frame as result.image. The real frame must be fetched from ZM.
     harness.cfg['write_image_to_zm'] = 'yes'
-    FakeDetector.result_image = None
-    harness.cfg  # image absent from result_data -> triggers fetch block
+    harness.cfg['ml_gateway'] = 'https://gw.example/ml'
+    FakeDetector.result_image = np.zeros((10, 10, 3), dtype='uint8')
 
     # api.request returns bytes; imdecode yields a valid array
-    fake_img = np.zeros((10, 10, 3), dtype='uint8')
+    fake_img = np.full((10, 10, 3), 7, dtype='uint8')
     monkeypatch.setattr(zm_detect.cv2, 'imdecode', lambda arr, flag: fake_img)
 
     # seed the response on the client the code will build
@@ -365,6 +378,42 @@ def test_url_mode_fetch_decode_failure_logs_and_skips(harness, monkeypatch, tmp_
     assert result.image is None
     assert FakeZMClient.last.event_obj.saved is None
     assert any('could not be decoded' in e for e in LocalLogger.errors)
+
+
+def test_fakeit_without_image_fetches_frame(harness, monkeypatch, tmp_path):
+    # Real case of image=None: --fakeit on an empty DetectionResult (pyzm
+    # returns DetectionResult() with image None when no frames match).
+    harness.cfg['write_image_to_zm'] = 'yes'
+    FakeDetector.result_data = {}
+    FakeDetector.result_image = None
+    fake_img = np.full((10, 10, 3), 7, dtype='uint8')
+    monkeypatch.setattr(zm_detect.cv2, 'imdecode', lambda arr, flag: fake_img)
+    orig_init = FakeZMClient.__init__
+    def init_with_resp(self, **kw):
+        orig_init(self, **kw)
+        self.api.response = _Resp(b'jpegbytes')
+    monkeypatch.setattr(FakeZMClient, '__init__', init_with_resp)
+
+    _run(monkeypatch, tmp_path, ['-e', '55555', '-m', '7', '--fakeit', 'dog'])
+
+    assert FakeZMClient.last.api.requested_urls == [
+        'https://zm.example/zm/index.php?view=image&eid=55555&fid=snapshot']
+    assert FakeDetectionResult.last.image is fake_img
+    assert FakeZMClient.last.event_obj.saved is not None
+
+
+def test_gateway_image_mode_real_frame_not_refetched(harness, monkeypatch, tmp_path):
+    # Gateway image mode (or a URL-mode download fallback) returns the real
+    # frame; it must be annotated as-is, not refetched.
+    harness.cfg['write_image_to_zm'] = 'yes'
+    harness.cfg['ml_gateway'] = 'https://gw.example/ml'
+    harness.cfg['ml_gateway_mode'] = 'image'
+    real = np.full((5, 5, 3), 120, dtype='uint8')
+    FakeDetector.result_image = real
+    _run(monkeypatch, tmp_path, ['-e', '55555', '-m', '7'])
+    assert FakeZMClient.last.api.requested_urls == []
+    assert FakeDetector.last_result.image is real
+    assert FakeZMClient.last.event_obj.saved is not None
 
 
 def test_no_fetch_when_image_already_present(harness, monkeypatch, tmp_path):

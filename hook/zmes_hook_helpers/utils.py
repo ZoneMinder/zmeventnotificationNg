@@ -101,8 +101,10 @@ def str_split(my_str):
 
 
 # credit: https://stackoverflow.com/a/5320179
+# w is literal text (a ZM zone name). (?<!\w)/(?!\w) equal \b next to a word
+# character, and still match when the name starts or ends with punctuation.
 def findWholeWord(w):
-    return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
+    return re.compile(r'(?<!\w)({0})(?!\w)'.format(re.escape(w)), flags=re.IGNORECASE).search
 
 
 def normalize_zone_name(name):

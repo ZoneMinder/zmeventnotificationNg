@@ -511,7 +511,8 @@ Consumed by ``zm_detect.py`` / ``utils.py``:
      - Base path for model files and data directories
    * - ``portal``
      - ``""``
-     - ZoneMinder portal URL (e.g. ``https://zm.example.com/zm``)
+     - ZoneMinder portal URL (e.g. ``https://zm.example.com/zm``). If empty,
+       derived from ``api_portal`` by dropping a trailing ``/api``
    * - ``api_portal``
      - ``""``
      - ZoneMinder API URL (e.g. ``https://zm.example.com/zm/api``)

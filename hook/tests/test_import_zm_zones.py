@@ -90,6 +90,23 @@ class TestImportZmZones:
         assert len(g.polygons) == 1
         assert g.polygons[0]['name'] == 'driveway'
 
+    def test_only_triggered_zone_name_with_parens(self):
+        """A ZM zone named with regex metacharacters still matches the cause literally."""
+        from zmes_hook_helpers.utils import import_zm_zones
+
+        g.config['only_triggered_zm_zones'] = 'yes'
+
+        mock_zm = MagicMock()
+        mock_monitor = MagicMock()
+        mock_monitor.get_zones.return_value = [
+            _make_zone("Gate (east)", "0,0 100,0 100,100 0,100"),
+            _make_zone("Gate (west)", "50,50 150,50 150,150 50,150"),
+        ]
+        mock_zm.monitor.return_value = mock_monitor
+
+        import_zm_zones("1", "Motion: Gate (east)", mock_zm)
+        assert [p['name'] for p in g.polygons] == ['gate_(east)']
+
     def test_no_reason_match_imports_all_when_not_triggered(self):
         """When only_triggered_zm_zones is no, reason is ignored."""
         from zmes_hook_helpers.utils import import_zm_zones

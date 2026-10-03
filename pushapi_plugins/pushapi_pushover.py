@@ -94,19 +94,22 @@ if len(sys.argv) == 7:
     image_path =  sys.argv[6]
     fname=get_image(image_path, cause)
 
-    zmlog.Debug (1,'eid:{} Image to be used is: {}'.format(eid,fname))
-    f,e=os.path.splitext(fname)
-    if e.lower() == '.mp4':
-        ctype = 'video/mp4'
+    if not os.path.isfile(fname):
+        zmlog.Debug (1,'eid:{} Image {} not found, sending without attachment'.format(eid,fname))
     else:
-        ctype = 'image/jpeg'
-    zmlog.Debug (1,'Setting ctype to {} for extension {}'.format(ctype, e.lower()))
-    files = {
-         "attachment": ("image"+e.lower(), open(fname,"rb"), ctype)
-    }
+        zmlog.Debug (1,'eid:{} Image to be used is: {}'.format(eid,fname))
+        f,e=os.path.splitext(fname)
+        if e.lower() == '.mp4':
+            ctype = 'video/mp4'
+        else:
+            ctype = 'image/jpeg'
+        zmlog.Debug (1,'Setting ctype to {} for extension {}'.format(ctype, e.lower()))
+        files = {
+             "attachment": ("image"+e.lower(), open(fname,"rb"), ctype)
+        }
 
 
-if not param_dict['token'] or param_dict['user']:
+if not param_dict['token'] or not param_dict['user']:
     # read from secrets
     secrets = read_secrets()
     if not param_dict['token']:
@@ -125,7 +128,7 @@ disp_param_dict=param_dict.copy()
 disp_param_dict['token']='<removed>'
 disp_param_dict['user']='<removed>'
 zmlog.Debug (1, "eid:{} Pushover payload: data={} files={}".format(eid,disp_param_dict,files))
-r = requests.post("https://api.pushover.net/1/messages.json", data = param_dict, files = files)
+r = requests.post("https://api.pushover.net/1/messages.json", data = param_dict, files = files, timeout = 30)
 zmlog.Debug(1,"eid:{} Pushover returned:{}".format(eid, r.text))
 print(r.text)
 zmlog.close()
