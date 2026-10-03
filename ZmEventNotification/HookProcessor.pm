@@ -274,7 +274,7 @@ sub shouldSendEventToConn {
   main::Debug(1, 'Checking alarm conditions for '.$id);
 
   if ( isInList( $monlist, $alarm->{MonitorId} ) ) {
-    my $mint = getInterval( $intlist, $monlist, $alarm->{MonitorId} );
+    my $mint = getInterval( $intlist, $monlist, $alarm->{MonitorId} ) // 0;
     my $last_sent = _lastSentTime( $ac, $alarm->{MonitorId} );
     if ( $last_sent ) {
       my $elapsed = time() - $last_sent;

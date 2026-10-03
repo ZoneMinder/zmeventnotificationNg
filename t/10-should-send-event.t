@@ -382,10 +382,13 @@ for my $case (
         token   => "tok_noint_${label}_1234567890",
         id      => 18,
     };
+    my @warnings;
+    local $SIG{__WARN__} = sub { push @warnings, @_ };
     _seed_last_sent($ac->{token}, '1', time() - 2);
     is(shouldSendEventToConn($alarm, $ac), 1, "$label, sent 2s ago -> 1");
     _seed_last_sent($ac->{token}, '1', time() + 100);
     is(shouldSendEventToConn($alarm, $ac), 0, "$label, last send in the future -> 0");
+    is_deeply(\@warnings, [], "$label: no undef warnings");
 }
 
 done_testing();
