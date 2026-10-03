@@ -156,6 +156,10 @@ Perl test reference
      - ``processNewAlarmsInFork`` end to end with a stub hook script: exact
        argv of hooks, user scripts and the API push script, hook exit
        code/stdout handling, notifications sent, job-pipe lines
+   * - ``t/23-process-jobs.t``
+     - ``processJobs`` (the parent's job-pipe consumer in
+       ``zmeventnotification.pl``), run from the script source via
+       ``t/lib/PlSource.pm`` against a real pipe: every job type
 
 
 Python unit / integration reference
