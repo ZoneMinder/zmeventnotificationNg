@@ -689,8 +689,9 @@ sub initSocketServer {
         SSL_key_file  => $ssl_config{key_file}
       );
     };
-    if ($@) {
-      Error("Failed starting server: $@");
+    # new() returns undef on failure (e.g. bind error) rather than dying
+    if ($@ || !$ssl_server) {
+      Error('Failed starting server: ' . ($@ || IO::Socket::SSL::errstr() . " ($!)"));
       exit(-1);
     }
     Info('Secure WS(WSS) is enabled...');

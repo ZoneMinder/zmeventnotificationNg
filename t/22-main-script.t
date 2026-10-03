@@ -213,6 +213,20 @@ subtest 'initSocketServer: SSL passes a configured IO::Socket::SSL listener' => 
   is( $FakeWSS::last_opts{listen}, $sock, 'listen is the SSL socket' );
 };
 
+subtest 'initSocketServer: SSL listener failure is fatal, no plaintext fallback' => sub {
+  no warnings 'redefine', 'once';
+  local *IO::Socket::SSL::new = sub { undef };
+  local *IO::Socket::SSL::errstr = sub { 'bind: Address already in use' };
+  local $ssl_config{enabled} = 1;
+  local $server_config{port} = 9127;
+  %FakeWSS::last_opts = ();
+  @logged_errors = ();
+  my $err = run_catching { initSocketServer() };
+  is( $err, "EXIT:-1\n", 'exits with -1' );
+  ok( !%FakeWSS::last_opts, 'websocket server not started' );
+  like( join( '', @logged_errors ), qr/Address already in use/, 'SSL error logged' );
+};
+
 sub connect_client {
   my $conn = FakeConn->new(@_);
   $FakeWSS::last_opts{on_connect}->( undef, $conn );
