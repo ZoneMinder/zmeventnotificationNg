@@ -715,6 +715,9 @@ sub initSocketServer {
     Info('Secure WS(WSS) is enabled...');
   } else {
     Info('Secure WS is disabled...');
+    Warning("network.address $server_config{address} is ignored when SSL is disabled; "
+        . 'listening on all IPv4 interfaces')
+      if $server_config{address} && $server_config{address} ne DEFAULT_ADDRESS;
   }
   Info('Web Socket Event Server listening on port ' . $server_config{port});
 

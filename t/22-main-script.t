@@ -18,7 +18,7 @@ use ZmEventNotification::Config qw(:all);
 use ZmEventNotification::Util qw(getConnFields);
 
 # ---- stubs for what the extracted subs call ----
-our (@exec_args, @logged_errors, @processed_msgs);
+our (@exec_args, @logged_errors, @processed_msgs, @logged_warnings);
 our %shm;    # monitor id -> { state, last_event, trigger_cause, trigger_text, alarm_cause }
 our ($token_saves, $monitor_loads) = (0, 0);
 
@@ -36,6 +36,7 @@ sub main::zmMemRead {
 {
   no warnings 'redefine', 'once';
   *main::Error = sub { push @logged_errors, $_[0] };
+  *main::Warning = sub { push @logged_warnings, $_[0] };
   *main::processIncomingMessage = sub { push @processed_msgs, $_[1] };
   *main::loadMonitors = sub { $monitor_loads++ };    # StubZM's version is a no-op
 }
@@ -214,6 +215,23 @@ subtest 'initSocketServer: plain WS with default address listens on port only' =
   is( $FakeWSS::last_opts{tick_period}, 7, 'tick_period from event_check_interval' );
   is( ref $FakeWSS::last_opts{on_connect}, 'CODE', 'on_connect handler set' );
   is( ref $FakeWSS::last_opts{on_tick}, 'CODE', 'on_tick handler set' );
+};
+
+subtest 'initSocketServer: plain WS warns that a configured address is ignored' => sub {
+  local $ssl_config{enabled} = 0;
+  local $server_config{port} = 9123;
+  for my $addr ( DEFAULT_ADDRESS, '', undef ) {
+    @logged_warnings = ();
+    local $server_config{address} = $addr;
+    initSocketServer();
+    is_deeply( \@logged_warnings, [], 'no warning for ' . ( $addr // 'undef' ) );
+  }
+  @logged_warnings = ();
+  local $server_config{address} = '127.0.0.1';
+  initSocketServer();
+  is( $FakeWSS::last_opts{listen}, 9123, 'still listens on the bare port' );
+  is( scalar @logged_warnings, 1, 'one warning' );
+  like( $logged_warnings[0], qr/127\.0\.0\.1.*ignored.*SSL/, 'names the address and why' );
 };
 
 subtest 'initSocketServer: SSL passes a configured IO::Socket::SSL listener' => sub {

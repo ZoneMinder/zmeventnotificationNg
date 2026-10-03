@@ -36,6 +36,8 @@ network:
   port: 9000
 
   # Address for Websockets server (default: [::]).
+  # Only used when SSL is enabled. Without SSL the ES always listens on all
+  # IPv4 interfaces and logs a warning if this is set.
   # If you are facing connection issues or SSL issues, put in your IP here
   # If you want to listen to multiple interfaces try 0.0.0.0
   #address: "1.2.3.4"
