@@ -110,6 +110,17 @@ my $tmpdir = tempdir(CLEANUP => 1);
     is(scalar @main::active_connections, 1, 'one connection after migration');
 }
 
+{
+    # Each loaded token gets its own id; the parent routes child jobs by id (#55)
+    my $tf = "$tmpdir/init_ids.txt";
+    _write_file($tf, encode_json({ tokens => { map { ("tok_$_" => {}) } 1..3 } }));
+    local $fcm_config{token_file} = $tf;
+    @main::active_connections = ();
+    initFCMTokens();
+    my %ids = map { $_->{id} => 1 } @main::active_connections;
+    is(scalar keys %ids, 3, 'tokens loaded together get distinct ids');
+}
+
 # ===== saveFCMTokens =====
 
 {
