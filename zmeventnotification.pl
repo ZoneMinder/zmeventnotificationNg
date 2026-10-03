@@ -741,10 +741,12 @@ sub initSocketServer {
       # The child closing the db connection can affect the parent.
       zmDbDisconnect();
 
+      my $forked_hooks = 0;
       foreach (@newEvents) {
-        if (($parallel_hooks >= $hooks_config{max_parallel_hooks}) && ($hooks_config{max_parallel_hooks} != 0)) {
+        if ( hookLimitReached( $parallel_hooks, \$forked_hooks, $_->{Alarm}->{MonitorId} ) ) {
           $dbh = zmDbConnect(1);
-          Error("There are $parallel_hooks hooks running as of now. This exceeds your set limit of max_parallel_hooks=$hooks_config{max_parallel_hooks}. Ignoring this event. Either increase your max_parallel_hooks value, or, adjust your ZM motion sensitivity ");
+          my $hooks = $parallel_hooks + $forked_hooks;
+          Error("There are $hooks hooks running as of now. This exceeds your set limit of max_parallel_hooks=$hooks_config{max_parallel_hooks}. Ignoring this event. Either increase your max_parallel_hooks value, or, adjust your ZM motion sensitivity ");
           last;
         }
         my $cpid;

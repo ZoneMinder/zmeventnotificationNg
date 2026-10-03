@@ -20,6 +20,7 @@ our @EXPORT_OK = qw(
   isAllowedChannel
   shouldSendEventToConn
   sendOverWebSocket
+  hookLimitReached
 );
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
@@ -402,6 +403,21 @@ sub _run_api_push {
   } else {
     main::Info("Not sending push over API as it is not allowed for $event_type");
   }
+}
+
+# Parent, before forking for each new event of a tick. A child reports its
+# running hook ('add' on the job pipe) only by the next tick, so start hooks
+# forked earlier in this tick are counted in $$forked_ref.
+# Returns 1 if max_parallel_hooks is reached and the event must be dropped.
+# ponytail: per-tick count; a child slower than one tick to report its 'add'
+# is still missed. Count per child pid if that matters.
+sub hookLimitReached {
+  my ( $running, $forked_ref, $mid ) = @_;
+  my $max = $hooks_config{max_parallel_hooks};
+  return 1 if $max && ( $running + $$forked_ref ) >= $max;
+  my %skip_hooks = map { $_ => 1 } split( ',', $hooks_config{hook_skip_monitors} // '' );
+  $$forked_ref++ if $hooks_config{event_start_hook} && $hooks_config{enabled} && !$skip_hooks{$mid};
+  return 0;
 }
 
 sub processNewAlarmsInFork {

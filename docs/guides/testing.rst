@@ -160,6 +160,9 @@ Perl test reference
      - ``processJobs`` (the parent's job-pipe consumer in
        ``zmeventnotification.pl``), run from the script source via
        ``t/lib/PlSource.pm`` against a real pipe: every job type
+   * - ``t/24-fork-hook-limit.t``
+     - The parent's per-tick fork loop (from the script source) and the
+       ``max_parallel_hooks`` gate, including a burst of events in one tick
 
 
 Python unit / integration reference
