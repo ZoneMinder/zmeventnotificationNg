@@ -224,6 +224,9 @@ Tools test reference
      - ``install.sh`` functions (sourced in a sandboxed repo copy, no system
        paths): flag parsing, venv handling, config install/upgrade, path
        rewrites, hook install layout, dependency checks
+   * - ``tools/tests/test_make_release.py``
+     - ``scripts/make_release.sh`` preflight (throwaway repo, local bare
+       origin, stub ``gh``/``git-cliff``/``curl``): aborts before any push
 
 
 e2e test reference
