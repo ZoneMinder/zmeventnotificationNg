@@ -234,7 +234,11 @@ sub validateAuth {
   } else {
     # admin category
     main::Debug(1, 'Detected escontrol interface auth');
-    return ( $p eq $escontrol_config{password} )
+    if ( $escontrol_config{enabled} && !length( $escontrol_config{password} // '' ) ) {
+      main::Error('escontrol login rejected: escontrol_interface_password is not set');
+      return 0;
+    }
+    return defined($p) && ( $p eq $escontrol_config{password} )
       && ($escontrol_config{enabled});
   }
 }
@@ -244,8 +248,14 @@ sub processIncomingMessage {
 
   my $json_string;
   eval { $json_string = decode_json($msg); };
-  if ($@) {
-    main::Error("Failed decoding json in processIncomingMessage: $@");
+  my $err = $@;
+  # top level and 'data' (when present) must be JSON objects; anything else
+  # would die on hash dereference below
+  $err = 'not a JSON object'
+    if !$err && ( ref($json_string) ne 'HASH'
+      || ( defined $json_string->{data} && ref( $json_string->{data} ) ne 'HASH' ) );
+  if ($err) {
+    main::Error("Failed decoding json in processIncomingMessage: $err");
     my $str = encode_json(
       { event  => 'malformed',
         type   => '',
@@ -291,6 +301,23 @@ sub processIncomingMessage {
 #-----------------------------------------------------------------------------------
   elsif ( ( $json_string->{event} eq 'push' ) && $fcm_config{enabled} ) {
 
+    # push commands write the token file and touch other devices' entries,
+    # so they need a connection that has authenticated
+    if ( $auth_config{enabled} ) {
+      my $obj = getObjectForConn($conn);
+      if ( !$obj || $obj->{state} != VALID_CONNECTION ) {
+        my $str = encode_json(
+          { event  => 'push',
+            type   => '',
+            status => 'Fail',
+            reason => 'NOAUTH'
+          }
+        );
+        _safe_send($conn, $str);
+        return;
+      }
+    }
+
 # sets the unread event count of events for a specific connection
 # the server keeps a tab of # of events it pushes out per connection
 # but won't know when the client has read them, so the client call tell the server
@@ -300,8 +327,7 @@ sub processIncomingMessage {
       foreach (@main::active_connections) {
         if (
           (    ( exists $_->{conn} )
-            && ( $_->{conn}->ip() eq $conn->ip() )
-            && ( $_->{conn}->port() eq $conn->port() )
+            && ( $_->{conn} == $conn )
           )
           || ( defined $json_string->{token}
             && $_->{token} eq $json_string->{token} )
@@ -339,8 +365,7 @@ sub processIncomingMessage {
         if ($_->{token} eq $data->{token}) {
           if (
             ( !exists $_->{conn} )
-            || ( $_->{conn}->ip() ne $conn->ip()
-              || $_->{conn}->port() ne $conn->port() )
+            || ( $_->{conn} != $conn )
             )
           {
             my $existing_token = substr( $_->{token}, -10 );
@@ -380,8 +405,7 @@ sub processIncomingMessage {
           }
         }
         elsif ( ( exists $_->{conn} )
-          && ( $_->{conn}->ip() eq $conn->ip() )
-          && ( $_->{conn}->port() eq $conn->port() )
+          && ( $_->{conn} == $conn )
           && ( $_->{token} ne $data->{token} ) )
         {
           my $existing_token = substr( $_->{token}, -10 );
@@ -448,8 +472,7 @@ sub processIncomingMessage {
       }
       foreach (@main::active_connections) {
         if ( ( exists $_->{conn} )
-          && ( $_->{conn}->ip() eq $conn->ip() )
-          && ( $_->{conn}->port() eq $conn->port() ) )
+          && ( $_->{conn} == $conn ) )
         {
           $_->{monlist} = $data->{monlist};
           $_->{intlist} = $data->{intlist};
@@ -471,8 +494,7 @@ sub processIncomingMessage {
     } elsif ( $data->{type} eq 'version' ) {
       foreach (@main::active_connections) {
         if ( ( exists $_->{conn} )
-          && ( $_->{conn}->ip() eq $conn->ip() )
-          && ( $_->{conn}->port() eq $conn->port() ) )
+          && ( $_->{conn} == $conn ) )
         {
           my $str = encode_json(
             { event   => 'control',
@@ -508,8 +530,7 @@ sub processIncomingMessage {
 
     foreach (@main::active_connections) {
       if ( ( exists $_->{conn} )
-        && ( $_->{conn}->ip() eq $conn->ip() )
-        && ( $_->{conn}->port() eq $conn->port() ) )
+        && ( $_->{conn} == $conn ) )
 
         # && ( $_->{state} == PENDING_AUTH ) ) # lets allow multiple auths
       {

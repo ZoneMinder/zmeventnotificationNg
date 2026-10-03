@@ -101,8 +101,10 @@ def str_split(my_str):
 
 
 # credit: https://stackoverflow.com/a/5320179
+# w is literal text (a ZM zone name). (?<!\w)/(?!\w) equal \b next to a word
+# character, and still match when the name starts or ends with punctuation.
 def findWholeWord(w):
-    return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
+    return re.compile(r'(?<!\w)({0})(?!\w)'.format(re.escape(w)), flags=re.IGNORECASE).search
 
 
 def normalize_zone_name(name):
@@ -542,6 +544,10 @@ def process_config(args, ctx):
         g.logger.Debug(1, 'Output path modified to {}'.format(args.get('output_path')))
         g.config['image_path'] = args.get('output_path')
         g.config['write_debug_image'] = 'yes'
+        try:
+            os.makedirs(g.config['image_path'], exist_ok=True)
+        except OSError as e:
+            g.logger.Error('Could not create output path {}: {}'.format(g.config['image_path'], e))
 
     # Apply CLI overrides last — highest priority
     if args.get('override'):

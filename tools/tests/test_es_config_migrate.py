@@ -87,3 +87,63 @@ class TestMigrateSecrets:
     def test_no_secrets_section_empty(self):
         cp = make_cp("[other]\nk=v\n")
         assert migrate_secrets(cp) == {}
+
+
+# ── main(): real INI files, parsed the way the tool parses them ─────────────
+
+def _migrate(tmp_path, monkeypatch, ini_text, secrets=False):
+    import sys
+    import yaml
+    ini = tmp_path / "in.ini"
+    ini.write_text(ini_text)
+    out = tmp_path / "out.yml"
+    argv = ["es_config_migrate_yaml.py", "-c", str(ini), "-o", str(out)]
+    if secrets:
+        argv.append("--secrets")
+    monkeypatch.setattr(sys, "argv", argv)
+    mod.main()
+    return yaml.safe_load(out.read_text())
+
+
+class TestMainLegacyValues:
+    """The legacy ES read zmeventnotification.ini and secrets.ini with
+    Config::IniFiles defaults: no inline comments at all (';' and '#' after
+    a value are part of it), surrounding whitespace trimmed. The legacy
+    Python hook read secrets.ini with ConfigParser(inline_comment_prefixes='#').
+    """
+
+    def test_es_semicolon_after_value_is_kept(self, tmp_path, monkeypatch):
+        out = _migrate(tmp_path, monkeypatch, "[general]\nport = 9000 ; ws port\n")
+        assert out == {"general": {"port": "9000 ; ws port"}}
+
+    def test_es_quotes_and_templates(self, tmp_path, monkeypatch):
+        out = _migrate(tmp_path, monkeypatch,
+                       "[hook]\nevent_start_hook = '{{base_data_path}}/bin/zm_event_start.sh'\n")
+        assert out == {"hook": {"event_start_hook": "${base_data_path}/bin/zm_event_start.sh"}}
+
+    def test_secrets_semicolon_and_quotes_kept(self, tmp_path, monkeypatch):
+        # Both legacy readers saw this value literally.
+        out = _migrate(tmp_path, monkeypatch,
+                       '[secrets]\nZM_PASSWORD = "quoted pass" ; trailing\n', secrets=True)
+        assert out == {"secrets": {"ZM_PASSWORD": '"quoted pass" ; trailing'}}
+
+    def test_secrets_quoted_value_unquoted(self, tmp_path, monkeypatch):
+        out = _migrate(tmp_path, monkeypatch,
+                       '[secrets]\nzm_password = "secret"\n', secrets=True)
+        assert out == {"secrets": {"ZM_PASSWORD": "secret"}}
+
+    def test_secrets_hash_after_whitespace_still_a_comment(self, tmp_path, monkeypatch):
+        # The legacy readers disagreed here (ES: whole text, hook and
+        # pushapi_pushover: cut at ' #'); the migration keeps the hook's view.
+        out = _migrate(tmp_path, monkeypatch,
+                       "[secrets]\nZM_PORTAL = https://zm/zm # my portal\n", secrets=True)
+        assert out == {"secrets": {"ZM_PORTAL": "https://zm/zm"}}
+
+    def test_es_hash_after_value_is_kept(self, tmp_path, monkeypatch):
+        # Config::IniFiles has no inline comments: the legacy ES saw the
+        # whole text, so a migration that cut ' # ...' changed the value.
+        out = _migrate(tmp_path, monkeypatch,
+                       "[general]\nescontrol_interface_password = ab #cd\n"
+                       "skip_monitors = #1\n")
+        assert out == {"general": {"escontrol_interface_password": "ab #cd",
+                                   "skip_monitors": "#1"}}

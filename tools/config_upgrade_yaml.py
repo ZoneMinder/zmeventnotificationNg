@@ -12,7 +12,10 @@ Usage:
 
 import argparse
 import copy
+import os
+import shutil
 import sys
+import time
 
 try:
     import yaml
@@ -21,19 +24,99 @@ except ImportError:
     sys.exit(1)
 
 
+# Maps keyed by monitor id. Example entries under them are samples, not schema,
+# so they are never merged into a user config.
+DATA_MAP_KEYS = ('monitors',)
+
+
+class RawScalar(str):
+    """A scalar kept as its source text, tag and quoting style.
+
+    The ES (Perl YAML::XS) and the hook (PyYAML, YAML 1.1) resolve plain
+    scalars differently: PyYAML reads 21:30 as 1290 and yes as True. Writing
+    back each scalar exactly as the user wrote it keeps both readers seeing
+    the same values after an upgrade.
+    """
+
+    def __new__(cls, value, tag, style):
+        obj = super().__new__(cls, value)
+        obj.tag = tag
+        obj.style = style
+        return obj
+
+    def __reduce__(self):  # for copy.deepcopy
+        return (RawScalar, (str(self), self.tag, self.style))
+
+
+class RawLoader(yaml.SafeLoader):
+    pass
+
+
+class RawDumper(yaml.SafeDumper):
+    pass
+
+
+for _tag in ('str', 'int', 'float', 'bool', 'null', 'timestamp'):
+    RawLoader.add_constructor('tag:yaml.org,2002:' + _tag,
+                              lambda loader, node: RawScalar(node.value, node.tag, node.style))
+RawDumper.add_representer(
+    RawScalar,
+    lambda dumper, data: dumper.represent_scalar(data.tag, str(data), style=data.style))
+
+
+class RawSeq(list):
+    """A sequence with an unknown tag, kept so it is written back as-is."""
+
+
+class RawMap(dict):
+    """A mapping with an unknown tag, kept so it is written back as-is."""
+
+
+def _construct_unknown(loader, node):
+    """Unknown tags (e.g. an unquoted 'user: !ZM_USER') are kept verbatim.
+
+    YAML::XS ignores such tags; safe_load rejects the file. Writing the tag
+    back unchanged keeps what each reader sees.
+    """
+    if isinstance(node, yaml.ScalarNode):
+        return RawScalar(node.value, node.tag, node.style)
+    if isinstance(node, yaml.SequenceNode):
+        obj = RawSeq(loader.construct_sequence(node, deep=True))
+    else:
+        obj = RawMap(loader.construct_mapping(node, deep=True))
+    obj.tag, obj.flow_style = node.tag, node.flow_style
+    return obj
+
+
+RawLoader.add_constructor(None, _construct_unknown)
+RawDumper.add_representer(
+    RawSeq,
+    lambda dumper, data: dumper.represent_sequence(data.tag, data, flow_style=data.flow_style))
+RawDumper.add_representer(
+    RawMap,
+    lambda dumper, data: dumper.represent_mapping(data.tag, data, flow_style=data.flow_style))
+
+
 def deep_merge(base, override):
     """Recursively merge *base* into *override* (in-place).
 
     - Keys in *override* are kept as-is (user values win).
     - Keys in *base* that are missing from *override* are added.
     - When both sides have a dict for the same key, recurse.
+    - Keys in DATA_MAP_KEYS (per-monitor data) are never merged.
 
     Returns a list of dotted key-paths that were added.
     """
     added = []
     for key, base_val in base.items():
+        if key in DATA_MAP_KEYS:
+            continue
         if key not in override:
-            override[key] = copy.deepcopy(base_val)
+            if isinstance(base_val, dict):
+                override[key] = {}
+                deep_merge(base_val, override[key])
+            else:
+                override[key] = copy.deepcopy(base_val)
             added.append(str(key))
         elif isinstance(base_val, dict) and isinstance(override[key], dict):
             sub_added = deep_merge(base_val, override[key])
@@ -123,9 +206,9 @@ def main():
     args = parser.parse_args()
 
     with open(args.example) as f:
-        example = yaml.safe_load(f)
+        example = yaml.load(f, Loader=RawLoader)
     with open(args.config) as f:
-        user = yaml.safe_load(f)
+        user = yaml.load(f, Loader=RawLoader)
 
     if not example:
         print("Example file is empty or invalid YAML", file=sys.stderr)
@@ -178,9 +261,17 @@ def main():
         return
 
     out_path = args.output or args.config
+    if out_path == args.config:
+        # The rewrite drops comments; keep the original next to it.
+        backup = '{}.{}.bak'.format(args.config, time.strftime('%Y%m%d-%H%M%S'))
+        shutil.copy2(args.config, backup)
+        # never more readable than the original; secrets.yml from older
+        # installs is 0644, the backup must not stay world-readable
+        os.chmod(backup, os.stat(args.config).st_mode & 0o770)
+        print("Backup of original config: {}".format(backup))
     with open(out_path, 'w') as f:
-        yaml.dump(user, f, default_flow_style=False, sort_keys=False,
-                  allow_unicode=True)
+        yaml.dump(user, f, Dumper=RawDumper, default_flow_style=False,
+                  sort_keys=False, allow_unicode=True)
 
     print("\nUpdated config written to: {}".format(out_path))
 

@@ -54,10 +54,13 @@ def parse_ini(config_path):
     return cp
 
 
-def collect_variables(cp):
-    """Collect all flat key-value pairs that can be used as {{variable}} substitutions."""
+def collect_variables(cp, sections=None):
+    """Collect all flat key-value pairs that can be used as {{variable}} substitutions.
+
+    *sections* limits the scan (default: every section).
+    """
     variables = {}
-    for section in cp.sections():
+    for section in (cp.sections() if sections is None else sections):
         for key, value in cp.items(section):
             # Skip complex values (dicts/lists) - only simple strings can be variable definitions
             if key not in LITERAL_KEYS and not is_polygon(value):
@@ -321,7 +324,7 @@ def migrate_monitor(cp, section_name):
 
         if key.endswith('_zone_detection_pattern'):
             zone_name = key.rsplit('_zone_detection_pattern', 1)[0]
-            zone_patterns[zone_name] = value
+            zone_patterns[zone_name] = strip_quotes(value)
         elif is_polygon(value):
             zones[key] = {'coords': value}
         elif key in LITERAL_KEYS:
@@ -349,18 +352,41 @@ def remove_indirection_keys(output, keys_to_remove):
     Does NOT recurse into nested structures like ml_sequence/stream_sequence,
     where these same key names are legitimate configuration parameters.
     """
-    for section_name, section_data in output.items():
-        if not isinstance(section_data, dict):
-            continue
-        if section_name == 'monitors':
-            for monitor_data in section_data.values():
-                if isinstance(monitor_data, dict):
-                    for key in keys_to_remove:
-                        monitor_data.pop(key, None)
-        else:
+    for section_data in output.values():
+        if isinstance(section_data, dict):
             for key in keys_to_remove:
                 section_data.pop(key, None)
     return output
+
+
+def expand_monitor(cp, section, overrides, raw_globals, global_vars):
+    """Expand {{variables}} in a monitor's overrides using the monitor's scope.
+
+    Legacy zm_detect applied [monitor-N] overrides before expanding variables,
+    so a monitor that overrides a variable used in a global ml_sequence /
+    stream_sequence gets its own expanded copy of that sequence. Indirection
+    keys the monitor's expansion consumed are then dropped from the monitor.
+
+    Returns (expanded_overrides, used_variable_names).
+    """
+    own = collect_variables(cp, [section])
+    mvars = resolve_variable_chains(dict(global_vars, **own))
+    gvars = resolve_variable_chains(dict(global_vars))
+    used = set()
+    for section_data in raw_globals.values():
+        if not isinstance(section_data, dict):
+            continue
+        for key in ('ml_sequence', 'stream_sequence'):
+            if key in section_data and key not in overrides:
+                mine, seq_used = expand_variables(section_data[key], mvars)
+                used |= seq_used
+                if mine != expand_variables(section_data[key], gvars)[0]:
+                    overrides[key] = mine
+    overrides, own_used = expand_variables(overrides, mvars)
+    used |= own_used
+    for key in INDIRECTION_ONLY_KEYS & used & own.keys():
+        overrides.pop(key, None)
+    return overrides, used
 
 
 def build_yaml(cp):
@@ -375,6 +401,18 @@ def build_yaml(cp):
         if data:
             output[section] = data
 
+    # Global variables come only from global sections; [monitor-N] values
+    # are per-monitor overrides, never globals.
+    global_sections = [s for s in cp.sections() if not s.startswith('monitor-')]
+    global_vars = collect_variables(cp, global_sections)
+    raw_globals = output
+    output, expanded_vars = expand_variables(
+        raw_globals, resolve_variable_chains(dict(global_vars)))
+
+    # Remove keys that were only used for indirection and have been expanded
+    keys_to_remove = INDIRECTION_ONLY_KEYS & expanded_vars
+    output = remove_indirection_keys(output, keys_to_remove)
+
     # Handle monitor sections
     monitors = {}
     for section in cp.sections():
@@ -384,22 +422,15 @@ def build_yaml(cp):
                 mid = int(mid)
             except ValueError:
                 pass
-            monitors[mid] = migrate_monitor(cp, section)
+            monitors[mid], used = expand_monitor(
+                cp, section, migrate_monitor(cp, section), raw_globals, global_vars)
+            expanded_vars |= used
 
     if monitors:
         output['monitors'] = monitors
 
-    # Collect variables, resolve chained references, then expand
-    variables = collect_variables(cp)
-    variables = resolve_variable_chains(variables)
-    output, expanded_vars = expand_variables(output, variables)
-
     # Find any unexpanded variables (missing definitions)
     unexpanded_vars = find_unexpanded_variables(output)
-
-    # Remove keys that were only used for indirection and have been expanded
-    keys_to_remove = INDIRECTION_ONLY_KEYS & expanded_vars
-    output = remove_indirection_keys(output, keys_to_remove)
 
     # Remove resize:'no' from stream_sequence — None (no resize) is now the
     # default in pyzm, so keeping it would be redundant clutter.

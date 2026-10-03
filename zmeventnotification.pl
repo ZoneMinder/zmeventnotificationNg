@@ -162,6 +162,8 @@ Usage: zmeventnotification.pl [OPTION]...
 
 USAGE
 
+our @original_argv = @ARGV;    # restartES re-execs with these; GetOptions consumes @ARGV
+
 GetOptions(
   'help'         => \$help,
   'config=s'     => \$config_file,
@@ -377,23 +379,13 @@ sub checkNewEvents() {
   if ((time() - $monitor_reload_time) > $server_config{monitor_reload_interval}) {
 
     # use this time to keep token counters updated
-    my $update_tokens = 0;
-    my $tokens_data;
-    if ($fcm_config{enabled}) {
-      $tokens_data = readTokenFile();
-      $update_tokens = 1 if $tokens_data;
-    }
+    saveTokenInvocations() if $fcm_config{enabled};
 
     # this means we have hit the reload monitor timeframe
     my $len = scalar @active_connections;
     Debug(1, 'Total event client connections: ' . $len . "\n");
     my $ndx = 1;
     foreach (@active_connections) {
-      if ($update_tokens and ($_->{type} == FCM)) {
-        $tokens_data->{tokens}->{$_->{token}}->{invocations}=
-        defined($_->{invocations})? $_->{invocations} : {count=>0, at=>(localtime)[4]};
-      }
-
       Debug(1, '-->checkNewEvents: Connection '
           . $ndx
           . ': ID->'
@@ -406,10 +398,6 @@ sub checkNewEvents() {
           . ' Push:'
           . $_->{pushstate});
       $ndx++;
-    }
-
-    if ($update_tokens && $fcm_config{enabled}) {
-      writeTokenFile($tokens_data);
     }
 
     foreach my $monitor ( values(%monitors) ) {
@@ -436,11 +424,13 @@ sub checkNewEvents() {
 
     next if !$current_event;    # skip monitors that have never recorded an event
 
-    my $alarm_cause = zmMemRead($monitor, 'shared_data:alarm_cause')
+    # declare separately: 'my ... if' keeps the previous iteration's value
+    my $alarm_cause;
+    $alarm_cause = zmMemRead($monitor, 'shared_data:alarm_cause')
       if ($notify_config{read_alarm_cause});
     $alarm_cause = $trigger_cause
       if ( defined($trigger_cause)
-      && $alarm_cause eq ''
+      && ( $alarm_cause // '' ) eq ''
       && $trigger_cause ne '' );
 
     # Alert only happens after alarm. The state before alarm
@@ -450,6 +440,14 @@ sub checkNewEvents() {
       # Ensure the monitor hash exists to avoid autovivification issues
       $active_events{$mid} //= {};
       if (!$active_events{$mid}->{$current_event}) {
+        # Right after start no event has been processed for this monitor. At
+        # the start of an alarm SHM can still point at the previous, finished
+        # event; don't report that one as new.
+        if ( !$active_events{$mid}->{last_event_processed} && isEventEnded($current_event) ) {
+          Debug(2, "Skipping event id: $current_event of Monitor:$mid, it has already ended");
+          $active_events{$mid}->{last_event_processed} = $current_event;
+          next;
+        }
         if ($active_events{$mid}->{last_event_processed} and
           ($active_events{$mid}->{last_event_processed} >= $current_event)
         ) {
@@ -593,14 +591,40 @@ sub processJobs {
         } # end foreach active connection
       } elsif ( $job eq 'fcm_notification' ) {
         # Update badge count of active connection
-        my ( $token, $badge, $count, $at ) = @fields;
+        my ( $token, $badge, $count, $at, $eid ) = @fields;
         Debug(2, "GOT JOB==> update badge to $badge, count to $count for: $token, at: $at");
         foreach (@active_connections) {
           next unless defined $_->{token};
-          if ( $_->{token} eq $token ) {
+          next if $_->{token} ne $token;
+          if ( !defined $eid ) {
             $_->{badge} = $badge;
             $_->{invocations} = {count=>$count, at=>$at};
+            next;
           }
+          # Forks send badge/count computed from their fork-time copy, so
+          # overlapping events would overwrite each other. Count each event
+          # once here instead; start and end pushes of one event share an eid.
+          next if $_->{fcm_counted}{$eid}++;
+          my @ids = sort { $a <=> $b } keys %{ $_->{fcm_counted} };
+          delete @{ $_->{fcm_counted} }{ @ids[ 0 .. $#ids - 50 ] } if @ids > 50;
+          $_->{badge} = ( $_->{badge} // 0 ) + 1;
+          my $inv = $_->{invocations};
+          $_->{invocations} =
+            ( ref($inv) eq 'HASH' && ( $inv->{at} // -1 ) == $at )
+            ? { count => ( $inv->{count} // 0 ) + 1, at => $at }
+            : { count => $count, at => $at };    # new month (fork reset it) or no counter yet
+        }
+      } elsif ( $job eq 'fcm_token_delete' ) {
+        # FCM rejected this token; the child already removed it from the
+        # token file. Drop entries that only push to it (loaded from the
+        # file, or a websocket that has since disconnected) so they are not
+        # used again. A live websocket connection is left alone.
+        my ($token) = @fields;
+        Debug(1, 'Job: dropping FCM token ...' . substr( $token, -10 ));
+        foreach (@active_connections) {
+          $_->{state} = PENDING_DELETE
+            if $_->{type} == FCM && ( $_->{token} // '' ) eq $token
+            && ( !exists $_->{conn} || $_->{state} == INVALID_CONNECTION );
         }
       } elsif ( $job eq 'event_description' ) {
       # hook script result will be updated in ZM DB
@@ -618,8 +642,12 @@ sub processJobs {
 
           # if detection is not used, this may be empty
           $causeJson = '[]' if !$causeJson;
-          $active_events{$mid}->{$eid}->{$type}->{DetectionJson} =
-            decode_json($causeJson);
+          my $detection = eval { decode_json($causeJson) };
+          if ($@) {
+            Error("Job: bad detection JSON for eid:$eid, mid:$mid, ignoring it: $@");
+          } else {
+            $active_events{$mid}->{$eid}->{$type}->{DetectionJson} = $detection;
+          }
         }
       } elsif ( $job eq 'active_event_delete' ) {
         my ( $mid, $eid ) = @fields;
@@ -665,7 +693,7 @@ sub restartES {
     Debug(1, 'Self exec-ing as zmdc is not tracking me');
 
     Info("restarting $0");
-    exec($0);
+    exec($0, @original_argv);
   }
 }
 
@@ -687,13 +715,17 @@ sub initSocketServer {
         SSL_key_file  => $ssl_config{key_file}
       );
     };
-    if ($@) {
-      Error("Failed starting server: $@");
+    # new() returns undef on failure (e.g. bind error) rather than dying
+    if ($@ || !$ssl_server) {
+      Error('Failed starting server: ' . ($@ || IO::Socket::SSL::errstr() . " ($!)"));
       exit(-1);
     }
     Info('Secure WS(WSS) is enabled...');
   } else {
     Info('Secure WS is disabled...');
+    Warning("network.address $server_config{address} is ignored when SSL is disabled; "
+        . 'listening on all IPv4 interfaces')
+      if $server_config{address} && $server_config{address} ne DEFAULT_ADDRESS;
   }
   Info('Web Socket Event Server listening on port ' . $server_config{port});
 
@@ -734,10 +766,12 @@ sub initSocketServer {
       # The child closing the db connection can affect the parent.
       zmDbDisconnect();
 
+      my $forked_hooks = 0;
       foreach (@newEvents) {
-        if (($parallel_hooks >= $hooks_config{max_parallel_hooks}) && ($hooks_config{max_parallel_hooks} != 0)) {
+        if ( hookLimitReached( $parallel_hooks, \$forked_hooks, $_->{Alarm}->{MonitorId} ) ) {
           $dbh = zmDbConnect(1);
-          Error("There are $parallel_hooks hooks running as of now. This exceeds your set limit of max_parallel_hooks=$hooks_config{max_parallel_hooks}. Ignoring this event. Either increase your max_parallel_hooks value, or, adjust your ZM motion sensitivity ");
+          my $hooks = $parallel_hooks + $forked_hooks;
+          Error("There are $hooks hooks running as of now. This exceeds your set limit of max_parallel_hooks=$hooks_config{max_parallel_hooks}. Ignoring this event. Either increase your max_parallel_hooks value, or, adjust your ZM motion sensitivity ");
           last;
         }
         my $cpid;
@@ -789,7 +823,9 @@ sub initSocketServer {
           my $dmsg = $msg;
           $dmsg =~ s/\"password\":\"(.*?)\"/"password":\*\*\*/;
           Debug(3, "Raw incoming message: $dmsg");
-          processIncomingMessage( $conn, $msg );
+          # a die here would propagate out of Net::WebSocket::Server and kill the daemon
+          eval { processIncomingMessage( $conn, $msg ); };
+          Error("Error processing incoming message: $@") if $@;
           Debug(2, '---------->onConnect msg END<--------------');
         },
         handshake => sub {
@@ -838,8 +874,7 @@ sub initSocketServer {
               . getConnFields($conn));
           foreach (@active_connections) {
             if ( ( exists $_->{conn} )
-              && ( $_->{conn}->ip() eq $conn->ip() )
-              && ( $_->{conn}->port() eq $conn->port() ) )
+              && ( $_->{conn} == $conn ) )
             {
 
               # mark this for deletion only if device token

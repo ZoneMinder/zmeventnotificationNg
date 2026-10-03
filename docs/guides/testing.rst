@@ -142,7 +142,9 @@ Perl test reference
    * - ``t/15-websocket-handler.t``
      - WebSocket message handling and **``validateAuth`` password comparison**
        (bcrypt ``$2b$``/``$2y$`` normalization, MySQL ``password41``, ``-ZM-``
-       guard)
+       guard), malformed-message rejection, push requires auth, escontrol
+       login without a configured password, per-connection matching by
+       object identity (reverse-proxy ip:port reuse)
    * - ``t/16-fcm-auth.t``
      - Google service-account JWT / access token
    * - ``t/17-version.t``
@@ -152,6 +154,25 @@ Perl test reference
    * - ``t/19-fork-orchestration.t``
      - HookProcessor fork helpers: ``_build_alarm_obj``,
        ``_tag_detected_objects`` (both JSON shapes), ``_run_api_push`` gating
+   * - ``t/22-main-script.t``
+     - Subs extracted from ``zmeventnotification.pl``: ``checkNewEvents``
+       (alarm/trigger cause, no stale cause across events, token counters
+       saved on monitor reload), ``initSocketServer`` (plain and SSL listener
+       setup, fatal SSL bind failure, connect/message/disconnect handlers, handler exceptions
+       contained), ``restartES`` (keeps command-line arguments)
+   * - ``t/23-process-jobs.t``
+     - ``processJobs`` (the parent's job-pipe consumer in
+       ``zmeventnotification.pl``), run from the script source via
+       ``t/lib/PlSource.pm`` against a real pipe: every job type
+   * - ``t/24-fork-hook-limit.t``
+     - The parent's per-tick fork loop (from the script source) and the
+       ``max_parallel_hooks`` gate, including a burst of events in one tick
+   * - ``t/25-hook-fork-flow.t``
+     - ``processNewAlarmsInFork`` end to end with a stub hook script: exact
+       argv of hooks, user scripts and the API push script, hook exit
+       code/stdout handling, notifications sent, job-pipe lines,
+       ``hook_timeout`` (unchanged behavior at 0; hung hooks and their
+       process group killed and treated as failure)
 
 
 Python unit / integration reference
@@ -173,6 +194,9 @@ Python unit / integration reference
      - ``send_push_notifications``: monitor filtering, throttle, cross-process
        push lock, picture-URL
        rewrite, Android/iOS payloads, invalid-token deletion heuristic
+   * - ``tests/test_pushapi_pushover.py``
+     - ``pushapi_plugins/pushapi_pushover.py`` run as a script: credentials from
+       the script or secrets, title/message, image attachment selection
    * - ``tests/test_cli_overrides.py``
      - ``-O`` dot-notation overrides: coercion, ``[index]`` / ``[name]`` paths,
        error/edge cases
@@ -192,8 +216,9 @@ Python unit / integration reference
        patterns onto ZM zone geometry
    * - ``tests/test_pyzm_contract.py``
      - The shape ES consumes from the REAL pyzm: ``DetectionResult`` keys,
-       ``detect_event`` signature, and ``ml_sequence.general.zone_match_strategy``
-       still reaching ``DetectorConfig``
+       ``detect_event`` signature, ``ml_sequence.general.zone_match_strategy``
+       still reaching ``DetectorConfig``, and ``ZMClientConfig`` deriving the
+       portal URL from ``api_url``
    * - ``tests/test_zm_detect.py``
      - CLI argparse early-exits (version, missing config)
 
@@ -209,17 +234,27 @@ Tools test reference
      - What it covers
    * - ``tools/tests/test_config_migrate.py``
      - ``config_migrate_yaml`` INI→YAML: variable-chain expansion, monitor/zone
-       parsing, polygon detection, type coercion
+       parsing, per-monitor variable overrides, polygon detection, type coercion
    * - ``tools/tests/test_config_upgrade.py``
-     - ``config_upgrade_yaml`` managed defaults / removed keys
+     - ``config_upgrade_yaml`` managed defaults / removed keys, backup before
+       rewrite, scalar text kept for Perl and PyYAML readers, example monitors
+       not merged
    * - ``tools/tests/test_deep_merge.py``
-     - ``deep_merge`` user-value-wins, nested add, dict/scalar mismatch
+     - ``deep_merge`` user-value-wins, nested add, dict/scalar mismatch,
+       ``monitors`` skipped
    * - ``tools/tests/test_es_config_migrate.py``
      - ``es_config_migrate_yaml`` template + secrets migration
    * - ``tools/tests/test_config_edit.py``
      - ``config_edit`` parse/apply, comment-out, ``_global_`` cross-section
    * - ``tools/tests/test_install_doctor.py``
      - ``install_doctor`` model discovery, OpenCV-version + model classification
+   * - ``tools/tests/test_install_sh.py``
+     - ``install.sh`` functions (sourced in a sandboxed repo copy, no system
+       paths): flag parsing, venv handling, config install/upgrade, path
+       rewrites, hook install layout, dependency checks
+   * - ``tools/tests/test_make_release.py``
+     - ``scripts/make_release.sh`` preflight (throwaway repo, local bare
+       origin, stub ``gh``/``git-cliff``/``curl``): aborts before any push
 
 
 e2e test reference

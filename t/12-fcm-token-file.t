@@ -8,6 +8,7 @@ use lib "$FindBin::Bin/lib";
 use Test::More;
 use File::Temp qw(tempfile tempdir);
 use JSON;
+use POSIX ();
 
 require StubZM;
 
@@ -246,7 +247,9 @@ my $tmpdir = tempdir(CLEANUP => 1);
 }
 
 {
-    # deleteFCMToken marks matching connection INVALID_CONNECTION
+    # deleteFCMToken marks the matching connection PENDING_DELETE so the rest
+    # of this event (e.g. the end push) skips it; INVALID_CONNECTION is the
+    # normal state of a push-only token and does not stop FCM sends
     my $tf = "$tmpdir/del_state.txt";
     _write_file($tf, '{"tokens":{"tok_inv":{}}}');
     local $fcm_config{token_file} = $tf;
@@ -254,7 +257,7 @@ my $tmpdir = tempdir(CLEANUP => 1);
         { token => 'tok_inv', state => VALID_CONNECTION },
     );
     deleteFCMToken('tok_inv');
-    is($main::active_connections[0]{state}, INVALID_CONNECTION, 'connection marked INVALID');
+    is($main::active_connections[0]{state}, PENDING_DELETE, 'connection marked PENDING_DELETE');
 }
 
 {
@@ -264,6 +267,138 @@ my $tmpdir = tempdir(CLEANUP => 1);
     # Should not die
     eval { deleteFCMToken('tok_none') };
     is($@, '', 'no error on missing file');
+}
+
+{
+    # deleteFCMToken tells the parent, which holds the authoritative list
+    my $tf = "$tmpdir/del_notify.txt";
+    _write_file($tf, '{"tokens":{"tok_gone":{}}}');
+    local $fcm_config{token_file} = $tf;
+    @main::active_connections = ();
+    my $pipe = '';
+    open(my $w, '>', \$pipe) or die;
+    local *main::WRITER = $w;
+    deleteFCMToken('tok_gone');
+    close($w);
+    is($pipe, "fcm_token_delete--TYPE--tok_gone\n", 'parent notified over the job pipe');
+}
+
+# ===== saveTokenInvocations =====
+
+{
+    my $tf = "$tmpdir/inv.txt";
+    _write_file($tf, encode_json({ tokens => {
+        tok_a => { platform => 'ios', monlist => '1', invocations => { count => 1, at => 2 } },
+    }}));
+    local $fcm_config{token_file} = $tf;
+    @main::active_connections = (
+        { type => FCM, token => 'tok_a', invocations => { count => 9, at => 2 } },
+        { type => FCM, token => 'tok_deleted', invocations => { count => 3, at => 2 } },
+        { type => WEB, id => 'w' },
+    );
+    saveTokenInvocations();
+    my $data = decode_json(_read_file($tf));
+    is_deeply($data->{tokens}{tok_a}, { platform => 'ios', monlist => '1', invocations => { count => 9, at => 2 } },
+        'counter of a token in the file updated, other fields kept');
+    ok(!exists $data->{tokens}{tok_deleted}, 'token deleted from the file is not recreated');
+}
+
+# ===== writeTokenFile =====
+
+{
+    # Rewrite keeps the file's permission bits and exact JSON format
+    my $tf = "$tmpdir/mode.txt";
+    _write_file($tf, '{"tokens":{}}');
+    chmod 0640, $tf;
+    local $fcm_config{token_file} = $tf;
+    writeTokenFile({ tokens => { a => { platform => 'ios' } } });
+    is((stat $tf)[2] & 07777, 0640, 'mode preserved');
+    is(_read_file($tf), '{"tokens":{"a":{"platform":"ios"}}}', 'content is plain encode_json');
+}
+
+{
+    # The new content replaces the file by rename (new inode), so a reader
+    # never sees it truncated; no temp file is left behind.
+    my $dir = "$tmpdir/atomic";
+    mkdir $dir;
+    my $tf = "$dir/tokens.txt";
+    _write_file($tf, '{"tokens":{"old":{}}}');
+    my $ino = (stat $tf)[1];
+    local $fcm_config{token_file} = $tf;
+    writeTokenFile({ tokens => { new => {} } });
+    isnt((stat $tf)[1], $ino, 'file replaced, not rewritten in place');
+    is(_read_file($tf), '{"tokens":{"new":{}}}', 'new content');
+    opendir(my $dh, $dir) or die;
+    my @left = grep { !/^\.\.?$/ && $_ ne 'tokens.txt' } readdir $dh;
+    is_deeply(\@left, [], 'no temp file left behind');
+}
+
+{
+    # A token file that does not exist yet gets the mode open() would give
+    my $tf = "$tmpdir/fresh_tokens.txt";
+    local $fcm_config{token_file} = $tf;
+    my $old = umask 022;
+    writeTokenFile({ tokens => {} });
+    umask $old;
+    is((stat $tf)[2] & 07777, 0644, 'new file is 0644 under umask 022');
+}
+
+{
+    # A reader polling during repeated writes never sees an empty or
+    # partial file
+    my $tf = "$tmpdir/reader.txt";
+    my $big = { tokens => { map { ("tok_$_" => { platform => 'android', monlist => '1,2,3' }) } 1 .. 300 } };
+    local $fcm_config{token_file} = $tf;
+    writeTokenFile($big);
+    my $pid = fork();
+    die "fork: $!" if !defined $pid;
+    if (!$pid) {
+        writeTokenFile($big) for 1 .. 300;
+        exit 0;
+    }
+    my $bad = 0;
+    while (waitpid($pid, POSIX::WNOHANG()) == 0) {
+        my $c = _read_file($tf);
+        $bad++ if !eval { decode_json($c); 1 };
+    }
+    is($bad, 0, 'no truncated or partial reads during writes');
+}
+
+SKIP: {
+    skip 'root ignores directory permissions', 1 if $> == 0;
+    # A writable token file in a read-only directory is still updated
+    my $ro = "$tmpdir/ro";
+    mkdir $ro;
+    my $tf = "$ro/tokens.txt";
+    _write_file($tf, '{"tokens":{}}');
+    chmod 0555, $ro;
+    local $fcm_config{token_file} = $tf;
+    local $fcm_config{enabled} = 1;
+    saveFCMTokens('tok_ro', '1', '0', 'ios', 'enabled', undef);
+    chmod 0755, $ro;
+    ok(exists decode_json(_read_file($tf))->{tokens}{tok_ro}, 'token saved in place');
+}
+
+{
+    # Parallel read-modify-write (parent saving a token while event forks
+    # update the file) must not lose entries or expose a truncated file.
+    my $tf = "$tmpdir/race.txt";
+    _write_file($tf, '{"tokens":{}}');
+    local $fcm_config{token_file} = $tf;
+    local $fcm_config{enabled} = 1;
+    my @pids;
+    for my $w (1 .. 3) {
+        my $pid = fork();
+        die "fork: $!" if !defined $pid;
+        if (!$pid) {
+            saveFCMTokens("tok_${w}_$_", '1', '0', 'android', 'enabled', undef) for 1 .. 40;
+            exit 0;
+        }
+        push @pids, $pid;
+    }
+    waitpid($_, 0) for @pids;
+    my $data = decode_json(_read_file($tf));
+    is(scalar(keys %{ $data->{tokens} }), 120, 'all 120 tokens saved by 3 parallel writers');
 }
 
 done_testing();

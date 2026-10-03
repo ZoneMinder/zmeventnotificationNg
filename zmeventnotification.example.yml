@@ -36,6 +36,8 @@ network:
   port: 9000
 
   # Address for Websockets server (default: [::]).
+  # Only used when SSL is enabled. Without SSL the ES always listens on all
+  # IPv4 interfaces and logs a warning if this is set.
   # If you are facing connection issues or SSL issues, put in your IP here
   # If you want to listen to multiple interfaces try 0.0.0.0
   #address: "1.2.3.4"
@@ -265,6 +267,15 @@ hook:
 
   # A value of 0 (default) means there are no limits
   max_parallel_hooks: 0
+
+  # Seconds a hook, user notify script or api_push_script may run before the
+  # ES kills it. A hook that never returns blocks its event fork forever and
+  # keeps its max_parallel_hooks slot. When the timeout is hit, the ES kills
+  # the command and every process it started (TERM, then KILL 2s later),
+  # logs an error, and treats the run as a failure (exit code 1, no output),
+  # so the *_notify_on_hook_fail channels apply.
+  # A value of 0 (default) means no timeout.
+  hook_timeout: 0
 
   # Shell script name here to be called every time an alarm is detected
   # the script will get passed $1=alarmEventID,  $2=alarmMonitorId

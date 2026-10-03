@@ -1,6 +1,41 @@
 Breaking Changes
 ----------------
 
+Security and correctness fixes (after 7.0.33)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These fixes change behavior you may notice:
+
+- **escontrol needs a password.** If ``escontrol_interface_password`` is unset
+  or empty, every escontrol login is now rejected. Before, an empty password
+  was accepted. Set a password to keep using escontrol.
+- **Push commands need an authenticated connection** when ``auth.enable`` is
+  on. A ``push`` message (token registration, badge) sent before a successful
+  ``auth`` now gets ``{"event":"push","status":"Fail","reason":"NOAUTH"}``.
+  zmNinja/zmNinjaNG already authenticate first.
+- **Hooks and user scripts get their arguments as-is.** Event values (monitor
+  name, cause, detection text and JSON) are passed as separate arguments and
+  are no longer parsed by the shell. User notify scripts now receive the
+  detection JSON intact as one argument; before, its quotes were stripped and
+  labels with spaces split it into several arguments. The configured command
+  itself (``event_start_hook`` etc.) is still run through the shell, so quoted
+  paths and extra arguments in it keep working.
+- **Muted monitors no longer send "Ended:" notifications.** A monitor muted
+  through escontrol was silent on event start but still sent event end
+  notifications.
+- **Hook push deletes a token only when FCM says it is invalid.** Before, any
+  4xx response (for example a wrong ``fcm_v1_key`` or a quota error) deleted
+  every device token from ZoneMinder.
+- **New files:** the token file is now written atomically and a
+  ``tokens.txt.lock`` file appears next to it. Config upgrades by
+  ``install.sh`` keep a ``<file>.<timestamp>.bak`` copy of each rewritten
+  config.
+- **image_path default** follows ``base_data_path`` (``${base_data_path}/images``),
+  as documented. Only installs with a custom ``base_data_path`` and no
+  ``image_path`` are affected; their past-detection history starts over once.
+- **Fresh installs** write ``secrets.yml`` with mode ``640``. Existing files
+  are not changed; ``install_doctor`` warns if yours is world-readable.
+
 pyzmNg v2 and pyzm.serve (ES 7.x)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

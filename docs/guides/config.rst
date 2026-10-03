@@ -98,9 +98,21 @@ The file is organized into these sections:
   ``tag_detected_objects``, and user scripts
 
 ``max_parallel_hooks`` (default ``0`` = unlimited) limits how many hook child
-processes can run concurrently. When the limit is reached, new events wait until a
-slot is free. This is useful for resource-constrained systems where too many
-simultaneous ML detections can cause OOM or GPU contention.
+processes can run concurrently. When the limit is reached, new events are
+dropped (logged as an error); they are not queued. This is useful for
+resource-constrained systems where too many simultaneous ML detections can
+cause OOM or GPU contention.
+
+``hook_timeout`` (default ``0`` = no timeout) is the number of seconds a hook,
+user notify script, or ``api_push_script`` may run. Without it, a hook that
+never returns blocks its event forever and keeps its ``max_parallel_hooks``
+slot. When the timeout is hit, the ES sends ``TERM`` to the command and every
+process it started (the command runs in its own process group), sends
+``KILL`` 2 seconds later to whatever is left, and logs an error naming the
+command. The run counts as a hook failure: exit code ``1`` and no output, so
+``event_start_notify_on_hook_fail`` / ``event_end_notify_on_hook_fail`` apply
+and ``event_end_notify_if_start_success`` suppresses the end notification.
+Set it well above your slowest normal detection.
 
 .. _es_config_reference:
 
@@ -133,7 +145,8 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - File to persist ES control admin overrides
    * - ``escontrol_interface_password``
      - *none*
-     - Password for accepting control interface connections
+     - Password for accepting control interface connections. If unset or
+       empty, all control interface logins are rejected
    * - ``restart_interval``
      - ``7200``
      - Auto-restart ES after this many seconds (``0`` = disable)
@@ -156,7 +169,9 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - WebSocket listening port
    * - ``address``
      - ``[::]``
-     - Bind address (use ``0.0.0.0`` for all IPv4 interfaces)
+     - Bind address (use ``0.0.0.0`` for all IPv4 interfaces). Only used when
+       SSL is enabled; without SSL the ES listens on all IPv4 interfaces and
+       logs a warning if ``address`` is set
 
 ``auth`` — authentication
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -196,7 +211,7 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - ``no`` (default): notifications stack and the event id is carried in the Android notification tag so the app can recover it. ``yes``: collapse to a single notification (each push replaces the previous)
    * - ``token_file``
      - ``${base_data_path}/push/tokens.txt``
-     - File to persist registered FCM tokens
+     - File to persist registered FCM tokens. A ``<token_file>.lock`` file next to it serializes updates
    * - ``date_format``
      - ``%I:%M %p, %d-%b``
      - strftime format for notification timestamps
@@ -375,6 +390,9 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
    * - ``max_parallel_hooks``
      - ``0``
      - Maximum concurrent hook processes (``0`` = unlimited)
+   * - ``hook_timeout``
+     - ``0``
+     - Seconds a hook, user notify script or API push script may run before it and its child processes are killed and the run counts as a failure (``0`` = no timeout)
    * - ``event_start_hook``
      - *none*
      - Script to run when an event starts
@@ -508,7 +526,8 @@ Consumed by ``zm_detect.py`` / ``utils.py``:
      - Base path for model files and data directories
    * - ``portal``
      - ``""``
-     - ZoneMinder portal URL (e.g. ``https://zm.example.com/zm``)
+     - ZoneMinder portal URL (e.g. ``https://zm.example.com/zm``). If empty,
+       derived from ``api_portal`` by dropping a trailing ``/api``
    * - ``api_portal``
      - ``""``
      - ZoneMinder API URL (e.g. ``https://zm.example.com/zm/api``)
@@ -778,7 +797,10 @@ Several tools are provided in the ``tools/`` directory of the source tree:
 - ``tools/es_config_migrate_yaml.py`` — migrates ``zmeventnotification.ini`` and ``secrets.ini``
   to their YAML equivalents
 - ``tools/config_upgrade_yaml.py`` — merges new keys from example configs into your existing YAML
-  config (used during upgrades to add new options without overwriting your settings)
+  config (used during upgrades to add new options without overwriting your settings). When it
+  rewrites a file it drops comments, so it first saves the original as
+  ``<file>.<YYYYmmdd-HHMMSS>.bak`` next to it. Entries under ``monitors`` in the example files are
+  samples and are not copied into your config.
 - ``tools/config_edit.py`` — programmatic config editor
 
 See :doc:`breaking` for details on the INI-to-YAML migration.

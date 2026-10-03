@@ -217,6 +217,13 @@ if Push is disabled it will send back
 
     {"event":"push", "type":"", "status":"Fail", "reason": "PUSHDISABLED"}
 
+When auth is enabled, ``push`` messages (token and badge) are only accepted
+after the connection has authenticated. Before that, the server replies
+
+::
+
+    {"event":"push", "type":"", "status":"Fail", "reason": "NOAUTH"}
+
 Badge reset
 +++++++++++++
 
@@ -254,7 +261,7 @@ Note that any changes you make are persistently stored in  the file specified in
 
 escontrol authentication
 '''''''''''''''''''''''''
-Just like normal messages, you need to authenticate yourself. The password is specified by what you choose in ``escontrol_interface_password`` attribute inside ``zmeventnotification.yml``.
+Just like normal messages, you need to authenticate yourself. The password is specified by what you choose in ``escontrol_interface_password`` attribute inside ``zmeventnotification.yml``. If that password is unset or empty, every escontrol login is rejected.
 
 To authenticate:
 **Client-->Server:**

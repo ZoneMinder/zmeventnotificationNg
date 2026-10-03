@@ -139,4 +139,24 @@ sub make_alarm {
     }
 }
 
+# ===== A malformed rule is skipped, it does not die =====
+{
+    my $good = { time_format => '%H:%M', from => '00:00', to => '23:59',
+                 cause_has => 'person', action => 'critical_notify' };
+    local $ZmEventNotification::Config::es_rules{notifications}{monitors}{10} = { rules => [
+        { time_format => '%H:%M', from => 'noon', to => '23:59', action => 'mute' },
+        { %$good },
+    ] };
+    local $ZmEventNotification::Config::es_rules{notifications}{monitors}{11} = { rules => [
+        { time_format => '%H:%M', from => '00:00', to => '23:59', cause_has => 'per(son', action => 'mute' },
+        { %$good },
+    ] };
+    for my $mid (10, 11) {
+        my ($allowed, $obj) = eval { isAllowedInRules(make_alarm(mid => $mid, cause => 'detected:person')) };
+        is($@, '', "monitor $mid: bad rule does not die");
+        is($allowed, 1, "monitor $mid: next rule still evaluated -> allowed");
+        is($obj->{notification_type} // '', 'critical', "monitor $mid: next rule matched");
+    }
+}
+
 done_testing();

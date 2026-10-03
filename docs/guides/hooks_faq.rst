@@ -41,7 +41,7 @@ If you have problems with hooks, there are three areas of failure:
 
 - Next, look at ``/var/log/zm/zmeventnotification.log`` for the event that invoked a hook. For example::
 
-   01/06/2021 07:20:31.936130 zmeventnotification[28118].DBG [main:977] [|----> FORK:DeckCamera (6), eid:182253 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' 182253 6 "DeckCamera" " stairs" "/var/cache/zoneminder/events/6/2021-01-06/182253"]
+   01/06/2021 07:20:31.936130 zmeventnotification[28118].DBG [main:977] [|----> FORK:DeckCamera (6), eid:182253 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' "182253" "6" "DeckCamera" " stairs" "/var/cache/zoneminder/events/6/2021-01-06/182253"]
 
 - Then run ``zm_detect.py`` manually with debug flags (``--config`` defaults to ``/etc/zm/objectconfig.yml``)::
 
@@ -71,10 +71,11 @@ If your events are not getting detection results, follow these steps to isolate 
 
 Look at your ``zmeventnotification.log`` for lines like::
 
-   FORK:DoorBell (2), eid:12345 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' 12345 2 "DoorBell" "Motion" "/var/cache/zoneminder/events/2/2026-02-14/12345"
+   FORK:DoorBell (2), eid:12345 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' "12345" "2" "DoorBell" "Motion" "/var/cache/zoneminder/events/2/2026-02-14/12345"
 
 This tells you the exact arguments the ES passed to the hook script:
-``<eid> <mid> "<MonitorName>" "<Cause>" "<EventPath>"``.
+``"<eid>" "<mid>" "<MonitorName>" "<Cause>" "<EventPath>"``. Each quoted value is passed
+to the hook as one argument, exactly as shown.
 
 **Step 2: Run zm_detect manually with debug flags**
 
@@ -179,6 +180,10 @@ How do I solve this issue?
 - Use ``stream_sequence`` retry settings (``max_attempts``, ``sleep_between_attempts``) to automatically retry frame downloads.
 - Fix your zone triggers. This is really the right way. If you use object detection, re-look at how your zone triggers to be able to capture the object of interest as soon as possible. If you do that, chances are high that by the time the script runs, the image containing the object will be written to disk.
 
+
+A hook hangs and the event never finishes
+-------------------------------------------
+If a hook never returns (for example a stuck remote ML request), the fork for that event waits forever and the hook keeps its ``max_parallel_hooks`` slot. Set ``hook_timeout`` in the ``hook`` section of ``zmeventnotification.yml`` to a number of seconds well above your slowest normal detection. A hook that runs longer is killed together with every process it started, the ES logs ``timed out after <N>s``, and the run is treated as a hook failure. The default, ``0``, means no timeout.
 
 I am trying to use YoloV4 and I see errors in OpenCV
 -----------------------------------------------------

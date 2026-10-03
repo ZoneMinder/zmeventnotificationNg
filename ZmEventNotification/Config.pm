@@ -229,6 +229,8 @@ sub loadEsConfigSettings {
 
   $hooks_config{max_parallel_hooks} = config_get_val($cfg, 'hook', 'max_parallel_hooks',
     DEFAULT_MAX_PARALLEL_HOOKS);
+  $hooks_config{hook_timeout} = config_get_val($cfg, 'hook', 'hook_timeout',
+    DEFAULT_HOOK_TIMEOUT);
 
   $hooks_config{event_end_notify_if_start_success} = config_get_val($cfg, 'hook',
     'event_end_notify_if_start_success', DEFAULT_EVENT_END_NOTIFY_IF_START_SUCCESS);
@@ -345,6 +347,7 @@ Monitor rules file.................... ${\(_value_or_undef($server_config{es_rul
 
 Use Hooks............................. ${\(_yes_or_no($hooks_config{enabled}))}
 Max Parallel Hooks.................... ${\(_value_or_undef($hooks_config{max_parallel_hooks}))}
+Hook Timeout (seconds, 0 = none)...... ${\(_value_or_undef($hooks_config{hook_timeout}))}
 Hook Script on Event Start ........... ${\(_value_or_undef($hooks_config{event_start_hook}))}
 User Script on Event Start............ ${\(_value_or_undef($hooks_config{event_start_hook_notify_userscript}))}
 Hook Script on Event End.............. ${\(_value_or_undef($hooks_config{event_end_hook}))}

@@ -316,3 +316,78 @@ class TestBuildYamlEndToEnd:
         # but the expanded value survives nested inside ml_sequence
         nested = output["ml"]["ml_sequence"]["object"]["general"]
         assert nested["object_detection_pattern"] == "(person|car)"
+
+    def test_plain_monitor_override_kept_and_globals_untouched(self, tmp_path):
+        cp = make_cp(SAMPLE_INI + "\n[monitor-2]\nwait=5\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["monitors"][2] == {"wait": 5}
+        nested = output["ml"]["ml_sequence"]["object"]["general"]
+        assert nested["object_detection_pattern"] == "(person|car)"
+
+    def test_shipped_legacy_objectconfig(self):
+        # legacy/objectconfig.ini: [monitor-999] sets my_model_sequence,
+        # object_detection_pattern and match_past_detections. Globals keep
+        # the global values; monitor 999 gets its own expanded ml_sequence.
+        legacy = os.path.join(os.path.dirname(__file__), '..', '..', 'legacy', 'objectconfig.ini')
+        out = build_yaml(parse_ini(legacy))[0]
+        seq = out['ml']['ml_sequence']
+        assert seq['general']['model_sequence'] == 'object,face,alpr'
+        assert seq['object']['general']['pattern'] == '(person|car|motorbike|bus|truck|boat)'
+        mon = out['monitors'][999]
+        assert mon['wait'] == 5
+        assert mon['ml_sequence']['general']['model_sequence'] == 'object,alpr'
+        assert mon['ml_sequence']['general']['match_past_detections'] == 'no'
+        assert mon['ml_sequence']['object']['general']['pattern'] == '(person)'
+        assert mon['zones']['my_driveway']['detection_pattern'] == '(person)'
+
+    def test_monitor_variable_override_stays_per_monitor(self, tmp_path):
+        # Legacy zm_detect applied [monitor-N] overrides before expanding
+        # {{vars}} in ml_sequence, so the override was per monitor. It must
+        # not leak into the global ml_sequence, and monitor 3 must keep it.
+        cp = make_cp(
+            "[object]\n"
+            "object_detection_pattern=(person)\n"
+            "[ml]\n"
+            "ml_sequence={'object': {'general': {'pattern': '{{object_detection_pattern}}'}}}\n"
+            "[monitor-3]\n"
+            "object_detection_pattern=(car)\n"
+            "[monitor-4]\n"
+            "wait=5\n",
+            tmp_path,
+        )
+        output, _, _ = build_yaml(cp)
+        assert output["ml"]["ml_sequence"] == {"object": {"general": {"pattern": "(person)"}}}
+        assert output["monitors"][3] == {
+            "ml_sequence": {"object": {"general": {"pattern": "(car)"}}}}
+        assert output["monitors"][4] == {"wait": 5}
+
+
+class TestMigrateMonitorZonePatternQuotes:
+    def test_zone_pattern_quotes_stripped(self, tmp_path):
+        # Every other value has ConfigParser's literal quotes stripped.
+        cp = make_cp('[monitor-1]\nyard_zone_detection_pattern="(car)"\n', tmp_path)
+        assert migrate_monitor(cp, "monitor-1") == {
+            "zones": {"yard": {"detection_pattern": "(car)"}}}
+
+
+class TestInlineCommentsMatchLegacyHook:
+    """The legacy hook read objectconfig.ini with
+    ConfigParser(inline_comment_prefixes='#'): ' #...' was a comment, ';'
+    after a value was not. The migration must hand the new hook the same
+    value the legacy hook saw.
+    """
+
+    def test_hash_after_whitespace_is_a_comment(self, tmp_path):
+        cp = make_cp("[general]\nbase_data_path = /var/lib/zm # data dir\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["general"]["base_data_path"] == "/var/lib/zm"
+
+    def test_semicolon_after_value_is_kept(self, tmp_path):
+        cp = make_cp("[general]\nwait = 0 ; inline comment\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["general"]["wait"] == "0 ; inline comment"
+
+    def test_hash_without_whitespace_is_kept(self, tmp_path):
+        cp = make_cp("[general]\npassword = abc#def\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["general"]["password"] == "abc#def"

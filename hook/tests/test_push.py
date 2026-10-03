@@ -235,6 +235,27 @@ class TestThrottle:
         run(FakeZM([notif]))
         assert rec.call_count == 1
 
+    def test_throttle_check_error_does_not_abort_other_tokens(self, monkeypatch):
+        # pyzm _parse_dt returns an aware datetime for an ISO LastNotifiedAt
+        # with an offset; is_throttled then raises TypeError subtracting it
+        # from naive datetime.now(). That must not stop the other tokens.
+        class AwareNotification(FakeNotification):
+            def is_throttled(self):
+                raise TypeError("can't subtract offset-naive and offset-aware datetimes")
+
+        rec = PostRecorder()
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        bad = AwareNotification(token='aware00000000000', interval=60)
+        good = FakeNotification(token='naive00000000000')
+        run(FakeZM([bad, good]))
+        sent = [c['payload']['token'] for c in rec.calls]
+        assert 'naive00000000000' in sent
+        assert good.update_last_sent_called is True
+        # throttle state unknown -> send rather than drop the alarm
+        assert 'aware00000000000' in sent
+        assert any('throttle' in e for e in g.logger.error)
+
     def test_fetch_and_update_hold_cross_process_lock(self, monkeypatch, tmp_path):
         # Parallel zm_detect runs must not all read LastNotifiedAt before any
         # of them updates it (#56): the token fetch and the LastNotifiedAt
@@ -299,6 +320,30 @@ class TestPictureUrl:
         run(FakeZM([FakeNotification()]), event_id=7)
         img = rec.last_payload['image_url']
         assert img == 'https://portal/zm?eid=7&fid=objdetect&username=admin&password=pw'
+
+    def test_plain_picture_credentials_unchanged(self, monkeypatch):
+        # URL-safe characters must pass through exactly as before
+        rec = PostRecorder()
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg(
+            include_picture='yes', picture_url=self.PIC,
+            picture_portal_username='zm.user_1', picture_portal_password='Pass-word~9.x_Y')}
+        run(FakeZM([FakeNotification()]), event_id=7)
+        img = rec.last_payload['image_url']
+        assert img == ('https://portal/zm?eid=7&fid=objdetect'
+                       '&username=zm.user_1&password=Pass-word~9.x_Y')
+
+    def test_picture_credentials_url_encoded(self, monkeypatch):
+        # & # + % in a password must not break the query string
+        rec = PostRecorder()
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg(
+            include_picture='yes', picture_url=self.PIC,
+            picture_portal_username='a&b', picture_portal_password='p&w#1+2%z')}
+        run(FakeZM([FakeNotification()]), event_id=7)
+        img = rec.last_payload['image_url']
+        assert img == ('https://portal/zm?eid=7&fid=objdetect'
+                       '&username=a%26b&password=p%26w%231%2B2%25z')
 
     def test_no_picture_when_disabled(self, monkeypatch):
         rec = PostRecorder()
@@ -458,14 +503,22 @@ class TestTokenDeletion:
         assert notif.deleted is True
         assert notif.update_last_sent_called is False
 
-    def test_4xx_without_token_error_still_deletes(self, monkeypatch):
-        # 4xx alone (client error) removes the token even without body match
-        rec = PostRecorder(FakeResponse(404, 'Not Found'))
+    @pytest.mark.parametrize('status,body', [
+        (401, 'Unauthorized'),          # wrong fcm_v1_key
+        (403, 'Forbidden'),
+        (429, 'Too Many Requests'),     # proxy rate limit
+        (404, 'Not Found'),             # wrong fcm_v1_url path
+    ])
+    def test_4xx_without_token_error_keeps_token(self, monkeypatch, status, body):
+        # A 4xx that does not name an invalid token is a config/proxy problem
+        # that applies to every token; deleting would wipe all devices.
+        rec = PostRecorder(FakeResponse(status, body))
         install_post(monkeypatch, rec)
         g.config = {'push': base_push_cfg()}
         notif = FakeNotification(token='aaaabbbbccccdddd')
         run(FakeZM([notif]))
-        assert notif.deleted is True
+        assert notif.deleted is False
+        assert notif.update_last_sent_called is False
 
     def test_5xx_does_not_delete(self, monkeypatch):
         # Server error is transient -> keep the token
@@ -485,6 +538,47 @@ class TestTokenDeletion:
         run(FakeZM([notif]))
         assert notif.deleted is False
         assert notif.update_last_sent_called is True
+
+    def test_fcm_invalid_token_400_deletes(self, monkeypatch):
+        # FCM v1 INVALID_ARGUMENT for a malformed token (same marker FCM.pm matches)
+        rec = PostRecorder(FakeResponse(
+            400, '{"error":{"code":400,"message":"The registration token is not a valid FCM registration token","status":"INVALID_ARGUMENT"}}'))
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        notif = FakeNotification(token='aaaabbbbccccdddd')
+        run(FakeZM([notif]))
+        assert notif.deleted is True
+
+    def test_fcm_unregistered_404_deletes(self, monkeypatch):
+        # FCM v1 UNREGISTERED: app uninstalled / token expired
+        rec = PostRecorder(FakeResponse(
+            404, '{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}'))
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        notif = FakeNotification(token='aaaabbbbccccdddd')
+        run(FakeZM([notif]))
+        assert notif.deleted is True
+
+    # Bodies exactly as the push proxy (examples/send_push.py) returns them:
+    # every FirebaseError is a 400 with {"Error": "token:<last 10>=>{ex}"},
+    # and a bad fcm_v1_key is a 401 from its auth wrapper.
+    @pytest.mark.parametrize('status,error,deleted', [
+        (400, 'Requested entity was not found.', True),
+        (400, 'The registration token is not a valid FCM registration token', True),
+        (400, 'Quota exceeded for quota metric \'Send requests\'', False),
+        (400, 'Internal error encountered.', False),
+        (401, 'Invalid credentials: Signature verification failed', False),
+    ])
+    def test_proxy_response_shapes(self, monkeypatch, status, error, deleted):
+        token = 'aaaabbbbccccdddd'
+        if status == 400:
+            error = 'token:{}=>{}'.format(token[-10:], error)
+        rec = PostRecorder(FakeResponse(status, json.dumps({'Error': error})))
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        notif = FakeNotification(token=token)
+        run(FakeZM([notif]))
+        assert notif.deleted is deleted
 
     def test_token_error_needs_matching_prefix(self, monkeypatch):
         # 'Error' present but the token prefix is NOT in body -> not a token error.
@@ -516,3 +610,22 @@ class TestMultiple:
         assert allowed_b.update_last_sent_called is True
         assert excluded.update_last_sent_called is False
         assert throttled.update_last_sent_called is False
+
+    def test_send_exception_does_not_abort_other_tokens(self, monkeypatch):
+        # A network error for one token must not stop delivery to the next.
+        calls = []
+
+        def post(url, headers=None, data=None, timeout=None):
+            calls.append(json.loads(data)['token'])
+            if len(calls) == 1:
+                raise ConnectionError('boom')
+            return FakeResponse(200, 'OK')
+
+        monkeypatch.setattr(push.requests, 'post', post)
+        g.config = {'push': base_push_cfg()}
+        first = FakeNotification(token='first00000000000')
+        second = FakeNotification(token='second0000000000')
+        run(FakeZM([first, second]))
+        assert calls == ['first00000000000', 'second0000000000']
+        assert first.update_last_sent_called is False
+        assert second.update_last_sent_called is True

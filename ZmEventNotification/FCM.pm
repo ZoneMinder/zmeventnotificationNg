@@ -6,6 +6,9 @@ use JSON;
 use MIME::Base64;
 use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday);
+use Fcntl qw(:flock);
+use File::Temp qw(tempfile);
+use File::Basename qw(dirname);
 use ZmEventNotification::Constants qw(:all);
 use ZmEventNotification::Config qw(:all);
 use ZmEventNotification::Util qw(uniq rsplit buildPictureUrl maskPassword getFrameId);
@@ -14,7 +17,7 @@ our @EXPORT_OK = qw(
   deleteFCMToken get_google_access_token
   sendOverFCM sendOverFCMV1
   migrateTokens initFCMTokens saveFCMTokens
-  readTokenFile writeTokenFile
+  readTokenFile writeTokenFile saveTokenInvocations
 );
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
@@ -34,12 +37,54 @@ sub readTokenFile {
   return $hr;
 }
 
+# Writes a temp file in the same directory and renames it over the token
+# file, so a reader never sees a truncated file and a failed write leaves
+# the old one. The old file's mode and owner are kept; if that is not
+# possible (directory not writable, symlink, cannot chown) the file is
+# rewritten in place as before.
 sub writeTokenFile {
   my $tokens_data = shift;
-  open(my $fh, '>', $fcm_config{token_file})
-    or do { main::Error("Error writing tokens file $fcm_config{token_file}: $!"); return; };
-  print $fh encode_json($tokens_data);
-  close($fh);
+  my $file = $fcm_config{token_file};
+  my $json = encode_json($tokens_data);
+
+  my @st = stat($file);
+  my ( $tfh, $tmp );
+  ( $tfh, $tmp ) = eval { tempfile( '.tokens.XXXXXX', DIR => dirname($file) ) } if !-l $file;
+  if ( $tfh && @st
+    && !( chmod( $st[2] & 07777, $tmp ) && chown( $st[4], $st[5], $tmp ) ) ) {
+    close($tfh);
+    unlink($tmp);
+    $tfh = undef;
+  }
+  if ( !$tfh ) {
+    open( my $fh, '>', $file )
+      or do { main::Error("Error writing tokens file $file: $!"); return; };
+    print $fh $json;
+    close($fh) or main::Error("Error writing tokens file $file: $!");
+    return;
+  }
+  # tempfile creates 0600; a new token file gets the mode open() would give
+  chmod( 0666 & ~umask, $tmp ) if !@st;
+  my $ok = print $tfh $json;
+  $ok = close($tfh) && $ok;
+  if ( !$ok || !rename( $tmp, $file ) ) {
+    main::Error("Error writing tokens file $file: $!");
+    unlink($tmp);
+  }
+}
+
+# Serializes read-modify-write of the token file between the parent and
+# event forks. Keep the returned handle while reading and writing; the lock
+# is released when it is closed or goes out of scope. Returns undef (no
+# lock, as before) if the lock file cannot be opened.
+sub _lockTokenFile {
+  my $lockfile = $fcm_config{token_file} . '.lock';
+  open( my $fh, '>>', $lockfile ) or do {
+    main::Debug(1, "Cannot open $lockfile: $!. Updating tokens without a lock");
+    return undef;
+  };
+  flock( $fh, LOCK_EX );
+  return $fh;
 }
 
 sub _check_monthly_limit {
@@ -78,15 +123,39 @@ sub _base64url_encode {
 sub deleteFCMToken {
   my $dtoken = shift;
   main::Debug(2, 'DeleteToken called with ...' . substr( $dtoken, -10 ));
-  my $hr = readTokenFile();
-  return if !$hr;
-  delete $hr->{tokens}->{$dtoken} if exists $hr->{tokens}->{$dtoken};
-  writeTokenFile($hr);
+  {
+    my $lock = _lockTokenFile();
+    my $hr = readTokenFile();
+    return if !$hr;
+    delete $hr->{tokens}->{$dtoken} if exists $hr->{tokens}->{$dtoken};
+    writeTokenFile($hr);
+  }
+  # Runs in an event fork; the parent drops the token from its own list.
+  # Written after the lock is released: a full pipe must not block while
+  # the parent waits for the lock.
+  print main::WRITER 'fcm_token_delete--TYPE--' . $dtoken . "\n";
 
   foreach (@main::active_connections) {
     next if ( $_ eq '' || $_->{token} ne $dtoken );
-    $_->{state} = INVALID_CONNECTION;
+    # not INVALID_CONNECTION: that is the normal state of a push-only token
+    # and sendEvent still pushes to it (e.g. this event's end notification)
+    $_->{state} = PENDING_DELETE;
   }
+}
+
+# Parent: store the in-memory monthly counters back into the token file.
+# Only tokens still in the file are updated, so a token deleted meanwhile
+# (FCM rejected it) is not recreated.
+sub saveTokenInvocations {
+  my $lock = _lockTokenFile();
+  my $tokens_data = readTokenFile();
+  return if !$tokens_data;
+  foreach (@main::active_connections) {
+    next if $_->{type} != FCM || !defined( $_->{token} ) || !exists $tokens_data->{tokens}->{ $_->{token} };
+    $tokens_data->{tokens}->{ $_->{token} }->{invocations} =
+      defined( $_->{invocations} ) ? $_->{invocations} : { count => 0, at => (localtime)[4] };
+  }
+  writeTokenFile($tokens_data);
 }
 
 sub get_google_access_token {
@@ -186,8 +255,10 @@ sub _prepare_fcm_common {
   my $count = defined($obj->{invocations}) ? $obj->{invocations}->{count} + 1 : 0;
   my $at = (localtime)[4];
 
+  # eid lets the parent count each event once (start and end pushes of an
+  # event carry the same values)
   print main::WRITER 'fcm_notification--TYPE--' . $obj->{token} . '--SPLIT--' . $badge
-                .'--SPLIT--' . $count .'--SPLIT--' . $at . "\n";
+                .'--SPLIT--' . $count .'--SPLIT--' . $at . '--SPLIT--' . $eid . "\n";
 
   my $title = $mname . ' Alarm';
   $title = $title . ' (' . $eid . ')' if $notify_config{tag_alarm_event_id};
@@ -536,6 +607,7 @@ sub saveFCMTokens {
 
   main::Debug(2, "SaveTokens called with:monlist=$smonlist, intlist=$sintlist, platform=$splatform, push=$spushstate");
 
+  my $lock = _lockTokenFile();
   my $tokens_data = readTokenFile();
   return if !$tokens_data;
 

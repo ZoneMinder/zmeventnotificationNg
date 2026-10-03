@@ -24,6 +24,13 @@ use ZmEventNotification::Util qw(parse_job_line);
     'fcm: token,badge,count,at in order');
 }
 
+# current forks add the event id: ...--SPLIT--<at>--SPLIT--<eid>
+{
+  my ($job, @f) = parse_job_line(
+    'fcm_notification--TYPE--tok123--SPLIT--5--SPLIT--2--SPLIT--4--SPLIT--777');
+  is_deeply(\@f, ['tok123', '5', '2', '4', '777'], 'fcm: token,badge,count,at,eid in order');
+}
+
 # message--TYPE--<id>--SPLIT--<message>
 {
   my ($job, @f) = parse_job_line('message--TYPE--conn7--SPLIT--hello world');
@@ -66,6 +73,13 @@ use ZmEventNotification::Util qw(parse_job_line);
   my ($job, @f) = parse_job_line('update_parallel_hooks--TYPE--add');
   is($job, 'update_parallel_hooks', 'update_parallel_hooks: job key');
   is_deeply(\@f, ['add'], 'update_parallel_hooks: single command field');
+}
+
+# fcm_token_delete--TYPE--<token>  (no --SPLIT--)
+{
+  my ($job, @f) = parse_job_line('fcm_token_delete--TYPE--tok123');
+  is($job, 'fcm_token_delete', 'fcm_token_delete: job key');
+  is_deeply(\@f, ['tok123'], 'fcm_token_delete: token');
 }
 
 # Edge cases
