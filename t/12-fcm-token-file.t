@@ -226,6 +226,8 @@ my $tmpdir = tempdir(CLEANUP => 1);
 }
 
 # ===== deleteFCMToken =====
+# deleteFCMToken reports to the parent over the job pipe; give it one
+open( *main::WRITER, '>', \my $job_pipe ) or die "job pipe: $!";
 
 {
     # deleteFCMToken removes token from file

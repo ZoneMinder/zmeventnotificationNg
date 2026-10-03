@@ -490,7 +490,7 @@ sub checkNewEvents() {
             . $monitor->{Id}
             . ' (Name:'
             . $monitor->{Name} . ') '
-            . $alarm_cause
+            . ( $alarm_cause // '' )
             . '[last processed eid:'
             . ($active_events{$mid}->{last_event_processed} // '')
             . ']' );

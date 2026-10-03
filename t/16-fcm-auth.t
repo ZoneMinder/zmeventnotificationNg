@@ -350,6 +350,7 @@ subtest 'deleteFCMToken removes token from file and connections' => sub {
         { token => 'token_to_keep', state => VALID_CONNECTION, type => FCM },
     );
 
+    open( local *main::WRITER, '>', \my $job_pipe ) or die "job pipe: $!";
     deleteFCMToken('token_to_delete');
 
     # Check file
