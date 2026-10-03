@@ -81,6 +81,7 @@ use constant {
   DEFAULT_FCM_V1_URL => 'https://us-central1-zmng-b7af6.cloudfunctions.net/send_push',
   DEFAULT_FCM_INCLUDE_PROFILE_IN_PUSH => 'no',
   DEFAULT_MAX_PARALLEL_HOOKS => 0,
+  DEFAULT_HOOK_TIMEOUT => 0,
   DEFAULT_HOOK_TAG_DETECTED_OBJECTS => 'no',
 };
 
