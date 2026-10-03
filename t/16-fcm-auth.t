@@ -359,7 +359,7 @@ subtest 'deleteFCMToken removes token from file and connections' => sub {
 
     # Check connections
     my @deleted = grep { $_->{token} eq 'token_to_delete' } @main::active_connections;
-    is($deleted[0]->{state}, INVALID_CONNECTION, 'Connection marked INVALID');
+    is($deleted[0]->{state}, PENDING_DELETE, 'Connection marked PENDING_DELETE (skipped for the rest of the event)');
 };
 
 done_testing();

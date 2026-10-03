@@ -247,7 +247,9 @@ my $tmpdir = tempdir(CLEANUP => 1);
 }
 
 {
-    # deleteFCMToken marks matching connection INVALID_CONNECTION
+    # deleteFCMToken marks the matching connection PENDING_DELETE so the rest
+    # of this event (e.g. the end push) skips it; INVALID_CONNECTION is the
+    # normal state of a push-only token and does not stop FCM sends
     my $tf = "$tmpdir/del_state.txt";
     _write_file($tf, '{"tokens":{"tok_inv":{}}}');
     local $fcm_config{token_file} = $tf;
@@ -255,7 +257,7 @@ my $tmpdir = tempdir(CLEANUP => 1);
         { token => 'tok_inv', state => VALID_CONNECTION },
     );
     deleteFCMToken('tok_inv');
-    is($main::active_connections[0]{state}, INVALID_CONNECTION, 'connection marked INVALID');
+    is($main::active_connections[0]{state}, PENDING_DELETE, 'connection marked PENDING_DELETE');
 }
 
 {

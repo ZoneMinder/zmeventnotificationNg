@@ -137,7 +137,9 @@ sub deleteFCMToken {
 
   foreach (@main::active_connections) {
     next if ( $_ eq '' || $_->{token} ne $dtoken );
-    $_->{state} = INVALID_CONNECTION;
+    # not INVALID_CONNECTION: that is the normal state of a push-only token
+    # and sendEvent still pushes to it (e.g. this event's end notification)
+    $_->{state} = PENDING_DELETE;
   }
 }
 
