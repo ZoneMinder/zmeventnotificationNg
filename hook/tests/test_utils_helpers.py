@@ -66,3 +66,15 @@ class TestFindWholeWord:
     def test_word_boundary(self):
         searcher = findWholeWord("cat")
         assert searcher("scatter") is None
+
+    def test_zone_name_with_space_in_alarm_cause(self):
+        assert findWholeWord("Front Yard")("Motion: Front Yard, Side") is not None
+
+    def test_each_zone_of_multi_zone_cause(self):
+        cause = "Motion: Driveway,Backyard"
+        assert findWholeWord("Driveway")(cause) is not None
+        assert findWholeWord("Backyard")(cause) is not None
+
+    def test_prefix_of_zone_does_not_match(self):
+        assert findWholeWord("Drive")("Motion: Driveway") is None
+        assert findWholeWord("Zone_1")("Motion: Zone_12") is None
