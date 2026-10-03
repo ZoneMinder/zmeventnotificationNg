@@ -325,14 +325,32 @@ def check_known_faces_empty(enabled_models, base_data_path):
 # ES config checks
 # ---------------------------------------------------------------------------
 
-def check_secrets_file(es_cfg, web_owner):
-    """Warn if the secrets file is missing or unreadable by the web user."""
+def _secrets_path(es_cfg):
+    """Return general.secrets from the ES config, or None."""
     if not es_cfg:
         return None
     general = es_cfg.get("general", {})
     if not isinstance(general, dict):
         return None
-    secrets_path = general.get("secrets")
+    return general.get("secrets") or None
+
+
+def check_secrets_world_readable(es_cfg):
+    """Warn if the secrets file can be read by any local user."""
+    secrets_path = _secrets_path(es_cfg)
+    if not secrets_path or not os.path.isfile(secrets_path):
+        return None
+    if os.stat(secrets_path).st_mode & stat.S_IROTH:
+        return (
+            f"Secrets file {secrets_path} is world-readable.\n"
+            f"    Run: chmod o-r {secrets_path}"
+        )
+    return None
+
+
+def check_secrets_file(es_cfg, web_owner):
+    """Warn if the secrets file is missing or unreadable by the web user."""
+    secrets_path = _secrets_path(es_cfg)
     if not secrets_path:
         return None
 
@@ -592,6 +610,10 @@ def main():
     # --- ES config checks ---
     if es_cfg:
         w = check_secrets_file(es_cfg, args.web_owner)
+        if w:
+            warnings.append(w)
+
+        w = check_secrets_world_readable(es_cfg)
         if w:
             warnings.append(w)
 
