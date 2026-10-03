@@ -235,6 +235,27 @@ class TestThrottle:
         run(FakeZM([notif]))
         assert rec.call_count == 1
 
+    def test_throttle_check_error_does_not_abort_other_tokens(self, monkeypatch):
+        # pyzm _parse_dt returns an aware datetime for an ISO LastNotifiedAt
+        # with an offset; is_throttled then raises TypeError subtracting it
+        # from naive datetime.now(). That must not stop the other tokens.
+        class AwareNotification(FakeNotification):
+            def is_throttled(self):
+                raise TypeError("can't subtract offset-naive and offset-aware datetimes")
+
+        rec = PostRecorder()
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        bad = AwareNotification(token='aware00000000000', interval=60)
+        good = FakeNotification(token='naive00000000000')
+        run(FakeZM([bad, good]))
+        sent = [c['payload']['token'] for c in rec.calls]
+        assert 'naive00000000000' in sent
+        assert good.update_last_sent_called is True
+        # throttle state unknown -> send rather than drop the alarm
+        assert 'aware00000000000' in sent
+        assert any('throttle' in e for e in g.logger.error)
+
     def test_fetch_and_update_hold_cross_process_lock(self, monkeypatch, tmp_path):
         # Parallel zm_detect runs must not all read LastNotifiedAt before any
         # of them updates it (#56): the token fetch and the LastNotifiedAt

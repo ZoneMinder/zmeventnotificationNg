@@ -81,7 +81,14 @@ def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cau
             logger.Debug(2, 'push: skipping token ...{} (monitor {} not in filter)'.format(token_suffix, mid))
             continue
 
-        if notif.is_throttled():
+        try:
+            throttled = notif.is_throttled()
+        except Exception as e:
+            # e.g. pyzm raises TypeError on a tz-aware LastNotifiedAt. Send
+            # rather than drop the alarm or abort the remaining tokens.
+            logger.Error('push: throttle check failed for token ...{}, sending anyway: {}'.format(token_suffix, e))
+            throttled = False
+        if throttled:
             logger.Debug(2, 'push: skipping token ...{} (throttled, interval={}s)'.format(token_suffix, notif.interval))
             continue
 
