@@ -3,6 +3,113 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.34] - 2026-10-03
+
+### Bug Fixes
+
+- no uninitialized warning in the new-event log line ([703783d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/703783d3c7041cfc6da5392f8911ce19f8777f0c))
+- find the pyzm pin when it carries extras ([d4692d3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d4692d30db052bf8786d33502df3072e4a78f105))
+- use snapshot for fid=objdetect when hooks are disabled ([eb43204](https://github.com/ZoneMinder/zmeventnotificationNg/commit/eb43204d4c0ff2fca8216aca568d0f7e919ec271))
+- keep unknown YAML tags verbatim in config upgrade ([ac8ee86](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ac8ee8694eb33d45cb695103b3946ed1fee97666))
+- keep ' # ...' in migrated zmeventnotification.ini values ([fa70936](https://github.com/ZoneMinder/zmeventnotificationNg/commit/fa709369ec7f7738bff66edb9295db1476324d8b))
+- edit symlinked configs through the link ([cc2449b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cc2449bd9a1cd7f58615d8817f2be7e206444fe1))
+- quote PYTHON and PIP so a venv path with a space works ([7ac77b0](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7ac77b0329d65da63cea1e093349f71cf19b3352))
+- create the -o output directory ([d120314](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d1203149d5e970fa2609a3f2776222b8c25f8323))
+- no undef warning when a monitor has no push interval ([4a067f8](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4a067f8fb3b672e84d1db5986d72f40c1261be07))
+- don't report a finished event as new right after start ([255cfcf](https://github.com/ZoneMinder/zmeventnotificationNg/commit/255cfcfedf61ab9434d0f3f489470be771555c7e))
+- skip a token FCM rejected for the rest of the event ([8b824a7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/8b824a719f91d69ddb972359cd6701cf2deaf90b))
+- one End: prefix per client; end cause falls back to start cause ([afebb43](https://github.com/ZoneMinder/zmeventnotificationNg/commit/afebb4325bc3f0518f0d0f85622c92b8c62e58fa))
+- no uninitialized warning per tick when alarm cause is not read ([5594eb3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5594eb3a06fef0e7ec9c93075f8fc0f050c3cf49))
+- warn that network.address is ignored without SSL ([592b810](https://github.com/ZoneMinder/zmeventnotificationNg/commit/592b81099e0974dc21b8ce9b1a3cc0e83406e6d9))
+- count each event once in the parent's badge and monthly count ([f7360cc](https://github.com/ZoneMinder/zmeventnotificationNg/commit/f7360cc0e2ed09fbb4a1a3cadd3a453fd40388cc))
+- keep dash from silently running nothing; fix --help text ([df9855a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/df9855a5c6ad90be2bff9b3ee22fef5faa5cf444))
+- config upgrade backup is never world-readable ([7c4bb09](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7c4bb092a666bd9e11a2ac3ebaecf206f6d748f8))
+- log the API push command at Info again ([874a507](https://github.com/ZoneMinder/zmeventnotificationNg/commit/874a5074dcb911afca0ff51c3d45fbba9a557f6d))
+- signal token deletion to the parent after releasing the lock ([3f0dc92](https://github.com/ZoneMinder/zmeventnotificationNg/commit/3f0dc92ecb89d252c4bff8c311fe3c52a8809f9a))
+- also drop a rejected token held by a disconnected websocket ([37bebb1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/37bebb1267fdc99959e7ce96d40bd997cd5f2410))
+- keep INI migration when only the hook config is skipped ([2451424](https://github.com/ZoneMinder/zmeventnotificationNg/commit/24514247a584b62d39ffe97485565f8472bbc95a))
+- fail preflight on missing gh auth or non-master branch ([228bdb9](https://github.com/ZoneMinder/zmeventnotificationNg/commit/228bdb949ae29b2cab0a44f0b1d85a49647f37cd))
+- do not require a global pip3 when installing into a venv ([e450b94](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e450b9419dc1a161005f9ec80ff88a74f1b4b381))
+- honor --no-install-hook/--no-install-config for INI upgrade ([7a9a663](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7a9a6630c93ec293f8101a5b1b1f496b3be14e4e))
+- create TARGET_BIN_HOOK before installing hook scripts ([90d13b1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/90d13b11e8bf15ed708b68f37cd1f9bbe15448e5))
+- never rm -rf a populated non-venv ZM_VENV directory ([9f5de8a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9f5de8aabebee155a4bc8d1dbc385a957bfc4877))
+- install secrets.yml mode 640, not world-readable ([e4e61fc](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e4e61fcdae43a1110265d4543e64987eccfd9933))
+- make /etc/zm path rewrite idempotent ([237ff1b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/237ff1bba53480a0fe90f15640df707c93d6a4b9))
+- warn in install_doctor when the secrets file is world-readable ([b5519e2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b5519e2321c3b56a89539d2467d72af350f2dd61))
+- treat models without an enabled key as enabled in install_doctor ([c497508](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c49750885bdaabd814ae2b412301544759e33495))
+- keep [monitor-N] variable overrides per monitor in migration ([488536b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/488536b08a60cfa09234af088c46c48b15177630))
+- strip INI quotes from zone detection patterns in migration ([c4601a4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c4601a4898600b21a2e0625284efdc07e9b026cd))
+- keep scalar text intact in config_upgrade_yaml round-trip ([5983a63](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5983a638b74d5ff36155d124283e2b574cf054bf))
+- back up config before config_upgrade_yaml rewrites it ([0551a2c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0551a2c8db945476a0eb518b664b29e7a29e5fde))
+- do not merge example monitor entries into user configs ([42986d7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/42986d7138b18e399af4f0ad08864134a3517e10))
+- enforce max_parallel_hooks for events arriving in the same tick ([c0cae55](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c0cae55e1cc57ff45a78a5109341736534f8e3b2))
+- token deleted after FCM rejection no longer comes back ([e035515](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e03551585056d75bbe0385217ab5d3047bca48cc))
+- write the token file atomically and lock read-modify-write ([5440f15](https://github.com/ZoneMinder/zmeventnotificationNg/commit/5440f157b79bbfd8cc97e42ae4b1ed600cd7ce76))
+- count badge and monthly FCM sends in the parent ([23c1ded](https://github.com/ZoneMinder/zmeventnotificationNg/commit/23c1dede9db75b30596091862fe623572a1cbeb0))
+- bad detection JSON on the job pipe no longer kills the daemon ([cd44eed](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cd44eed65ed06e9ad7473fd2e846600ae8c5f3b4))
+- honor escontrol mute for event end notifications ([cf82910](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cf82910b2c169d02cd0b32dcd9cc9eb9bc68f7ca))
+- bad hook JSON or malformed rule no longer kills the event fork ([c663881](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c6638813f766dea1d80ebee6859329e198f10e93))
+- pass event values to hooks and scripts as arguments, not shell text ([de32cc3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/de32cc30f884b6f54d04cdf92a78c56713e28e57))
+- send without attachment when the event image is missing ([9b56e2d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9b56e2ddbe8e1c4d1d56a7f1ed607a3482ff5bc7))
+- add timeout to the Pushover API request ([80ab417](https://github.com/ZoneMinder/zmeventnotificationNg/commit/80ab417c4948e0f6b86794f39c1aca2a414aca39))
+- read secrets when either credential is missing ([d1ce895](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d1ce8950d6ca15c4fdee505c9a41e381a369b781))
+- match ZM zone names literally in alarm cause ([2f9a2a9](https://github.com/ZoneMinder/zmeventnotificationNg/commit/2f9a2a98bb8faf5b34eaa1b2f5a6ca0c6ef6f894))
+- default image_path to ${base_data_path}/images ([4ab8c3c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4ab8c3c2e03eeb06d97cb15d6c86e93e0c0638e5))
+- let pyzm derive portal URL when portal is empty ([f84f0c1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/f84f0c15ae95032851bc4d51380e6a126eed2d39))
+- fetch real frame for URL-mode gateway results ([e9c43a3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e9c43a329813d73e642ad0b268ffc461a27b018f))
+- URL-encode picture portal credentials ([89a3cef](https://github.com/ZoneMinder/zmeventnotificationNg/commit/89a3cef6d9e6854d55f9c48235f8d2d6379b815e))
+- isolate throttle-check errors per token ([8bae301](https://github.com/ZoneMinder/zmeventnotificationNg/commit/8bae3016c28703b87455dd41f07f0c1baa2c06fb))
+- delete FCM token only on token-specific errors ([17683a5](https://github.com/ZoneMinder/zmeventnotificationNg/commit/17683a5d86715ab55c9b4d2fba217042d65a33c2))
+- match a message's connection by identity, not ip:port ([1125bd2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1125bd27574f3f5a8bf1d14fd6c0e189e5c33fbd))
+- keep command-line arguments on self-restart ([452e892](https://github.com/ZoneMinder/zmeventnotificationNg/commit/452e892ff01821561f1aaa4df79ea3aa6bf4ba55))
+- honor network.address when SSL is off ([2bca060](https://github.com/ZoneMinder/zmeventnotificationNg/commit/2bca06017ed51253c438e36091e16e9fa11aa78f))
+- exit when the SSL listener cannot be created ([d9dbd61](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d9dbd61f4054d649044142678f7a71b0c06a6950))
+- stop trigger cause leaking into later events ([9a4227a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9a4227a891851e35464b7b0e761563365580e908))
+- reject escontrol login when no password is configured ([cb2a655](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cb2a6556616ee9c2903e79155282d60b8bdcef88))
+- require authentication for push commands ([02d8754](https://github.com/ZoneMinder/zmeventnotificationNg/commit/02d87543233780033c40d39859d0226b82da72d8))
+- reject non-object messages and contain handler exceptions ([de109a7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/de109a7684035263c4e3ab4e3cd8c76bd3b128ce))
+- run Perl compile check as the web user ([0a24bc3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0a24bc38b796aa4dcf4a20b247420a0c66767fad))
+
+### Documentation
+
+- drop stale objdetect gif/mp4 note; list fid=objdetect once ([7ee1dd0](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7ee1dd0b307422ae07fbf453a8aea416224e9b63))
+- document hook_timeout; max_parallel_hooks drops, not queues ([16d665f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/16d665f80a1d40fb8fd27ccc8bef8ce6854a3103))
+- note user-visible changes from the review fixes; refresh log and backup examples ([da6303f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/da6303fdce8200c7247b159a3c42bc3a1c6a32fd))
+- describe new tools test coverage ([2a2f9ee](https://github.com/ZoneMinder/zmeventnotificationNg/commit/2a2f9ee616a6d5dbd8b987165a3a4ed09f6c4a07))
+- map t/22-main-script.t and new websocket handler tests ([1c009d7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1c009d790190314f7bb6e4431a2513c35813bb5b))
+
+### Features
+
+- opt-in hook_timeout kills hung hooks ([de9273b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/de9273b72807b28f5c94e98dc12131a7026fc318))
+
+### Miscellaneous
+
+- bump version to v7.0.34 ([36f02c1](https://github.com/ZoneMinder/zmeventnotificationNg/commit/36f02c16c0786a39ab78955381c6418258e585e9))
+- require pyzm>=2.5.4 ([386114c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/386114c4a81e1b186e87fd7ed481dbf966c49ac5))
+
+### Testing
+
+- pin INI migration comment/quote handling and core YAML tags ([727d885](https://github.com/ZoneMinder/zmeventnotificationNg/commit/727d8854ade096aea7bcad136cbce1c850866522))
+- pin -o behaviour for an existing output dir ([687e5f5](https://github.com/ZoneMinder/zmeventnotificationNg/commit/687e5f5dc51c191269045d196b4eb1d5bdd53612))
+- pin send decision when a monitor has no interval ([6e740ec](https://github.com/ZoneMinder/zmeventnotificationNg/commit/6e740ec64fd3ddc7e4ed9115e8fb35bd55a6d38b))
+- pin hook argv/output/exit/pipe behavior for upcoming hook_timeout ([6cd6de6](https://github.com/ZoneMinder/zmeventnotificationNg/commit/6cd6de61b805912bb78efb07907d10bb2f016a5f))
+- migrate shipped legacy objectconfig.ini; doctor main warns on world-readable secrets ([fc87232](https://github.com/ZoneMinder/zmeventnotificationNg/commit/fc8723289e36ad1d5ab6f78864a21393b0ca7b6d))
+- pin token deletion against real push-proxy responses and pushover frame choice ([6e39e0a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/6e39e0a7e333268d9aac2c9bb8b2a810c66d6640))
+- cover atomic token-file replace, new-file mode and reload write-back ([07be426](https://github.com/ZoneMinder/zmeventnotificationNg/commit/07be4264706d7c20619e5d6b80e6579f42da02e9))
+- pin make_release.sh preflight in a throwaway repo ([12dc1e8](https://github.com/ZoneMinder/zmeventnotificationNg/commit/12dc1e8b64163d413c0ebf363a6e004b55f4b470))
+- pin install.sh function behavior in a sandbox ([7c650b7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7c650b7de058fbba0d65cd90ad29534cec605e77))
+- pin install_doctor handling of YAML boolean enabled flags ([ee6c784](https://github.com/ZoneMinder/zmeventnotificationNg/commit/ee6c784ec715826b8703b7cb3ad309c4613c6608))
+- pin plain monitor overrides in config_migrate_yaml ([c124a67](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c124a678f5b5e8efee07bc31cdb7b351d9875ba2))
+- pin config_upgrade_yaml end-to-end behavior ([cd154a4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cd154a49fb0c697c1f3ebb77e723b6aa9db29cdf))
+- pin processJobs handling of every job type ([9b801c3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9b801c3df67d93dc946a24da1e744d9fe14ff675))
+- pin hook/user-script/api-push argv and fork flow ([a97ba3d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/a97ba3d772927fd0eb83d4b06273ffc5e0fce8c4))
+- pin pushapi_pushover.py credentials, title and attachment ([306e491](https://github.com/ZoneMinder/zmeventnotificationNg/commit/306e491b5a9c00fb193df4268f117e271cb2aeac))
+- pin zone-name matching against alarm cause ([c296565](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c29656502bcd2ec34fd9076094268320935a7565))
+- pin image_path default, explicit value and -o override ([0d72af7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/0d72af7a6c24a546958329b9815083e42597ae75))
+- carry result image through FakeResult.to_dict like pyzm ([99fbe47](https://github.com/ZoneMinder/zmeventnotificationNg/commit/99fbe47de55606db5c0aeed92ccde7182b4a4e9e))
+- pin FCM token deletion, picture creds and per-token error isolation ([4332093](https://github.com/ZoneMinder/zmeventnotificationNg/commit/433209397a5b86207cd920f1a72e36ed7ea68095))
+- characterize websocket handler and main-script subs ([7477b8a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7477b8aaa3ffb61905316304fb17887033bddc6f))
+
 ## [7.0.33] - 2026-10-03
 
 ### Bug Fixes
@@ -11,6 +118,10 @@ All notable changes to this project will be documented in this file.
 - serialize zm_detect push sends so token interval holds ([1c2edba](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1c2edba7292a89528a6c886981af17463efc3743))
 - enforce per-monitor notification interval across event forks ([1365e15](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1365e152f4e11345c3c840ae3208e4459acfb6fe))
 - give each loaded token a unique connection id ([82a64fa](https://github.com/ZoneMinder/zmeventnotificationNg/commit/82a64fa85102362a19e7a64a3908dfeb3753af1a))
+
+### Documentation
+
+- update CHANGELOG for v7.0.33 ([63548ec](https://github.com/ZoneMinder/zmeventnotificationNg/commit/63548ecbb8b9a2add2db2c7beda66811917ee037))
 
 ### Miscellaneous
 
