@@ -321,7 +321,7 @@ def migrate_monitor(cp, section_name):
 
         if key.endswith('_zone_detection_pattern'):
             zone_name = key.rsplit('_zone_detection_pattern', 1)[0]
-            zone_patterns[zone_name] = value
+            zone_patterns[zone_name] = strip_quotes(value)
         elif is_polygon(value):
             zones[key] = {'coords': value}
         elif key in LITERAL_KEYS:

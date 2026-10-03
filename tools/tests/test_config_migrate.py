@@ -323,3 +323,11 @@ class TestBuildYamlEndToEnd:
         assert output["monitors"][2] == {"wait": 5}
         nested = output["ml"]["ml_sequence"]["object"]["general"]
         assert nested["object_detection_pattern"] == "(person|car)"
+
+
+class TestMigrateMonitorZonePatternQuotes:
+    def test_zone_pattern_quotes_stripped(self, tmp_path):
+        # Every other value has ConfigParser's literal quotes stripped.
+        cp = make_cp('[monitor-1]\nyard_zone_detection_pattern="(car)"\n', tmp_path)
+        assert migrate_monitor(cp, "monitor-1") == {
+            "zones": {"yard": {"detection_pattern": "(car)"}}}
