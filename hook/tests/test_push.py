@@ -333,6 +333,18 @@ class TestPictureUrl:
         assert img == ('https://portal/zm?eid=7&fid=objdetect'
                        '&username=zm.user_1&password=Pass-word~9.x_Y')
 
+    def test_picture_credentials_url_encoded(self, monkeypatch):
+        # & # + % in a password must not break the query string
+        rec = PostRecorder()
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg(
+            include_picture='yes', picture_url=self.PIC,
+            picture_portal_username='a&b', picture_portal_password='p&w#1+2%z')}
+        run(FakeZM([FakeNotification()]), event_id=7)
+        img = rec.last_payload['image_url']
+        assert img == ('https://portal/zm?eid=7&fid=objdetect'
+                       '&username=a%26b&password=p%26w%231%2B2%25z')
+
     def test_no_picture_when_disabled(self, monkeypatch):
         rec = PostRecorder()
         install_post(monkeypatch, rec)

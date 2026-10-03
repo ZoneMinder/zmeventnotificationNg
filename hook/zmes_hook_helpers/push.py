@@ -9,6 +9,7 @@ import json
 import os
 import requests
 from datetime import datetime
+from urllib.parse import quote
 
 DEFAULT_BASE_DATA_PATH = '/var/lib/zmeventnotification'
 # FCM errors that mean the token itself is invalid (INVALID_ARGUMENT,
@@ -125,9 +126,9 @@ def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cau
                 pic_user = push_cfg.get('picture_portal_username', '')
                 pic_pass = push_cfg.get('picture_portal_password', '')
                 if pic_user:
-                    image_url += '&username={}'.format(pic_user)
+                    image_url += '&username={}'.format(quote(str(pic_user), safe=''))
                 if pic_pass:
-                    image_url += '&password={}'.format(pic_pass)
+                    image_url += '&password={}'.format(quote(str(pic_pass), safe=''))
                 payload['image_url'] = image_url
                 logger.Debug(1, 'push: image_url={}'.format(image_url.split('&password=')[0]))
             else:
