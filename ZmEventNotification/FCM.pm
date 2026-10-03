@@ -123,12 +123,16 @@ sub _base64url_encode {
 sub deleteFCMToken {
   my $dtoken = shift;
   main::Debug(2, 'DeleteToken called with ...' . substr( $dtoken, -10 ));
-  my $lock = _lockTokenFile();
-  my $hr = readTokenFile();
-  return if !$hr;
-  delete $hr->{tokens}->{$dtoken} if exists $hr->{tokens}->{$dtoken};
-  writeTokenFile($hr);
+  {
+    my $lock = _lockTokenFile();
+    my $hr = readTokenFile();
+    return if !$hr;
+    delete $hr->{tokens}->{$dtoken} if exists $hr->{tokens}->{$dtoken};
+    writeTokenFile($hr);
+  }
   # Runs in an event fork; the parent drops the token from its own list.
+  # Written after the lock is released: a full pipe must not block while
+  # the parent waits for the lock.
   print main::WRITER 'fcm_token_delete--TYPE--' . $dtoken . "\n";
 
   foreach (@main::active_connections) {
