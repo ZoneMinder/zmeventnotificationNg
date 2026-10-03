@@ -100,9 +100,16 @@ class TestCollectEnabledModels:
     def test_no_ml_section(self):
         assert collect_enabled_models({"general": {}}) == []
 
-    def test_default_disabled_when_no_enabled_key(self):
+    def test_yaml_booleans(self):
+        # Unquoted yes/no load as Python bools.
+        cfg = {"ml": {"ml_sequence": {"object": {"sequence": [
+            {"name": "on", "enabled": True}, {"name": "off", "enabled": False}]}}}}
+        assert collect_enabled_models(cfg) == [("object", {"name": "on", "enabled": True})]
+
+    def test_default_enabled_when_no_enabled_key(self):
+        # pyzm ModelConfig: enabled=_bool(seq.get("enabled", True), default=True)
         cfg = {"ml": {"ml_sequence": {"object": {"sequence": [{"name": "x"}]}}}}
-        assert collect_enabled_models(cfg) == []
+        assert collect_enabled_models(cfg) == [("object", {"name": "x"})]
 
 
 # ── check_opencv_version ────────────────────────────────────────────────
@@ -269,6 +276,25 @@ class TestCheckSecretsFile:
         sf.write_text("x"); sf.chmod(0o604)  # other-read set
         monkeypatch.setattr(mod, "uid_for_user", lambda u: os.getuid() + 12345)
         assert check_secrets_file({"general": {"secrets": str(sf)}}, "www-data") is None
+
+
+class TestCheckSecretsWorldReadable:
+    def test_world_readable_warns(self, tmp_path):
+        sf = tmp_path / "secrets.yml"
+        sf.write_text("x"); sf.chmod(0o644)
+        warn = mod.check_secrets_world_readable({"general": {"secrets": str(sf)}})
+        assert warn is not None and "world-readable" in warn and "chmod o-r" in warn
+
+    def test_not_world_readable_ok(self, tmp_path):
+        sf = tmp_path / "secrets.yml"
+        sf.write_text("x"); sf.chmod(0o640)
+        assert mod.check_secrets_world_readable({"general": {"secrets": str(sf)}}) is None
+
+    def test_no_secrets_or_missing_file_ok(self, tmp_path):
+        assert mod.check_secrets_world_readable(None) is None
+        assert mod.check_secrets_world_readable({"general": {}}) is None
+        missing = {"general": {"secrets": str(tmp_path / "nope.yml")}}
+        assert mod.check_secrets_world_readable(missing) is None
 
 
 # ── cv2 import state ────────────────────────────────────────────────────

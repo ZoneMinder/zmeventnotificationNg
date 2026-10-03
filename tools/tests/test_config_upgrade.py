@@ -155,3 +155,133 @@ class TestMainInPlace:
         self._run_main(monkeypatch, ["-c", user, "-e", example, "-o", out])
         assert open(user).read() == before          # input untouched
         assert "b" in open(out).read()               # output has merged key
+
+
+# ── main(): end-to-end behavior on realistic configs ────────────────────────
+
+def _run_upgrade(tmp_path, monkeypatch, user_text, example_text, extra=()):
+    import sys
+    user = tmp_path / "user.yml"
+    user.write_text(user_text)
+    example = tmp_path / "example.yml"
+    example.write_text(example_text)
+    monkeypatch.setattr(sys, "argv", ["config_upgrade_yaml.py", "-c", str(user),
+                                      "-e", str(example)] + list(extra))
+    mod.main()
+    return user
+
+
+class TestMainCharacterization:
+    """Pin what the upgrade already does right on real-shaped configs."""
+
+    def test_python_reader_sees_same_user_values(self, tmp_path, monkeypatch):
+        # The hook reads objectconfig.yml with PyYAML; existing values must
+        # load identically after an upgrade that adds a key.
+        import yaml
+        user_text = (
+            "general:\n"
+            "  port: 9000\n"
+            "  ratio: 0.6\n"
+            "  enable: yes\n"
+            "  name: 'quoted'\n"
+            "  empty:\n"
+            "  multi: |\n"
+            "    line1\n"
+            "    line2\n"
+            "  seq:\n"
+            "    - a\n"
+            "    - 2\n"
+        )
+        user = _run_upgrade(tmp_path, monkeypatch, user_text,
+                            "general:\n  port: 1\n  new_key: added\n")
+        after = yaml.safe_load(user.read_text())
+        before = yaml.safe_load(user_text)
+        assert after["general"].pop("new_key") == "added"
+        assert after == before
+
+    def test_new_schema_section_added_from_example(self, tmp_path, monkeypatch):
+        import yaml
+        user = _run_upgrade(tmp_path, monkeypatch, "general:\n  a: 1\n",
+                            "general:\n  a: 1\nmqtt:\n  enable: no\n  server: x\n")
+        assert yaml.safe_load(user.read_text())["mqtt"] == {"enable": False, "server": "x"}
+
+    def test_managed_default_replaced_end_to_end(self, tmp_path, monkeypatch):
+        import yaml
+        managed = tmp_path / "managed.yml"
+        managed.write_text("sec:\n  fcm.key:\n    - old\n")
+        user = _run_upgrade(tmp_path, monkeypatch, "fcm:\n  key: old\n",
+                            "fcm:\n  key: new\n",
+                            extra=["-m", str(managed), "-s", "sec"])
+        assert yaml.safe_load(user.read_text()) == {"fcm": {"key": "new"}}
+
+    def test_up_to_date_config_not_rewritten(self, tmp_path, monkeypatch):
+        text = "# my comment\na: 1\n"
+        user = _run_upgrade(tmp_path, monkeypatch, text, "a: 2\n")
+        assert user.read_text() == text
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["example.yml", "user.yml"]
+
+
+class TestMainBugs:
+    def test_in_place_rewrite_keeps_backup_of_original(self, tmp_path, monkeypatch):
+        # The rewrite drops comments, so the original must be kept.
+        text = "# my precious comment\na: 1\n"
+        _run_upgrade(tmp_path, monkeypatch, text, "a: 1\nb: 2\n")
+        backups = list(tmp_path.glob("user.yml.*.bak"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == text
+
+    def test_scalars_keep_their_text_for_perl_and_python(self, tmp_path, monkeypatch):
+        # The ES (Perl YAML::XS, untyped scalars) reads es_rules.yml and
+        # zmeventnotification.yml. PyYAML's YAML 1.1 round-trip rewrote
+        # 21:30 -> 1290, yes -> true, 0123 -> 83. BaseLoader yields the raw
+        # scalar text, which is what an untyped reader sees.
+        import yaml
+        user_text = (
+            "rules:\n"
+            "  from: 21:30\n"
+            "  to: 1:30:00\n"
+            "  enable: yes\n"
+            "  off: no\n"
+            "  pin: 0123\n"
+            "  hex: 0x1F\n"
+            "  date: 2024-1-1\n"
+            "  quoted: '800'\n"
+            "  real_bool: true\n"
+            "  nothing: ~\n"
+        )
+        user = _run_upgrade(tmp_path, monkeypatch, user_text,
+                            "rules:\n  from: x\n  new_key: added\n")
+        after_text = user.read_text()
+        raw_after = yaml.load(after_text, Loader=yaml.BaseLoader)
+        assert raw_after["rules"].pop("new_key") == "added"
+        assert raw_after == yaml.load(user_text, Loader=yaml.BaseLoader)
+        typed_after = yaml.safe_load(after_text)
+        del typed_after["rules"]["new_key"]
+        assert typed_after == yaml.safe_load(user_text)
+
+    def test_example_monitor_entries_not_merged_into_es_rules(self, tmp_path, monkeypatch):
+        import yaml
+        repo = os.path.join(os.path.dirname(__file__), "..", "..")
+        example = open(os.path.join(repo, "es_rules.example.yml")).read()
+        user_text = (
+            "notifications:\n"
+            "  monitors:\n"
+            "    5:\n"
+            "      rules:\n"
+            "        - from: '9 pm'\n"
+            "          to: '1 am'\n"
+            "          action: mute\n"
+        )
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, example)
+        assert yaml.safe_load(user.read_text()) == yaml.safe_load(user_text)
+
+    def test_example_monitor_not_merged_into_objectconfig(self, tmp_path, monkeypatch):
+        import yaml
+        repo = os.path.join(os.path.dirname(__file__), "..", "..")
+        example = open(os.path.join(repo, "hook", "objectconfig.example.yml")).read()
+        # User deliberately removed the sample monitors section.
+        user_text = "general:\n  base_data_path: /var/lib/zmeventnotification\n"
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, example)
+        after = yaml.safe_load(user.read_text())
+        assert "monitors" not in after
+        assert "ml" in after  # real schema sections still merged

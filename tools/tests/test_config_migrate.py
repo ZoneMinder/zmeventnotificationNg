@@ -316,3 +316,39 @@ class TestBuildYamlEndToEnd:
         # but the expanded value survives nested inside ml_sequence
         nested = output["ml"]["ml_sequence"]["object"]["general"]
         assert nested["object_detection_pattern"] == "(person|car)"
+
+    def test_plain_monitor_override_kept_and_globals_untouched(self, tmp_path):
+        cp = make_cp(SAMPLE_INI + "\n[monitor-2]\nwait=5\n", tmp_path)
+        output, _, _ = build_yaml(cp)
+        assert output["monitors"][2] == {"wait": 5}
+        nested = output["ml"]["ml_sequence"]["object"]["general"]
+        assert nested["object_detection_pattern"] == "(person|car)"
+
+    def test_monitor_variable_override_stays_per_monitor(self, tmp_path):
+        # Legacy zm_detect applied [monitor-N] overrides before expanding
+        # {{vars}} in ml_sequence, so the override was per monitor. It must
+        # not leak into the global ml_sequence, and monitor 3 must keep it.
+        cp = make_cp(
+            "[object]\n"
+            "object_detection_pattern=(person)\n"
+            "[ml]\n"
+            "ml_sequence={'object': {'general': {'pattern': '{{object_detection_pattern}}'}}}\n"
+            "[monitor-3]\n"
+            "object_detection_pattern=(car)\n"
+            "[monitor-4]\n"
+            "wait=5\n",
+            tmp_path,
+        )
+        output, _, _ = build_yaml(cp)
+        assert output["ml"]["ml_sequence"] == {"object": {"general": {"pattern": "(person)"}}}
+        assert output["monitors"][3] == {
+            "ml_sequence": {"object": {"general": {"pattern": "(car)"}}}}
+        assert output["monitors"][4] == {"wait": 5}
+
+
+class TestMigrateMonitorZonePatternQuotes:
+    def test_zone_pattern_quotes_stripped(self, tmp_path):
+        # Every other value has ConfigParser's literal quotes stripped.
+        cp = make_cp('[monitor-1]\nyard_zone_detection_pattern="(car)"\n', tmp_path)
+        assert migrate_monitor(cp, "monitor-1") == {
+            "zones": {"yard": {"detection_pattern": "(car)"}}}

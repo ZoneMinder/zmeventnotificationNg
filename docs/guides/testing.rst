@@ -232,17 +232,27 @@ Tools test reference
      - What it covers
    * - ``tools/tests/test_config_migrate.py``
      - ``config_migrate_yaml`` INI→YAML: variable-chain expansion, monitor/zone
-       parsing, polygon detection, type coercion
+       parsing, per-monitor variable overrides, polygon detection, type coercion
    * - ``tools/tests/test_config_upgrade.py``
-     - ``config_upgrade_yaml`` managed defaults / removed keys
+     - ``config_upgrade_yaml`` managed defaults / removed keys, backup before
+       rewrite, scalar text kept for Perl and PyYAML readers, example monitors
+       not merged
    * - ``tools/tests/test_deep_merge.py``
-     - ``deep_merge`` user-value-wins, nested add, dict/scalar mismatch
+     - ``deep_merge`` user-value-wins, nested add, dict/scalar mismatch,
+       ``monitors`` skipped
    * - ``tools/tests/test_es_config_migrate.py``
      - ``es_config_migrate_yaml`` template + secrets migration
    * - ``tools/tests/test_config_edit.py``
      - ``config_edit`` parse/apply, comment-out, ``_global_`` cross-section
    * - ``tools/tests/test_install_doctor.py``
      - ``install_doctor`` model discovery, OpenCV-version + model classification
+   * - ``tools/tests/test_install_sh.py``
+     - ``install.sh`` functions (sourced in a sandboxed repo copy, no system
+       paths): flag parsing, venv handling, config install/upgrade, path
+       rewrites, hook install layout, dependency checks
+   * - ``tools/tests/test_make_release.py``
+     - ``scripts/make_release.sh`` preflight (throwaway repo, local bare
+       origin, stub ``gh``/``git-cliff``/``curl``): aborts before any push
 
 
 e2e test reference

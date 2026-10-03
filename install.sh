@@ -133,9 +133,15 @@ ensure_venv() {
     if [[ -d "${ZM_VENV}" && -x "${ZM_VENV}/bin/python" && -x "${ZM_VENV}/bin/pip" ]]; then
         print_success "Venv already exists at ${ZM_VENV}"
     else
-        if [[ -d "${ZM_VENV}" ]]; then
+        # Only delete what is clearly a venv; never rm -rf an arbitrary
+        # populated directory (e.g. a mistyped --venv-path).
+        if [[ -f "${ZM_VENV}/pyvenv.cfg" ]]; then
             print_warning "Existing venv at ${ZM_VENV} has no pip — recreating"
             rm -rf "${ZM_VENV}"
+        elif [[ -d "${ZM_VENV}" && -n "$(ls -A "${ZM_VENV}")" ]]; then
+            print_error "${ZM_VENV} exists, is not empty and is not a Python venv (no pyvenv.cfg)."
+            print_error "Refusing to delete it. Remove it yourself or pick another --venv-path."
+            exit 1
         fi
         create_venv
     fi
@@ -553,6 +559,7 @@ install_hook() {
 
     print_section 'Installing Hooks'
     mkdir -p "${TARGET_DATA}/bin" 2>/dev/null
+    mkdir -p "${TARGET_BIN_HOOK}" 2>/dev/null
     rm -fr  "${TARGET_DATA}/bin/*" 2>/dev/null
 
     #don't delete contrib so custom user files remain
@@ -630,6 +637,16 @@ install_hook() {
 }
 
 
+# Point /etc/zm/ paths in ${TARGET_CONFIG}/<file> at TARGET_CONFIG.
+# Idempotent: paths already under TARGET_CONFIG (which may itself be under
+# /etc/zm/) are matched first and left as they are.
+rewrite_etc_zm_paths() {
+    local file="${TARGET_CONFIG}/$1"
+    [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${file}" ] || return 0
+    T="${TARGET_CONFIG}" perl -pi -e 's{\Q$ENV{T}\E/|/etc/zm/}{$ENV{T}/}g' "${file}"
+    print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in $1"
+}
+
 # move ES config files
 install_es_config() {
     # Ensure pyyaml is installed for config migration/upgrade scripts
@@ -650,6 +667,8 @@ install_es_config() {
         echo "Found existing secrets.ini but no secrets.yml - running migration..."
         if ${PYTHON} tools/es_config_migrate_yaml.py --secrets -c "${TARGET_CONFIG}/secrets.ini" -o "${TARGET_CONFIG}/secrets.yml"; then
             print_success "secrets migration complete"
+            chown "${WEB_OWNER}:${WEB_GROUP}" "${TARGET_CONFIG}/secrets.yml"
+            chmod 640 "${TARGET_CONFIG}/secrets.yml"
             mv "${TARGET_CONFIG}/secrets.ini" "${TARGET_CONFIG}/secrets.ini.migrated"
             print_important "Renamed old secrets.ini to secrets.ini.migrated"
         else
@@ -668,7 +687,7 @@ install_es_config() {
     fi
     if [ ! -f "${TARGET_CONFIG}/secrets.yml" ]; then
         echo 'No existing secrets found, installing example as active config'
-        install -o "${WEB_OWNER}" -g "${WEB_GROUP}" -m 644 secrets.example.yml "${TARGET_CONFIG}/secrets.yml" &&
+        install -o "${WEB_OWNER}" -g "${WEB_GROUP}" -m 640 secrets.example.yml "${TARGET_CONFIG}/secrets.yml" &&
             print_success "secrets copied" || print_error "could not copy secrets"
     else
         echo "Upgrading existing secrets with any new keys..."
@@ -685,10 +704,7 @@ install_es_config() {
     fi
 
     # Fix hardcoded /etc/zm paths in ES config when TARGET_CONFIG differs
-    if [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${TARGET_CONFIG}/zmeventnotification.yml" ]; then
-        sed -i "s|/etc/zm/|${TARGET_CONFIG}/|g" "${TARGET_CONFIG}/zmeventnotification.yml"
-        print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in zmeventnotification.yml"
-    fi
+    rewrite_etc_zm_paths zmeventnotification.yml
 
     # Migrate es_rules.json to YAML if needed
     if [ -f "${TARGET_CONFIG}/es_rules.json" ] && [ ! -f "${TARGET_CONFIG}/es_rules.yml" ]; then
@@ -760,10 +776,7 @@ install_hook_config() {
     fi
 
     # Fix hardcoded /etc/zm paths in hook config when TARGET_CONFIG differs
-    if [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${TARGET_CONFIG}/objectconfig.yml" ]; then
-        sed -i "s|/etc/zm/|${TARGET_CONFIG}/|g" "${TARGET_CONFIG}/objectconfig.yml"
-        print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in objectconfig.yml"
-    fi
+    rewrite_etc_zm_paths objectconfig.yml
 
     print_warning " Remember to fill in the right values in the config files, or your system won't work!"
     echo
@@ -842,6 +855,7 @@ display_help() {
         --hook-config-upgrade: Upgrades legacy objectconfig.ini and migrates to objectconfig.yml
         You will need to manually review the migrated config
         --no-hook-config-upgrade: skips above process
+        (default: upgrade, except when hook config install is skipped by flag)
 
         --install-birdnet: Install birdnet-analyzer for audio bird species detection
         --no-install-birdnet: Skip BirdNET installation (default)
@@ -898,6 +912,7 @@ check_args() {
     PY_SUDO='sudo -H'
     DOWNLOAD_MODELS='yes'
     HOOK_CONFIG_UPGRADE='yes'
+    HOOK_CONFIG_UPGRADE_EXPLICIT='no'
 
     local i=0
     while [[ $i -lt ${#cmd_args[@]} ]]; do
@@ -930,9 +945,11 @@ check_args() {
             ;;
         --no-hook-config-upgrade)
             HOOK_CONFIG_UPGRADE='no'
+            HOOK_CONFIG_UPGRADE_EXPLICIT='yes'
             ;;
         --hook-config-upgrade)
             HOOK_CONFIG_UPGRADE='yes'
+            HOOK_CONFIG_UPGRADE_EXPLICIT='yes'
             ;;
         --install-config)
             INSTALL_HOOK_CONFIG='yes'
@@ -991,6 +1008,12 @@ check_args() {
         [[ ${INSTALL_HOOK} == 'no' ]] && INSTALL_HOOK_CONFIG='no'
         [[ ${INSTALL_HOOK} == 'prompt' && ${INSTALL_HOOK_CONFIG} == 'yes' ]] && INSTALL_HOOK_CONFIG='prompt'
     fi
+
+    # Skipping the hook config also skips migrating/renaming objectconfig.ini,
+    # unless the upgrade was asked for explicitly
+    if [[ ${HOOK_CONFIG_UPGRADE_EXPLICIT} == 'no' && ${INSTALL_HOOK_CONFIG} == 'no' ]]; then
+        HOOK_CONFIG_UPGRADE='no'
+    fi
 }
 
 check_deps() {
@@ -1019,7 +1042,8 @@ check_deps() {
         fi
     fi
 
-    if [[ ${INSTALL_HOOK} != 'no' ]]; then
+    # With a venv, ensure_venv bootstraps pip into it; a global pip is not used
+    if [[ ${INSTALL_HOOK} != 'no' && ${USE_VENV} != 'yes' ]]; then
         if ! command -v ${PIP} >/dev/null 2>&1; then
             print_error "${PIP} is not installed."
             echo "       Install it with: sudo ${INSTALLER} install python3-pip"
@@ -1036,6 +1060,10 @@ check_deps() {
 ###################################################
 # script main
 ###################################################
+
+# When sourced (tools/tests/test_install_sh.py), only define the functions.
+(return 0 2>/dev/null) && return 0
+
 cmd_args=("$@") # because we need a function to access them
 check_args
 DISTRO=$(get_distro)

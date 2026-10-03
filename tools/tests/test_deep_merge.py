@@ -79,3 +79,16 @@ class TestDeepMerge:
         added = deep_merge({}, user)
         assert added == []
         assert user == {"a": 1}
+
+    def test_monitors_example_data_not_merged(self):
+        # `monitors` maps monitor ids to user data; example entries are
+        # samples, not schema, at any depth and in new sections too.
+        base = {
+            "monitors": {999: {"wait": 5}},
+            "notifications": {"monitors": {998: {"rules": []}}},
+            "newsec": {"k": 1, "monitors": {1: {}}},
+        }
+        user = {"notifications": {}}
+        added = deep_merge(base, user)
+        assert sorted(added) == ["newsec"]
+        assert user == {"notifications": {}, "newsec": {"k": 1}}
