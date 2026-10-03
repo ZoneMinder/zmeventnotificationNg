@@ -172,6 +172,22 @@ def test_install_es_config_rewrites_etc_zm_paths(sandbox):
     assert "secrets: {}/secrets.yml".format(target) in text
 
 
+def test_path_rewrite_idempotent_when_target_under_etc_zm(sandbox):
+    # TARGET_CONFIG=/etc/zm/es: a second run used to give /etc/zm/es/es/...
+    target = str(sandbox["tmp"] / "etc" / "zm" / "es")
+    os.makedirs(target)
+    write_es_configs(sandbox, target)
+    with open(os.path.join(target, "objectconfig.yml"), "w") as f:
+        f.write("general:\n  secrets: /etc/zm/secrets.yml\n")
+    script = "PY_SUDO=''; install_es_config; install_hook_config\n"
+    for _ in range(2):
+        r = run(sandbox, script, TARGET_CONFIG=target, DOWNLOAD_MODELS="no")
+        assert r.returncode == 0, r.stdout + r.stderr
+    for name in ("zmeventnotification.yml", "objectconfig.yml"):
+        text = open(os.path.join(target, name)).read()
+        assert "secrets: {}/secrets.yml\n".format(target) in text, name
+
+
 def test_install_es_config_installs_example_secrets(sandbox):
     target = sandbox["env"]["TARGET_CONFIG"]
     write_es_configs(sandbox, target)

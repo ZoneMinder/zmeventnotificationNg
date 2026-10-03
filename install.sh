@@ -630,6 +630,16 @@ install_hook() {
 }
 
 
+# Point /etc/zm/ paths in ${TARGET_CONFIG}/<file> at TARGET_CONFIG.
+# Idempotent: paths already under TARGET_CONFIG (which may itself be under
+# /etc/zm/) are matched first and left as they are.
+rewrite_etc_zm_paths() {
+    local file="${TARGET_CONFIG}/$1"
+    [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${file}" ] || return 0
+    T="${TARGET_CONFIG}" perl -pi -e 's{\Q$ENV{T}\E/|/etc/zm/}{$ENV{T}/}g' "${file}"
+    print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in $1"
+}
+
 # move ES config files
 install_es_config() {
     # Ensure pyyaml is installed for config migration/upgrade scripts
@@ -685,10 +695,7 @@ install_es_config() {
     fi
 
     # Fix hardcoded /etc/zm paths in ES config when TARGET_CONFIG differs
-    if [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${TARGET_CONFIG}/zmeventnotification.yml" ]; then
-        sed -i "s|/etc/zm/|${TARGET_CONFIG}/|g" "${TARGET_CONFIG}/zmeventnotification.yml"
-        print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in zmeventnotification.yml"
-    fi
+    rewrite_etc_zm_paths zmeventnotification.yml
 
     # Migrate es_rules.json to YAML if needed
     if [ -f "${TARGET_CONFIG}/es_rules.json" ] && [ ! -f "${TARGET_CONFIG}/es_rules.yml" ]; then
@@ -760,10 +767,7 @@ install_hook_config() {
     fi
 
     # Fix hardcoded /etc/zm paths in hook config when TARGET_CONFIG differs
-    if [ "${TARGET_CONFIG}" != "/etc/zm" ] && [ -f "${TARGET_CONFIG}/objectconfig.yml" ]; then
-        sed -i "s|/etc/zm/|${TARGET_CONFIG}/|g" "${TARGET_CONFIG}/objectconfig.yml"
-        print_success "Updated /etc/zm paths to ${TARGET_CONFIG} in objectconfig.yml"
-    fi
+    rewrite_etc_zm_paths objectconfig.yml
 
     print_warning " Remember to fill in the right values in the config files, or your system won't work!"
     echo
