@@ -185,6 +185,22 @@ subtest 'checkNewEvents: trigger_cause does not stick to later events' => sub {
     or diag( 'got cause: ' . $b[0]{Alarm}{Start}{Cause} );
 };
 
+subtest 'checkNewEvents: read_alarm_cause off with no trigger cause warns nothing' => sub {
+  # every tick checks every monitor; an undef alarm cause must not emit
+  # 'uninitialized' warnings each time
+  _t_reset_events();
+  local $notify_config{read_alarm_cause} = 0;
+  my @warn;
+  local $SIG{__WARN__} = sub { push @warn, @_ };
+  alarm_on( 1, 700, trigger_cause => '' );
+  $shm{1}{state} = 0;
+  checkNewEvents();
+  alarm_on( 1, 701, trigger_cause => 'Forced Web' );
+  $shm{1}{state} = 0;
+  checkNewEvents();
+  is_deeply( [ grep {/uninitialized/} @warn ], [], 'no uninitialized warnings on idle ticks' );
+};
+
 # ===== initSocketServer =====
 %main::monitors = ();
 

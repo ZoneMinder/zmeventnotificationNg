@@ -430,7 +430,7 @@ sub checkNewEvents() {
       if ($notify_config{read_alarm_cause});
     $alarm_cause = $trigger_cause
       if ( defined($trigger_cause)
-      && $alarm_cause eq ''
+      && ( $alarm_cause // '' ) eq ''
       && $trigger_cause ne '' );
 
     # Alert only happens after alarm. The state before alarm
