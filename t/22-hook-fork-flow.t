@@ -270,6 +270,24 @@ subtest 'user script receives the detection JSON as one intact argument' => sub 
     is(scalar(@$u), 8, 'argument count unchanged');
 };
 
+subtest 'escontrol default and force-notify: start and end sent' => sub {
+    set_hooks();
+    $escontrol_config{enabled} = 1;
+    for my $st (ESCONTROL_DEFAULT_NOTIFY, ESCONTROL_FORCE_NOTIFY) {
+        $esc_status = $st;
+        run_event();
+        is_deeply([ map { $_->[0] } @sent ], [ 'event_start', 'event_end' ], "status $st: start and end sent");
+    }
+};
+
+subtest 'escontrol force-mute: neither start nor end notification sent' => sub {
+    set_hooks();
+    $escontrol_config{enabled} = 1;
+    $esc_status = ESCONTROL_FORCE_MUTE;
+    run_event();
+    is_deeply(\@sent, [], 'muted monitor sends nothing');
+};
+
 subtest 'invalid detection JSON from a hook does not kill the fork' => sub {
     set_hooks();
     local $ENV{ZMT_OUT_start} = 'detected:person--SPLIT--{not json';

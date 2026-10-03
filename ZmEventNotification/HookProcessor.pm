@@ -629,7 +629,12 @@ sub processNewAlarmsInFork {
         _run_api_push($temp_alarm_obj, $eid, $mid, 'event_end', $hookResult);
 
         main::Debug(1, 'Matching alarm to connection rules...');
-        foreach (@main::active_connections) {
+        # Same mute as the start path (shouldSendEventToConn)
+        my $muted = $escontrol_config{enabled}
+          && getNotificationStatusEsControl($mid) == ESCONTROL_FORCE_MUTE;
+        main::Debug(1, "ESCONTROL: Notifications are muted for Monitor:$mname($mid), not sending end notification")
+          if $muted;
+        foreach ( $muted ? () : @main::active_connections ) {
           if ( isInList( $_->{monlist}, $temp_alarm_obj->{MonitorId} ) ) {
             sendEvent( $temp_alarm_obj, $_, 'event_end', $hookResult );
           } else {
