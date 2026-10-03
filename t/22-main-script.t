@@ -27,6 +27,9 @@ sub main::STATE_ALERT () { 3 }
 sub main::zmMemInvalidate { }
 sub main::saveTokenInvocations { $token_saves++ }
 sub main::getNotesFromEventDB { '' }
+our %event_ended;    # eid -> 1 ended / 0 open; missing = unknown (undef)
+our $ended_calls = 0;
+sub main::isEventEnded { $ended_calls++; $event_ended{ $_[0] } }
 sub main::zmMemRead {
   my ($monitor, $fields) = @_;
   my $s = $shm{ $monitor->{Id} };
@@ -154,6 +157,44 @@ subtest 'checkNewEvents: same event reported once, older event discarded' => sub
   is( scalar( my @c = checkNewEvents() ), 0, 'older event id discarded' );
   alarm_on( 1, 201, alarm_cause => 'x' );
   is( scalar( my @d = checkNewEvents() ), 1, 'newer event reported' );
+};
+
+subtest 'checkNewEvents: first alarm after start skips a stale, already ended event id' => sub {
+  # At the start of an alarm SHM can still point at the previous event.
+  # With no event processed yet for the monitor (ES just started), that
+  # finished event used to be reported as new.
+  _t_reset_events();
+  local $notify_config{read_alarm_cause} = 1;
+  local %event_ended = ( 800 => 1, 801 => 0 );
+  alarm_on( 1, 800, alarm_cause => 'x' );
+  is( scalar( my @a = checkNewEvents() ), 0, 'ended event 800 not reported' );
+  alarm_on( 1, 801, alarm_cause => 'x' );
+  my @b = checkNewEvents();
+  is( scalar @b, 1, 'the real new event is reported' );
+  is( $b[0]{Alarm}{EventId}, 801, 'with its own id' );
+};
+
+subtest 'checkNewEvents: open or unknown event on first sight is reported as before' => sub {
+  _t_reset_events();
+  local $notify_config{read_alarm_cause} = 1;
+  local %event_ended = ( 810 => 0 );
+  alarm_on( 1, 810, alarm_cause => 'x' );
+  is( scalar( my @a = checkNewEvents() ), 1, 'open event (e.g. continuous recording) reported' );
+  _t_reset_events();
+  alarm_on( 1, 820, alarm_cause => 'x' );    # not in %event_ended: DB lookup failed
+  is( scalar( my @b = checkNewEvents() ), 1, 'unknown end state reported' );
+};
+
+subtest 'checkNewEvents: ended check only runs before any event was processed' => sub {
+  _t_reset_events();
+  local $notify_config{read_alarm_cause} = 1;
+  local %event_ended = ( 830 => 0, 831 => 1 );
+  alarm_on( 1, 830, alarm_cause => 'x' );
+  checkNewEvents();
+  $ended_calls = 0;
+  alarm_on( 1, 831, alarm_cause => 'x' );
+  is( scalar( my @a = checkNewEvents() ), 1, 'later events are reported without a DB check' );
+  is( $ended_calls, 0, 'no DB lookup once an event was processed' );
 };
 
 subtest 'checkNewEvents: idle monitor reports nothing' => sub {

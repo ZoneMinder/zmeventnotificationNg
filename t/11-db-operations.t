@@ -140,4 +140,42 @@ sub reset_spies {
     is($uid, 0, 'no secrets -> uid=0');
 }
 
+# ===== isEventEnded =====
+{
+    package MockSth;
+    sub new      { my ($c, %o) = @_; bless {%o}, $c }
+    sub execute  { my $s = shift; $s->{dbh}{args} = [@_]; !$s->{fail_exec} }
+    sub fetchrow_hashref { $_[0]{row} }
+    sub finish   { }
+    package MockDbh;
+    sub new      { my ($c, %o) = @_; bless {%o}, $c }
+    sub prepare_cached {
+        my ($s, $sql) = @_;
+        $s->{sql} = $sql;
+        die "boom\n" if $s->{die};
+        return if $s->{fail_prepare};
+        MockSth->new(dbh => $s, row => $s->{row}, fail_exec => $s->{fail_exec});
+    }
+}
+{
+    local $main::dbh = MockDbh->new(row => { EndDateTime => '2026-10-03 12:05:20' });
+    is(isEventEnded(42), 1, 'EndDateTime set: ended');
+    like($main::dbh->{sql}, qr/SELECT\s+`EndDateTime`\s+FROM\s+`Events`\s+WHERE\s+`Id`=\?/, 'queries the event end time');
+    is_deeply($main::dbh->{args}, [42], 'by event id');
+}
+{
+    local $main::dbh = MockDbh->new(row => { EndDateTime => undef });
+    is(isEventEnded(43), 0, 'EndDateTime NULL: still open');
+}
+for my $case (
+    [ 'no such event',    row => undef ],
+    [ 'prepare fails',    fail_prepare => 1 ],
+    [ 'execute fails',    fail_exec => 1, row => { EndDateTime => 'x' } ],
+    [ 'query dies (e.g. older ZM without EndDateTime)', die => 1 ],
+) {
+    my ($name, %o) = @$case;
+    local $main::dbh = MockDbh->new(%o);
+    is(isEventEnded(44), undef, "unknown: $name");
+}
+
 done_testing();

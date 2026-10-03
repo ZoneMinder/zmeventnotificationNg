@@ -7,7 +7,7 @@ use version;
 use POSIX qw(strftime);
 use ZoneMinder;
 
-our @EXPORT_OK = qw(getAllMonitorIds updateEventinZmDB getNotesFromEventDB getZmUserId tagEventObjects);
+our @EXPORT_OK = qw(getAllMonitorIds updateEventinZmDB getNotesFromEventDB isEventEnded getZmUserId tagEventObjects);
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
 our $cached_zm_user_id;
@@ -40,6 +40,22 @@ sub getNotesFromEventDB {
   $sth->finish();
 
   return $notes ? $notes->{Notes} : undef;
+}
+
+# 1 if the event has ended (EndDateTime set), 0 if it is still open, undef if
+# unknown (no such event, or the query failed, e.g. on an older schema).
+sub isEventEnded {
+  my $eid = shift;
+  my $row = eval {
+    my $sth = $main::dbh->prepare_cached('SELECT `EndDateTime` FROM `Events` WHERE `Id`=?')
+      or return;
+    $sth->execute($eid) or return;
+    my $r = $sth->fetchrow_hashref();
+    $sth->finish();
+    $r;
+  };
+  return undef if !$row;
+  return defined( $row->{EndDateTime} ) ? 1 : 0;
 }
 
 sub getZmUserId {

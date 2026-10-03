@@ -440,6 +440,14 @@ sub checkNewEvents() {
       # Ensure the monitor hash exists to avoid autovivification issues
       $active_events{$mid} //= {};
       if (!$active_events{$mid}->{$current_event}) {
+        # Right after start no event has been processed for this monitor. At
+        # the start of an alarm SHM can still point at the previous, finished
+        # event; don't report that one as new.
+        if ( !$active_events{$mid}->{last_event_processed} && isEventEnded($current_event) ) {
+          Debug(2, "Skipping event id: $current_event of Monitor:$mid, it has already ended");
+          $active_events{$mid}->{last_event_processed} = $current_event;
+          next;
+        }
         if ($active_events{$mid}->{last_event_processed} and
           ($active_events{$mid}->{last_event_processed} >= $current_event)
         ) {
