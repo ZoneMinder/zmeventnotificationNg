@@ -41,7 +41,7 @@ If you have problems with hooks, there are three areas of failure:
 
 - Next, look at ``/var/log/zm/zmeventnotification.log`` for the event that invoked a hook. For example::
 
-   01/06/2021 07:20:31.936130 zmeventnotification[28118].DBG [main:977] [|----> FORK:DeckCamera (6), eid:182253 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' 182253 6 "DeckCamera" " stairs" "/var/cache/zoneminder/events/6/2021-01-06/182253"]
+   01/06/2021 07:20:31.936130 zmeventnotification[28118].DBG [main:977] [|----> FORK:DeckCamera (6), eid:182253 Invoking hook on event start:'/var/lib/zmeventnotification/bin/zm_event_start.sh' "182253" "6" "DeckCamera" " stairs" "/var/cache/zoneminder/events/6/2021-01-06/182253"]
 
 - Then run ``zm_detect.py`` manually with debug flags (``--config`` defaults to ``/etc/zm/objectconfig.yml``)::
 

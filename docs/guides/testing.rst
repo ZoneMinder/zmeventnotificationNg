@@ -156,9 +156,9 @@ Perl test reference
        ``_tag_detected_objects`` (both JSON shapes), ``_run_api_push`` gating
    * - ``t/22-main-script.t``
      - Subs extracted from ``zmeventnotification.pl``: ``checkNewEvents``
-       (alarm/trigger cause, no stale cause across events), ``initSocketServer``
-       (listener setup incl. ``network.address`` without SSL, fatal SSL bind
-       failure, connect/message/disconnect handlers, handler exceptions
+       (alarm/trigger cause, no stale cause across events, token counters
+       saved on monitor reload), ``initSocketServer`` (plain and SSL listener
+       setup, fatal SSL bind failure, connect/message/disconnect handlers, handler exceptions
        contained), ``restartES`` (keeps command-line arguments)
    * - ``t/23-process-jobs.t``
      - ``processJobs`` (the parent's job-pipe consumer in

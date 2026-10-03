@@ -115,7 +115,7 @@ STEP 2: stop the current ES
 STEP 3: Make a backup of your config files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before you execute the next step you may want to create a backup of your existing ``zmeventnotification.yml``, ``objectconfig.yml``, and ``secrets.yml`` config files. The install script will attempt to upgrade existing configs by merging new keys, and old configs are backed up with numbered suffixes, but it is always good to make your own backup first.
+Before you execute the next step you may want to create a backup of your existing ``zmeventnotification.yml``, ``objectconfig.yml``, and ``secrets.yml`` config files. The install script will attempt to upgrade existing configs by merging new keys. When it rewrites a config it first saves a copy as ``<file>.<YYYYmmdd-HHMMSS>.bak`` (comments are only kept in that copy), but it is always good to make your own backup first.
 
 
 STEP 4: Execute the install script
@@ -129,7 +129,7 @@ If your ZM install is elsewhere, like ``/usr/local/bin`` please modify the ``TAR
   sudo -H ./install.sh
 
 
-Follow prompts. Note that just copying the ES perl file to ``/usr/bin`` is not sufficient. You also have to install the updated machine learning hook files if you are using them. That is why ``install.sh`` is better. If you are updating, make sure not to overwrite your config files (but please read breaking changes to see if any config files have changed). Note that the install script makes a backup of your old config files using ``~n`` suffixes where ``n`` is the backup number. However, never hurts to make your own backup first. 
+Follow prompts. Note that just copying the ES perl file to ``/usr/bin`` is not sufficient. You also have to install the updated machine learning hook files if you are using them. That is why ``install.sh`` is better. If you are updating, make sure not to overwrite your config files (but please read breaking changes to see if any config files have changed). Note that when the install script rewrites a config to add new keys, it saves the old file as ``<file>.<YYYYmmdd-HHMMSS>.bak``. However, never hurts to make your own backup first. 
 
 
 Note that you can also automate updates like so:
