@@ -84,7 +84,7 @@ sub pl_sub {
 
 my $code = join "\n",
   'package main; use strict; use warnings;',
-  'use Time::HiRes qw/gettimeofday/; use POSIX qw(ceil); use IO::Socket::IP;',
+  'use Time::HiRes qw/gettimeofday/; use POSIX qw(ceil);',
   'our ($es_terminate, %monitors, @active_connections, $wss, $dbh, @original_argv);',
   'my ($child_forks, $parallel_hooks, $total_forks) = (0, 0, 0);',
   'my ($mqtt_last_tick_time, $es_start_time) = (time(), time());',
@@ -211,37 +211,6 @@ subtest 'initSocketServer: SSL passes a configured IO::Socket::SSL listener' => 
   is( $ssl_args{SSL_cert_file}, '/c.pem', 'cert' );
   is( $ssl_args{SSL_key_file}, '/k.pem', 'key' );
   is( $FakeWSS::last_opts{listen}, $sock, 'listen is the SSL socket' );
-};
-
-subtest 'initSocketServer: plain WS honors a configured address' => sub {
-  local $ssl_config{enabled} = 0;
-  local $server_config{port} = 0;    # ephemeral
-  local $server_config{address} = '127.0.0.1';
-  initSocketServer();
-  my $l = $FakeWSS::last_opts{listen};
-  ok( ref $l, 'listen is a socket' );
-  is( ref $l && $l->sockhost, '127.0.0.1', 'bound to the configured address' );
-  close $l if ref $l;
-};
-
-subtest 'initSocketServer: plain WS with empty address listens on port only' => sub {
-  local $ssl_config{enabled} = 0;
-  local $server_config{port} = 9128;
-  local $server_config{address} = '';
-  initSocketServer();
-  is( $FakeWSS::last_opts{listen}, 9128, 'listen is the bare port' );
-};
-
-subtest 'initSocketServer: plain WS bind failure on configured address is fatal' => sub {
-  local $ssl_config{enabled} = 0;
-  local $server_config{port} = 9129;
-  local $server_config{address} = '192.0.2.1';    # TEST-NET, not local
-  %FakeWSS::last_opts = ();
-  @logged_errors = ();
-  my $err = run_catching { initSocketServer() };
-  is( $err, "EXIT:-1\n", 'exits with -1' );
-  ok( !%FakeWSS::last_opts, 'websocket server not started' );
-  like( join( '', @logged_errors ), qr/192\.0\.2\.1/, 'error names the address' );
 };
 
 subtest 'initSocketServer: SSL listener failure is fatal, no plaintext fallback' => sub {

@@ -157,9 +157,7 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - WebSocket listening port
    * - ``address``
      - ``[::]``
-     - Bind address (use ``0.0.0.0`` for all IPv4 interfaces). Applies with
-       and without SSL. With SSL off and the default ``[::]``, the ES listens
-       on all IPv4 interfaces
+     - Bind address (use ``0.0.0.0`` for all IPv4 interfaces)
 
 ``auth`` — authentication
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
