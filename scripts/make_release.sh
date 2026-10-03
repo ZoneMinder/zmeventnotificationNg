@@ -46,7 +46,9 @@ fi
 
 # --- Keep pyzm dependency pin in sync with latest PyPI release ---
 if command -v curl &>/dev/null && command -v python3 &>/dev/null; then
-    CURRENT_PYZM=$(grep -oP "pyzm>=\K[0-9][0-9.]*" "$SETUP_PY" || true)
+    # the pin may carry extras, e.g. 'pyzm[ml]>=2.5.0'
+    PYZM_SPEC=$(grep -oP "pyzm(\[[^]]*\])?>=" "$SETUP_PY" | head -1 || true)
+    CURRENT_PYZM=$(grep -oP "pyzm(\[[^]]*\])?>=\K[0-9][0-9.]*" "$SETUP_PY" | head -1 || true)
     LATEST_PYZM=$(curl -fsSL https://pypi.org/pypi/pyzm/json 2>/dev/null \
         | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])" 2>/dev/null || true)
     if [ -z "$CURRENT_PYZM" ]; then
@@ -56,11 +58,11 @@ if command -v curl &>/dev/null && command -v python3 &>/dev/null; then
         echo "WARNING: could not fetch latest pyzm version from PyPI; skipping pyzm sync."
         echo
     elif [ "$CURRENT_PYZM" != "$LATEST_PYZM" ]; then
-        echo "pyzm pin in $SETUP_PY is 'pyzm>=${CURRENT_PYZM}', latest on PyPI is ${LATEST_PYZM}."
-        read -p "Bump pin to 'pyzm>=${LATEST_PYZM}'? [y/N] " bump_pyzm
+        echo "pyzm pin in $SETUP_PY is '${PYZM_SPEC}${CURRENT_PYZM}', latest on PyPI is ${LATEST_PYZM}."
+        read -p "Bump pin to '${PYZM_SPEC}${LATEST_PYZM}'? [y/N] " bump_pyzm
         if [[ "$bump_pyzm" =~ ^[Yy]$ ]]; then
-            sed -i "s/pyzm>=${CURRENT_PYZM}/pyzm>=${LATEST_PYZM}/" "$SETUP_PY"
-            echo "  Updated $SETUP_PY: pyzm>=${LATEST_PYZM}"
+            sed -i -E "s/(pyzm(\[[^]]*\])?>=)${CURRENT_PYZM//./\\.}/\1${LATEST_PYZM}/" "$SETUP_PY"
+            echo "  Updated $SETUP_PY: ${PYZM_SPEC}${LATEST_PYZM}"
         else
             echo "  Leaving pyzm pin unchanged."
         fi

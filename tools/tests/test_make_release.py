@@ -59,12 +59,13 @@ def release(tmp_path):
     git("commit", "-q", "-m", "init")
     git("remote", "add", "origin", str(tmp_path / "origin.git"))
 
-    def run():
+    def run(answers=None):
+        kw = {"input": answers} if answers is not None else {"stdin": subprocess.DEVNULL}
         return subprocess.run(["bash", "scripts/make_release.sh"], cwd=work, env=env,
-                              capture_output=True, text=True,
-                              stdin=subprocess.DEVNULL, timeout=60)
+                              capture_output=True, text=True, timeout=60, **kw)
 
-    return {"stubs": stubs, "git": git, "run": run, "origin": tmp_path / "origin.git"}
+    return {"stubs": stubs, "git": git, "run": run, "origin": tmp_path / "origin.git",
+            "work": work}
 
 
 def _origin_refs(release):
@@ -103,3 +104,47 @@ def test_non_master_branch_aborts_before_any_push(release):
     assert "must be run on master" in r.stdout
     assert SUMMARY not in r.stdout
     assert _origin_refs(release) == ""
+
+
+def _pyzm_on_pypi(release, version):
+    _stub(release["stubs"] / "curl",
+          'echo \'{"info": {"version": "%s"}}\'' % version)
+
+
+def _real_setup_pin(release, pin):
+    # same form as the real hook/setup.py: pyzm with the [ml] extra
+    (release["work"] / "hook" / "setup.py").write_text(
+        "install_requires=[\n    'numpy', 'requests', 'imutils',\n"
+        "    '%s', 'scikit-learn',\n]\n" % pin)
+    release["git"]("commit", "-q", "-am", "real pin")
+
+
+def test_pyzm_pin_with_extras_is_found(release):
+    _real_setup_pin(release, "pyzm[ml]>=2.5.0")
+    _pyzm_on_pypi(release, "2.5.4")
+    r = release["run"]()
+    assert "could not find a 'pyzm>=' pin" not in r.stdout
+    assert "is 'pyzm[ml]>=2.5.0', latest on PyPI is 2.5.4" in r.stdout
+
+
+def test_pyzm_pin_bump_keeps_extras(release):
+    _real_setup_pin(release, "pyzm[ml]>=2.5.0")
+    _pyzm_on_pypi(release, "2.5.4")
+    release["run"](answers="y\n")
+    setup = (release["work"] / "hook" / "setup.py").read_text()
+    assert "'pyzm[ml]>=2.5.4'" in setup
+    assert "2.5.0" not in setup
+
+
+def test_pyzm_pin_without_extras_still_bumps(release):
+    _pyzm_on_pypi(release, "2.5.4")
+    release["run"](answers="y\n")
+    assert "pyzm>=2.5.4" in (release["work"] / "hook" / "setup.py").read_text()
+
+
+def test_pyzm_pin_already_current_no_prompt(release):
+    _real_setup_pin(release, "pyzm[ml]>=2.5.4")
+    _pyzm_on_pypi(release, "2.5.4")
+    r = release["run"]()
+    assert "latest on PyPI" not in r.stdout
+    assert "could not find" not in r.stdout
