@@ -324,6 +324,22 @@ class TestBuildYamlEndToEnd:
         nested = output["ml"]["ml_sequence"]["object"]["general"]
         assert nested["object_detection_pattern"] == "(person|car)"
 
+    def test_shipped_legacy_objectconfig(self):
+        # legacy/objectconfig.ini: [monitor-999] sets my_model_sequence,
+        # object_detection_pattern and match_past_detections. Globals keep
+        # the global values; monitor 999 gets its own expanded ml_sequence.
+        legacy = os.path.join(os.path.dirname(__file__), '..', '..', 'legacy', 'objectconfig.ini')
+        out = build_yaml(parse_ini(legacy))[0]
+        seq = out['ml']['ml_sequence']
+        assert seq['general']['model_sequence'] == 'object,face,alpr'
+        assert seq['object']['general']['pattern'] == '(person|car|motorbike|bus|truck|boat)'
+        mon = out['monitors'][999]
+        assert mon['wait'] == 5
+        assert mon['ml_sequence']['general']['model_sequence'] == 'object,alpr'
+        assert mon['ml_sequence']['general']['match_past_detections'] == 'no'
+        assert mon['ml_sequence']['object']['general']['pattern'] == '(person)'
+        assert mon['zones']['my_driveway']['detection_pattern'] == '(person)'
+
     def test_monitor_variable_override_stays_per_monitor(self, tmp_path):
         # Legacy zm_detect applied [monitor-N] overrides before expanding
         # {{vars}} in ml_sequence, so the override was per monitor. It must

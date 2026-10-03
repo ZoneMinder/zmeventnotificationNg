@@ -296,6 +296,20 @@ class TestCheckSecretsWorldReadable:
         missing = {"general": {"secrets": str(tmp_path / "nope.yml")}}
         assert mod.check_secrets_world_readable(missing) is None
 
+    @pytest.mark.parametrize("mode,warned", [(0o644, True), (0o640, False)])
+    def test_main_reports_world_readable_secrets(self, tmp_path, monkeypatch, capsys, mode, warned):
+        sf = tmp_path / "secrets.yml"
+        sf.write_text("secrets: {}\n"); sf.chmod(mode)
+        es = tmp_path / "zmeventnotification.yml"
+        es.write_text("general:\n  secrets: {}\n".format(sf))
+        # keep main() to the config checks: python dependency probes vary by machine
+        for probe in ("check_cv2_import", "check_pyzm", "check_python_deps"):
+            monkeypatch.setattr(mod, probe, lambda: None)
+        monkeypatch.setattr(sys, "argv", ["install_doctor.py", "--es-config", str(es),
+                                          "--web-owner", os.environ.get("USER", "root")])
+        mod.main()
+        assert ("world-readable" in capsys.readouterr().out) is warned
+
 
 # ── cv2 import state ────────────────────────────────────────────────────
 
