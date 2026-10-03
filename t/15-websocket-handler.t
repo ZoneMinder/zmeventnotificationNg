@@ -189,6 +189,19 @@ subtest 'validateAuth - escontrol category' => sub {
     ok(!validateAuth('admin', 'wrongpass', 'escontrol'), 'Wrong escontrol password');
 };
 
+subtest 'validateAuth - escontrol with no password configured rejects everyone' => sub {
+    reset_state();
+    local $escontrol_config{enabled} = 1;
+    for my $configured (undef, '') {
+        local $escontrol_config{password} = $configured;
+        no warnings 'uninitialized';
+        ok(!validateAuth('admin', '', 'escontrol'), 'empty password rejected');
+        ok(!validateAuth('admin', undef, 'escontrol'), 'missing password rejected');
+    }
+    local $escontrol_config{password} = '0';
+    ok(validateAuth('admin', '0', 'escontrol'), "password '0' still works");
+};
+
 subtest 'validateAuth - escontrol disabled' => sub {
     reset_state();
     local $escontrol_config{enabled} = 0;

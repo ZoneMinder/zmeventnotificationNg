@@ -133,7 +133,8 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - File to persist ES control admin overrides
    * - ``escontrol_interface_password``
      - *none*
-     - Password for accepting control interface connections
+     - Password for accepting control interface connections. If unset or
+       empty, all control interface logins are rejected
    * - ``restart_interval``
      - ``7200``
      - Auto-restart ES after this many seconds (``0`` = disable)

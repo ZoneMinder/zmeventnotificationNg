@@ -234,7 +234,11 @@ sub validateAuth {
   } else {
     # admin category
     main::Debug(1, 'Detected escontrol interface auth');
-    return ( $p eq $escontrol_config{password} )
+    if ( $escontrol_config{enabled} && !length( $escontrol_config{password} // '' ) ) {
+      main::Error('escontrol login rejected: escontrol_interface_password is not set');
+      return 0;
+    }
+    return defined($p) && ( $p eq $escontrol_config{password} )
       && ($escontrol_config{enabled});
   }
 }
