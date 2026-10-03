@@ -155,3 +155,67 @@ class TestMainInPlace:
         self._run_main(monkeypatch, ["-c", user, "-e", example, "-o", out])
         assert open(user).read() == before          # input untouched
         assert "b" in open(out).read()               # output has merged key
+
+
+# ── main(): end-to-end behavior on realistic configs ────────────────────────
+
+def _run_upgrade(tmp_path, monkeypatch, user_text, example_text, extra=()):
+    import sys
+    user = tmp_path / "user.yml"
+    user.write_text(user_text)
+    example = tmp_path / "example.yml"
+    example.write_text(example_text)
+    monkeypatch.setattr(sys, "argv", ["config_upgrade_yaml.py", "-c", str(user),
+                                      "-e", str(example)] + list(extra))
+    mod.main()
+    return user
+
+
+class TestMainCharacterization:
+    """Pin what the upgrade already does right on real-shaped configs."""
+
+    def test_python_reader_sees_same_user_values(self, tmp_path, monkeypatch):
+        # The hook reads objectconfig.yml with PyYAML; existing values must
+        # load identically after an upgrade that adds a key.
+        import yaml
+        user_text = (
+            "general:\n"
+            "  port: 9000\n"
+            "  ratio: 0.6\n"
+            "  enable: yes\n"
+            "  name: 'quoted'\n"
+            "  empty:\n"
+            "  multi: |\n"
+            "    line1\n"
+            "    line2\n"
+            "  seq:\n"
+            "    - a\n"
+            "    - 2\n"
+        )
+        user = _run_upgrade(tmp_path, monkeypatch, user_text,
+                            "general:\n  port: 1\n  new_key: added\n")
+        after = yaml.safe_load(user.read_text())
+        before = yaml.safe_load(user_text)
+        assert after["general"].pop("new_key") == "added"
+        assert after == before
+
+    def test_new_schema_section_added_from_example(self, tmp_path, monkeypatch):
+        import yaml
+        user = _run_upgrade(tmp_path, monkeypatch, "general:\n  a: 1\n",
+                            "general:\n  a: 1\nmqtt:\n  enable: no\n  server: x\n")
+        assert yaml.safe_load(user.read_text())["mqtt"] == {"enable": False, "server": "x"}
+
+    def test_managed_default_replaced_end_to_end(self, tmp_path, monkeypatch):
+        import yaml
+        managed = tmp_path / "managed.yml"
+        managed.write_text("sec:\n  fcm.key:\n    - old\n")
+        user = _run_upgrade(tmp_path, monkeypatch, "fcm:\n  key: old\n",
+                            "fcm:\n  key: new\n",
+                            extra=["-m", str(managed), "-s", "sec"])
+        assert yaml.safe_load(user.read_text()) == {"fcm": {"key": "new"}}
+
+    def test_up_to_date_config_not_rewritten(self, tmp_path, monkeypatch):
+        text = "# my comment\na: 1\n"
+        user = _run_upgrade(tmp_path, monkeypatch, text, "a: 2\n")
+        assert user.read_text() == text
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["example.yml", "user.yml"]
