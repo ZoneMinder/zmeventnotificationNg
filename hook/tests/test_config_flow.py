@@ -325,6 +325,16 @@ class TestMonitorIdInjection:
         assert self._image_path_for(
             tmp_path, ctx, args={"output_path": "/tmp/out"}) == "/tmp/out"
 
+    def test_output_path_existing_dir_untouched(self, tmp_path, ctx):
+        out = tmp_path / "out"
+        out.mkdir()
+        (out / "keep.jpg").write_text("x")
+        assert self._image_path_for(
+            tmp_path, ctx, args={"output_path": str(out)}) == str(out)
+        assert g.config["write_debug_image"] == "yes"
+        assert os.listdir(str(out)) == ["keep.jpg"]
+        assert g.logger.error == []
+
 
 # ===========================================================================
 # 3. TestRemoteConfigInjection
