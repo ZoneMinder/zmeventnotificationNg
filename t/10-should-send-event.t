@@ -366,4 +366,26 @@ my $alarm = { MonitorId => '1', Name => 'Front' };
     is(shouldSendEventToConn($alarm, $ac), 1, 'store cannot be opened -> 1');
 }
 
+# ===== No interval for the monitor: a prior send does not block =====
+# All-monitor connections (monlist empty or -1) and blank intlist entries
+# have no interval, which counts as 0.
+for my $case (
+    [ '',      '',      'empty monlist' ],
+    [ '-1',    '',      'monlist=-1' ],
+    [ '2,1,3', '5,,3',  'blank intlist entry' ],
+) {
+    my ($monlist, $intlist, $label) = @$case;
+    my $ac = {
+        monlist => $monlist,
+        intlist => $intlist,
+        type    => FCM,
+        token   => "tok_noint_${label}_1234567890",
+        id      => 18,
+    };
+    _seed_last_sent($ac->{token}, '1', time() - 2);
+    is(shouldSendEventToConn($alarm, $ac), 1, "$label, sent 2s ago -> 1");
+    _seed_last_sent($ac->{token}, '1', time() + 100);
+    is(shouldSendEventToConn($alarm, $ac), 0, "$label, last send in the future -> 0");
+}
+
 done_testing();
