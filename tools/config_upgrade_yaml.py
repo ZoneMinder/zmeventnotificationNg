@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import copy
+import os
 import shutil
 import sys
 import time
@@ -231,6 +232,9 @@ def main():
         # The rewrite drops comments; keep the original next to it.
         backup = '{}.{}.bak'.format(args.config, time.strftime('%Y%m%d-%H%M%S'))
         shutil.copy2(args.config, backup)
+        # never more readable than the original; secrets.yml from older
+        # installs is 0644, the backup must not stay world-readable
+        os.chmod(backup, os.stat(args.config).st_mode & 0o770)
         print("Backup of original config: {}".format(backup))
     with open(out_path, 'w') as f:
         yaml.dump(user, f, Dumper=RawDumper, default_flow_style=False,

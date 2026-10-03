@@ -230,6 +230,15 @@ class TestMainBugs:
         assert len(backups) == 1
         assert backups[0].read_text() == text
 
+    def test_backup_is_not_world_readable(self, tmp_path, monkeypatch):
+        # secrets.yml from older installs is 0644; its backup must not be
+        user = tmp_path / "user.yml"
+        user.write_text("a: 1\n")
+        user.chmod(0o644)
+        _run_upgrade(tmp_path, monkeypatch, "a: 1\n", "a: 1\nb: 2\n")
+        (backup,) = tmp_path.glob("user.yml.*.bak")
+        assert backup.stat().st_mode & 0o777 == 0o640
+
     def test_scalars_keep_their_text_for_perl_and_python(self, tmp_path, monkeypatch):
         # The ES (Perl YAML::XS, untyped scalars) reads es_rules.yml and
         # zmeventnotification.yml. PyYAML's YAML 1.1 round-trip rewrote
