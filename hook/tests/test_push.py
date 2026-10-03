@@ -300,6 +300,18 @@ class TestPictureUrl:
         img = rec.last_payload['image_url']
         assert img == 'https://portal/zm?eid=7&fid=objdetect&username=admin&password=pw'
 
+    def test_plain_picture_credentials_unchanged(self, monkeypatch):
+        # URL-safe characters must pass through exactly as before
+        rec = PostRecorder()
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg(
+            include_picture='yes', picture_url=self.PIC,
+            picture_portal_username='zm.user_1', picture_portal_password='Pass-word~9.x_Y')}
+        run(FakeZM([FakeNotification()]), event_id=7)
+        img = rec.last_payload['image_url']
+        assert img == ('https://portal/zm?eid=7&fid=objdetect'
+                       '&username=zm.user_1&password=Pass-word~9.x_Y')
+
     def test_no_picture_when_disabled(self, monkeypatch):
         rec = PostRecorder()
         install_post(monkeypatch, rec)
@@ -486,6 +498,26 @@ class TestTokenDeletion:
         assert notif.deleted is False
         assert notif.update_last_sent_called is True
 
+    def test_fcm_invalid_token_400_deletes(self, monkeypatch):
+        # FCM v1 INVALID_ARGUMENT for a malformed token (same marker FCM.pm matches)
+        rec = PostRecorder(FakeResponse(
+            400, '{"error":{"code":400,"message":"The registration token is not a valid FCM registration token","status":"INVALID_ARGUMENT"}}'))
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        notif = FakeNotification(token='aaaabbbbccccdddd')
+        run(FakeZM([notif]))
+        assert notif.deleted is True
+
+    def test_fcm_unregistered_404_deletes(self, monkeypatch):
+        # FCM v1 UNREGISTERED: app uninstalled / token expired
+        rec = PostRecorder(FakeResponse(
+            404, '{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}'))
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        notif = FakeNotification(token='aaaabbbbccccdddd')
+        run(FakeZM([notif]))
+        assert notif.deleted is True
+
     def test_token_error_needs_matching_prefix(self, monkeypatch):
         # 'Error' present but the token prefix is NOT in body -> not a token error.
         # With a 5xx this must NOT delete (proves the AND in the heuristic).
@@ -516,3 +548,22 @@ class TestMultiple:
         assert allowed_b.update_last_sent_called is True
         assert excluded.update_last_sent_called is False
         assert throttled.update_last_sent_called is False
+
+    def test_send_exception_does_not_abort_other_tokens(self, monkeypatch):
+        # A network error for one token must not stop delivery to the next.
+        calls = []
+
+        def post(url, headers=None, data=None, timeout=None):
+            calls.append(json.loads(data)['token'])
+            if len(calls) == 1:
+                raise ConnectionError('boom')
+            return FakeResponse(200, 'OK')
+
+        monkeypatch.setattr(push.requests, 'post', post)
+        g.config = {'push': base_push_cfg()}
+        first = FakeNotification(token='first00000000000')
+        second = FakeNotification(token='second0000000000')
+        run(FakeZM([first, second]))
+        assert calls == ['first00000000000', 'second0000000000']
+        assert first.update_last_sent_called is False
+        assert second.update_last_sent_called is True
