@@ -301,11 +301,10 @@ The image is specified by the ``picture_url`` attribute. The URL format is: ``ht
 The ``<FID>`` portion supports several values:
 
 * ``fid=BESTMATCH`` - this will replace the frameID with whichever frame objects were detected
-* ``fid=objdetect``
+* ``fid=objdetect`` — the frame with detected objects annotated (bounding boxes drawn).
+  If the start hook failed, or hooks are disabled, the ES replaces it with ``snapshot``.
 
 Whatever value is finally used for ``<FID>`` is what we call the "anchor" frame.
-
-* ``fid=objdetect`` — the frame with detected objects annotated (bounding boxes drawn)
 
 
 Controlling the Event Server

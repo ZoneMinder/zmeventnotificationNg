@@ -237,8 +237,8 @@ customize:
   # The notification server will replace it with the correct eid of the alarm
 
   # BESTMATCH should be used only if you are using bestmatch for FID in detect_wrapper.sh
-  # objdetect is ONLY available in ZM 1.33+
-  # objdetect_mp4 and objdetect_gif is ONLY available in ZM 1.35+
+  # objdetect is ONLY available in ZM 1.33+. The ES writes objdetect.jpg only;
+  # it does not create objdetect.gif or objdetect.mp4.
   picture_url: "!ZMES_PICTURE_URL"
   picture_portal_username: "!ZM_USER"
   picture_portal_password: "!ZM_PASSWORD"
