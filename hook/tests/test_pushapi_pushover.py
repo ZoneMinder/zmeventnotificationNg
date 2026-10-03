@@ -103,3 +103,8 @@ def test_both_credentials_in_script_skip_secrets(h):
     assert h.secrets_reads == 0
     assert post['data']['token'] == 'file-token'
     assert post['data']['user'] == 'file-user'
+
+
+def test_post_has_timeout(h):
+    post = h.run(ARGS)
+    assert post['kw'].get('timeout')
