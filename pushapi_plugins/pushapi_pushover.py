@@ -94,16 +94,19 @@ if len(sys.argv) == 7:
     image_path =  sys.argv[6]
     fname=get_image(image_path, cause)
 
-    zmlog.Debug (1,'eid:{} Image to be used is: {}'.format(eid,fname))
-    f,e=os.path.splitext(fname)
-    if e.lower() == '.mp4':
-        ctype = 'video/mp4'
+    if not os.path.isfile(fname):
+        zmlog.Debug (1,'eid:{} Image {} not found, sending without attachment'.format(eid,fname))
     else:
-        ctype = 'image/jpeg'
-    zmlog.Debug (1,'Setting ctype to {} for extension {}'.format(ctype, e.lower()))
-    files = {
-         "attachment": ("image"+e.lower(), open(fname,"rb"), ctype)
-    }
+        zmlog.Debug (1,'eid:{} Image to be used is: {}'.format(eid,fname))
+        f,e=os.path.splitext(fname)
+        if e.lower() == '.mp4':
+            ctype = 'video/mp4'
+        else:
+            ctype = 'image/jpeg'
+        zmlog.Debug (1,'Setting ctype to {} for extension {}'.format(ctype, e.lower()))
+        files = {
+             "attachment": ("image"+e.lower(), open(fname,"rb"), ctype)
+        }
 
 
 if not param_dict['token'] or not param_dict['user']:

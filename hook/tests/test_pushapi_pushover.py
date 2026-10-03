@@ -108,3 +108,9 @@ def test_both_credentials_in_script_skip_secrets(h):
 def test_post_has_timeout(h):
     post = h.run(ARGS)
     assert post['kw'].get('timeout')
+
+
+def test_missing_image_sends_without_attachment(h, tmp_path):
+    # no objdetect/alarm/snapshot file in the event dir
+    post = h.run(['42', '3', 'Front', '[s] detected:car', 'event_start', str(tmp_path)])
+    assert post['files'] is None
