@@ -594,12 +594,15 @@ sub processJobs {
         }
       } elsif ( $job eq 'fcm_token_delete' ) {
         # FCM rejected this token; the child already removed it from the
-        # token file. Drop push-only entries so they are not used again.
+        # token file. Drop entries that only push to it (loaded from the
+        # file, or a websocket that has since disconnected) so they are not
+        # used again. A live websocket connection is left alone.
         my ($token) = @fields;
         Debug(1, 'Job: dropping FCM token ...' . substr( $token, -10 ));
         foreach (@active_connections) {
           $_->{state} = PENDING_DELETE
-            if $_->{type} == FCM && ( $_->{token} // '' ) eq $token && !exists $_->{conn};
+            if $_->{type} == FCM && ( $_->{token} // '' ) eq $token
+            && ( !exists $_->{conn} || $_->{state} == INVALID_CONNECTION );
         }
       } elsif ( $job eq 'event_description' ) {
       # hook script result will be updated in ZM DB
