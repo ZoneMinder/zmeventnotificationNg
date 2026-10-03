@@ -465,7 +465,10 @@ If you run your own FCM cloud function proxy, replace ``fcm_v1_url`` and
 ``fcm_v1_key`` with your own values.
 
 ``zm_detect`` respects per-token monitor filtering, throttle intervals,
-and push state. Invalid tokens are automatically cleaned up.
+and push state. Invalid tokens are automatically cleaned up. The throttle
+interval is per device, across all monitors. Parallel ``zm_detect`` runs take
+turns through ``<base_data_path>/misc/push.lock`` so the interval holds when
+several events arrive together.
 
 By default, push notifications are only sent when detection finds a match.
 If you use external sensor triggers and want a push even when ML detects

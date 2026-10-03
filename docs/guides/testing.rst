@@ -170,7 +170,8 @@ Python unit / integration reference
        ``zm.api.request``**, ``--fakeit``, note update, object tagging, push
        dispatch
    * - ``tests/test_push.py``
-     - ``send_push_notifications``: monitor filtering, throttle, picture-URL
+     - ``send_push_notifications``: monitor filtering, throttle, cross-process
+       push lock, picture-URL
        rewrite, Android/iOS payloads, invalid-token deletion heuristic
    * - ``tests/test_cli_overrides.py``
      - ``-O`` dot-notation overrides: coercion, ``[index]`` / ``[name]`` paths,

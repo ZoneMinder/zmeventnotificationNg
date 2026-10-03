@@ -4,13 +4,20 @@ Reads registered tokens from ZM's Notifications table via pyzm,
 filters by monitor, checks throttle, and sends via FCM cloud function proxy.
 """
 
+import fcntl
 import json
+import os
 import requests
 from datetime import datetime
 
 
 def send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cause, logger, no_match=False):
     """Send FCM push notifications to all qualifying registered tokens.
+
+    Holds ``<base_data_path>/misc/push.lock`` from token fetch to the
+    LastNotifiedAt update. Parallel zm_detect runs would otherwise all read
+    LastNotifiedAt before any of them updates it, and the token interval
+    would not throttle a burst of events.
 
     Args:
         zm: pyzm ZMClient instance (already authenticated).
@@ -22,6 +29,21 @@ def send_push_notifications(zm, config, monitor_id, event_id, monitor_name, caus
         logger: pyzm logger instance.
         no_match: bool, if True use fid=alarm instead of objdetect in picture URL.
     """
+    lock_path = os.path.join(
+        config.get('base_data_path', '/var/lib/zmeventnotification'), 'misc', 'push.lock')
+    try:
+        lock = open(lock_path, 'a')
+    except OSError as e:
+        logger.Error('push: cannot open {}: {}. Token intervals are not enforced '
+                     'across parallel runs'.format(lock_path, e))
+        _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cause, logger, no_match)
+        return
+    with lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cause, logger, no_match)
+
+
+def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cause, logger, no_match):
     push_cfg = config.get('push', {})
     if not push_cfg or push_cfg.get('enabled') != 'yes':
         logger.Debug(1, 'push: disabled in config, skipping')

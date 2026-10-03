@@ -7,6 +7,7 @@ monkeypatched requests.post so no real network calls happen.
 The module is exercised through g.config (common_params) exactly as the
 production caller supplies it.
 """
+import fcntl
 import json
 import sys
 import os
@@ -226,6 +227,38 @@ class TestThrottle:
         notif = FakeNotification(throttled=False)
         run(FakeZM([notif]))
         assert rec.call_count == 1
+
+    def test_fetch_and_update_hold_cross_process_lock(self, monkeypatch, tmp_path):
+        # Parallel zm_detect runs must not all read LastNotifiedAt before any
+        # of them updates it (#56): the token fetch and the LastNotifiedAt
+        # update must happen while push.lock is held.
+        (tmp_path / 'misc').mkdir()
+        lock_path = tmp_path / 'misc' / 'push.lock'
+        seen = []
+
+        def lock_held():
+            with open(lock_path, 'a') as other:
+                try:
+                    fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return True
+                return False
+
+        class LockCheckingZM(FakeZM):
+            def notifications(self):
+                seen.append(('fetch', lock_held()))
+                return super().notifications()
+
+        class LockCheckingNotification(FakeNotification):
+            def update_last_sent(self, badge=None):
+                seen.append(('update', lock_held()))
+                super().update_last_sent(badge)
+
+        install_post(monkeypatch, PostRecorder())
+        g.config = {'push': base_push_cfg(), 'base_data_path': str(tmp_path)}
+        run(LockCheckingZM([LockCheckingNotification()]))
+        assert seen == [('fetch', True), ('update', True)]
+        assert lock_held() is False
 
 
 # ---------------------------------------------------------------------------
