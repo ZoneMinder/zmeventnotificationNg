@@ -559,6 +559,27 @@ class TestTokenDeletion:
         run(FakeZM([notif]))
         assert notif.deleted is True
 
+    # Bodies exactly as the push proxy (examples/send_push.py) returns them:
+    # every FirebaseError is a 400 with {"Error": "token:<last 10>=>{ex}"},
+    # and a bad fcm_v1_key is a 401 from its auth wrapper.
+    @pytest.mark.parametrize('status,error,deleted', [
+        (400, 'Requested entity was not found.', True),
+        (400, 'The registration token is not a valid FCM registration token', True),
+        (400, 'Quota exceeded for quota metric \'Send requests\'', False),
+        (400, 'Internal error encountered.', False),
+        (401, 'Invalid credentials: Signature verification failed', False),
+    ])
+    def test_proxy_response_shapes(self, monkeypatch, status, error, deleted):
+        token = 'aaaabbbbccccdddd'
+        if status == 400:
+            error = 'token:{}=>{}'.format(token[-10:], error)
+        rec = PostRecorder(FakeResponse(status, json.dumps({'Error': error})))
+        install_post(monkeypatch, rec)
+        g.config = {'push': base_push_cfg()}
+        notif = FakeNotification(token=token)
+        run(FakeZM([notif]))
+        assert notif.deleted is deleted
+
     def test_token_error_needs_matching_prefix(self, monkeypatch):
         # 'Error' present but the token prefix is NOT in body -> not a token error.
         # With a 5xx this must NOT delete (proves the AND in the heuristic).

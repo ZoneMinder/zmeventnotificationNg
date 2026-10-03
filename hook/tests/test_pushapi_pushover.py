@@ -89,13 +89,36 @@ def test_event_end_title(h):
     assert post['data']['title'] == 'Ended:Front Alarm (42)'
 
 
+def _attachment(post):
+    name, fh, ctype = post['files']['attachment']
+    fh.close()
+    return name, fh.name, ctype
+
+
 def test_objdetect_image_attached(h, tmp_path):
     (tmp_path / 'objdetect.jpg').write_bytes(b'jpg')
     post = h.run(ARGS + [str(tmp_path)])
-    name, fh, ctype = post['files']['attachment']
-    assert name == 'image.jpg'
-    assert fh.name == str(tmp_path / 'objdetect.jpg')
-    assert ctype == 'image/jpeg'
+    assert _attachment(post) == ('image.jpg', str(tmp_path / 'objdetect.jpg'), 'image/jpeg')
+
+
+def test_objdetect_gif_preferred_over_jpg(h, tmp_path):
+    (tmp_path / 'objdetect.gif').write_bytes(b'gif')
+    (tmp_path / 'objdetect.jpg').write_bytes(b'jpg')
+    post = h.run(ARGS + [str(tmp_path)])
+    # the content type has always been image/jpeg for anything but .mp4
+    assert _attachment(post) == ('image.gif', str(tmp_path / 'objdetect.gif'), 'image/jpeg')
+
+
+@pytest.mark.parametrize('cause,expected', [
+    ('[a] detected:person', 'alarm.jpg'),
+    ('[s] detected:person', 'snapshot.jpg'),
+    ('Motion: All', 'snapshot.jpg'),
+])
+def test_frame_chosen_from_cause_prefix_without_objdetect(h, tmp_path, cause, expected):
+    for f in ('alarm.jpg', 'snapshot.jpg'):
+        (tmp_path / f).write_bytes(b'jpg')
+    post = h.run(['42', '3', 'Front', cause, 'event_start', str(tmp_path)])
+    assert _attachment(post) == ('image.jpg', str(tmp_path / expected), 'image/jpeg')
 
 
 def test_both_credentials_in_script_skip_secrets(h):

@@ -197,7 +197,7 @@ def _send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cau
             else:
                 logger.Error('push: FCM proxy error for token ...{}: {}'.format(token_suffix, body_text))
                 # Remove the token only when the error names it as invalid
-                # (FCM.pm matches the same markers). A bare 4xx such as 401
+                # (FCM.pm matches the first two markers). A bare 4xx such as 401
                 # (bad fcm_v1_key) or 429 applies to every token, so deleting
                 # on status alone would wipe all registered devices.
                 if has_token_error or any(m in body_text for m in FCM_INVALID_TOKEN_MARKERS):
