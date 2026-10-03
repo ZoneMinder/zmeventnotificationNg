@@ -895,7 +895,9 @@ Transports: url vs image
 Set by ``ml_gateway_mode``:
 
 - ``url`` (default) — the ZM box sends frame references and the **gateway**
-  fetches each frame directly from ZoneMinder. Nothing downloads on the ZM box.
+  fetches each frame directly from ZoneMinder. Nothing downloads on the ZM box
+  for detection. If ``write_image_to_zm`` or ``write_debug_image`` is ``yes``,
+  ``zm_detect`` then downloads the one matched frame to draw the boxes on.
 - ``image`` — the ZM box fetches frames and uploads them as lossless PNG. Use
   when the gateway cannot reach your ZM portal.
 

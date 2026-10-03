@@ -321,13 +321,15 @@ class _Resp:
 
 
 def test_url_mode_fetch_uses_zmapi_and_annotates(harness, monkeypatch, tmp_path):
-    # gateway/URL mode: detector returns boxes but NO image
+    # gateway/URL mode: pyzm _detect_event_url runs the pipeline on a blank
+    # np.zeros frame of monitor size, and pipeline.run returns that blank
+    # frame as result.image. The real frame must be fetched from ZM.
     harness.cfg['write_image_to_zm'] = 'yes'
-    FakeDetector.result_image = None
-    harness.cfg  # image absent from result_data -> triggers fetch block
+    harness.cfg['ml_gateway'] = 'https://gw.example/ml'
+    FakeDetector.result_image = np.zeros((10, 10, 3), dtype='uint8')
 
     # api.request returns bytes; imdecode yields a valid array
-    fake_img = np.zeros((10, 10, 3), dtype='uint8')
+    fake_img = np.full((10, 10, 3), 7, dtype='uint8')
     monkeypatch.setattr(zm_detect.cv2, 'imdecode', lambda arr, flag: fake_img)
 
     # seed the response on the client the code will build

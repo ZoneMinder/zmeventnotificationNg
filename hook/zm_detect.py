@@ -196,10 +196,13 @@ def main_handler():
     g.logger.Info('Prediction string:{}'.format(pred)); print(output)
 
     # --- Write images ---
-    # In gateway/URL mode the server does not return the image, only bounding
-    # box coordinates and labels.  Fetch the matched frame from ZoneMinder so
-    # we can annotate it locally and write the objdetect artefact as usual.
-    if (matched_data.get('image') is None and matched_data.get('frame_id')
+    # In gateway/URL mode the frame never reaches us: pyzm runs the pipeline on
+    # a blank (all-zero) frame of monitor size and returns that as the image.
+    # A missing image (e.g. --fakeit on an empty result) needs the same fix.
+    # Fetch the matched frame from ZoneMinder so we can annotate it locally and
+    # write the objdetect artefact as usual.
+    img = matched_data.get('image')
+    if ((img is None or (g.config.get('ml_gateway') and not img.any())) and matched_data.get('frame_id')
             and (g.config['write_image_to_zm'] == 'yes' or g.config['write_debug_image'] == 'yes')):
         try:
             import numpy as np
