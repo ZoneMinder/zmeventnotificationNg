@@ -236,6 +236,21 @@ subtest 'initSocketServer: connect, message, disconnect handlers' => sub {
     'connection with token kept but invalidated on disconnect' );
 };
 
+subtest 'initSocketServer: an exception while handling a message does not escape' => sub {
+  local $ssl_config{enabled} = 0;
+  local $server_config{port} = 9126;
+  local $server_config{address} = DEFAULT_ADDRESS;
+  @main::active_connections = ();
+  @logged_errors = ();
+  initSocketServer();
+  my $c = connect_client( '1.2.3.6', 5002 );
+  no warnings 'redefine';
+  local *main::processIncomingMessage = sub { die "boom\n" };
+  my $err = run_catching { $c->{h}{utf8}->( $c, '[1]' ) };
+  is( $err, '', 'utf8 handler does not die' );
+  like( join( '', @logged_errors ), qr/boom/, 'error logged' );
+};
+
 # ===== restartES =====
 subtest 'restartES: under zmdc shuts down and exits 0' => sub {
   $main::wss = FakeWSS->new;

@@ -789,7 +789,9 @@ sub initSocketServer {
           my $dmsg = $msg;
           $dmsg =~ s/\"password\":\"(.*?)\"/"password":\*\*\*/;
           Debug(3, "Raw incoming message: $dmsg");
-          processIncomingMessage( $conn, $msg );
+          # a die here would propagate out of Net::WebSocket::Server and kill the daemon
+          eval { processIncomingMessage( $conn, $msg ); };
+          Error("Error processing incoming message: $@") if $@;
           Debug(2, '---------->onConnect msg END<--------------');
         },
         handshake => sub {

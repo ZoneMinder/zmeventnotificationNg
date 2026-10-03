@@ -244,8 +244,14 @@ sub processIncomingMessage {
 
   my $json_string;
   eval { $json_string = decode_json($msg); };
-  if ($@) {
-    main::Error("Failed decoding json in processIncomingMessage: $@");
+  my $err = $@;
+  # top level and 'data' (when present) must be JSON objects; anything else
+  # would die on hash dereference below
+  $err = 'not a JSON object'
+    if !$err && ( ref($json_string) ne 'HASH'
+      || ( defined $json_string->{data} && ref( $json_string->{data} ) ne 'HASH' ) );
+  if ($err) {
+    main::Error("Failed decoding json in processIncomingMessage: $err");
     my $str = encode_json(
       { event  => 'malformed',
         type   => '',

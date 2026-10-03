@@ -738,6 +738,23 @@ subtest 'processIncomingMessage - escontrol auth with configured password' => su
     is($main::active_connections[0]{state}, VALID_CONNECTION, 'connection valid');
 };
 
+subtest 'processIncomingMessage - non-object JSON or non-object data is rejected, not fatal' => sub {
+    for my $msg ('[1]', '"str"', '{"event":"auth","data":"x"}', '{"event":"push","data":[1]}',
+                 '{"event":"control","data":5}') {
+        reset_state();
+        local $fcm_config{enabled} = 1;
+        my $mock_conn = MockConn->new('192.168.1.1', 12345);
+        @main::active_connections = (
+            { conn => $mock_conn, state => VALID_CONNECTION, type => WEB, token => '' },
+        );
+        my $ok = eval { processIncomingMessage($mock_conn, $msg); 1 };
+        ok($ok, "$msg does not die") or diag($@);
+        my $response = $mock_conn->{sent}[0] ? decode_json($mock_conn->{sent}[0]) : {};
+        is($response->{event}, 'malformed', "$msg answered as malformed");
+        is($response->{reason}, 'BADJSON', "$msg reason BADJSON");
+    }
+};
+
 done_testing();
 
 # Mock connection class
