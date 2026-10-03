@@ -660,6 +660,8 @@ install_es_config() {
         echo "Found existing secrets.ini but no secrets.yml - running migration..."
         if ${PYTHON} tools/es_config_migrate_yaml.py --secrets -c "${TARGET_CONFIG}/secrets.ini" -o "${TARGET_CONFIG}/secrets.yml"; then
             print_success "secrets migration complete"
+            chown "${WEB_OWNER}:${WEB_GROUP}" "${TARGET_CONFIG}/secrets.yml"
+            chmod 640 "${TARGET_CONFIG}/secrets.yml"
             mv "${TARGET_CONFIG}/secrets.ini" "${TARGET_CONFIG}/secrets.ini.migrated"
             print_important "Renamed old secrets.ini to secrets.ini.migrated"
         else
@@ -678,7 +680,7 @@ install_es_config() {
     fi
     if [ ! -f "${TARGET_CONFIG}/secrets.yml" ]; then
         echo 'No existing secrets found, installing example as active config'
-        install -o "${WEB_OWNER}" -g "${WEB_GROUP}" -m 644 secrets.example.yml "${TARGET_CONFIG}/secrets.yml" &&
+        install -o "${WEB_OWNER}" -g "${WEB_GROUP}" -m 640 secrets.example.yml "${TARGET_CONFIG}/secrets.yml" &&
             print_success "secrets copied" || print_error "could not copy secrets"
     else
         echo "Upgrading existing secrets with any new keys..."

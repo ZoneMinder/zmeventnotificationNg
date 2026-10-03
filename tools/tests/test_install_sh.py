@@ -199,6 +199,27 @@ def test_install_es_config_installs_example_secrets(sandbox):
     assert os.stat(cfg(sandbox, "secrets.yml")).st_mode & stat.S_IRUSR
 
 
+def test_fresh_secrets_not_world_readable(sandbox):
+    write_es_configs(sandbox, sandbox["env"]["TARGET_CONFIG"])
+    os.remove(cfg(sandbox, "secrets.yml"))
+    r = run(sandbox, "umask 022; PY_SUDO=''; install_es_config")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert stat.S_IMODE(os.stat(cfg(sandbox, "secrets.yml")).st_mode) == 0o640
+
+
+def test_migrated_secrets_not_world_readable(sandbox):
+    write_es_configs(sandbox, sandbox["env"]["TARGET_CONFIG"])
+    os.remove(cfg(sandbox, "secrets.yml"))
+    with open(cfg(sandbox, "secrets.ini"), "w") as f:
+        f.write("[secrets]\nzm_user=me\n")
+    r = run(sandbox, "umask 022; PY_SUDO=''; install_es_config")
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = os.stat(cfg(sandbox, "secrets.yml"))
+    assert stat.S_IMODE(st.st_mode) == 0o640
+    assert st.st_uid == os.getuid()  # WEB_OWNER in the sandbox
+    assert "ZM_USER: me" in open(cfg(sandbox, "secrets.yml")).read()
+
+
 # ── install_hook ────────────────────────────────────────────────────────
 
 HOOK_ENV = dict(INSTALL_OPENCV="no", DOWNLOAD_MODELS="no")
