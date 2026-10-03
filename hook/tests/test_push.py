@@ -135,6 +135,13 @@ def install_post(monkeypatch, recorder):
     monkeypatch.setattr(push.requests, 'post', recorder)
 
 
+@pytest.fixture(autouse=True)
+def _private_lock_dir(tmp_path, monkeypatch):
+    """Keep push.lock out of the real /var/lib/zmeventnotification."""
+    (tmp_path / 'misc').mkdir()
+    monkeypatch.setattr(push, 'DEFAULT_BASE_DATA_PATH', str(tmp_path))
+
+
 def run(zm, notif=None, monitor_id=5, event_id=42, monitor_name='Front',
         cause='person detected', no_match=False):
     """Invoke send_push_notifications with g.config and g.logger from conftest."""
@@ -232,7 +239,6 @@ class TestThrottle:
         # Parallel zm_detect runs must not all read LastNotifiedAt before any
         # of them updates it (#56): the token fetch and the LastNotifiedAt
         # update must happen while push.lock is held.
-        (tmp_path / 'misc').mkdir()
         lock_path = tmp_path / 'misc' / 'push.lock'
         seen = []
 

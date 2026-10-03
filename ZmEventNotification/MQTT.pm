@@ -81,6 +81,7 @@ sub initMQTT {
   push @main::active_connections,
     {
     type         => MQTT,
+    id           => $id,
     state        => VALID_CONNECTION,
     time         => time(),
     monlist      => '',

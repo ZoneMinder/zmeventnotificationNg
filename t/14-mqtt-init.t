@@ -190,6 +190,7 @@ subtest 'initMQTT sets correct connection metadata' => sub {
     is($conn->{state}, VALID_CONNECTION, 'state is VALID_CONNECTION');
     is($conn->{monlist}, '', 'monlist is empty string');
     is($conn->{intlist}, '', 'intlist is empty string');
+    ok(defined $conn->{id}, 'id set (mqtt_publish jobs are routed by id)');
     ok(exists $conn->{mqtt_conn}, 'mqtt_conn exists');
 };
 

@@ -26,6 +26,7 @@ loadEsConfigSettings($cfg);
 # Stub out the heavy dependencies before loading HookProcessor.
 # Use a package var so the closure in BEGIN can reference it.
 our $escontrol_return;
+our $fcm_sends = 0;
 
 BEGIN {
     $escontrol_return = 0;  # ESCONTROL_DEFAULT_NOTIFY = 0
@@ -40,7 +41,7 @@ BEGIN {
         $INC{"$file.pm"} = 1;
     }
     no strict 'refs';
-    *{'ZmEventNotification::FCM::sendOverFCM'} = sub { };
+    *{'ZmEventNotification::FCM::sendOverFCM'} = sub { $fcm_sends++ };
     *{'ZmEventNotification::FCM::import'} = sub {
         my $caller = caller;
         no strict 'refs';
@@ -269,6 +270,87 @@ my $alarm = { MonitorId => '1', Name => 'Front' };
     };
     sendEvent($alarm, $ac, 'event_start', 1);  # hook failed, fail channel is 'none'
     is(shouldSendEventToConn($alarm, {%$ac}), 1, 'filtered send leaves interval unstarted -> 1');
+}
+
+# ===== Two forks pass the check together: only the first to send does (#54) =====
+{
+    local $hooks_config{enabled} = 0;
+    my %conn = (
+        monlist   => '1',
+        intlist   => '300',
+        type      => FCM,
+        pushstate => 'enabled',
+        state     => VALID_CONNECTION,
+        token     => 'tok_together_1234567890',
+        id        => 14,
+    );
+    my ($fork1, $fork2) = ({%conn}, {%conn});
+    is(shouldSendEventToConn($alarm, $fork1), 1, 'fork1 check passes');
+    is(shouldSendEventToConn($alarm, $fork2), 1, 'fork2 check passes before fork1 sends');
+    $fcm_sends = 0;
+    sendEvent($alarm, $fork1, 'event_start', 0);
+    sendEvent($alarm, $fork2, 'event_start', 0);
+    is($fcm_sends, 1, 'only one of the two forks sends');
+}
+
+# ===== escontrol FORCE_NOTIFY sends even within the interval =====
+{
+    local $hooks_config{enabled} = 0;
+    local $escontrol_config{enabled} = 1;
+    local $escontrol_return = ESCONTROL_FORCE_NOTIFY;
+    my $ac = {
+        monlist   => '1',
+        intlist   => '300',
+        type      => FCM,
+        pushstate => 'enabled',
+        state     => VALID_CONNECTION,
+        token     => 'tok_forced_1234567890',
+        id        => 15,
+    };
+    _seed_last_sent($ac->{token}, '1', time() - 10);
+    $fcm_sends = 0;
+    sendEvent($alarm, $ac, 'event_start', 0);
+    is($fcm_sends, 1, 'FORCE_NOTIFY sends within interval');
+}
+
+# ===== event_end notification does not move the interval =====
+{
+    local $hooks_config{enabled} = 0;
+    my $ac = {
+        monlist   => '1',
+        intlist   => '300',
+        type      => FCM,
+        pushstate => 'enabled',
+        state     => VALID_CONNECTION,
+        token     => 'tok_endsend_1234567890',
+        id        => 16,
+    };
+    $fcm_sends = 0;
+    sendEvent($alarm, $ac, 'event_end', 0);
+    is($fcm_sends, 1, 'event_end sent');
+    is(shouldSendEventToConn($alarm, {%$ac}), 1, 'event_end send leaves interval unstarted -> 1');
+}
+
+# ===== Pruning drops stale connection-id keys, never device tokens =====
+{
+    local $hooks_config{enabled} = 0;
+    my $old = time() - 8 * 86400;
+    _seed_last_sent('tok_longgone_1234567890', '1', $old);
+    _seed_last_sent('conn-77', '1', $old);
+    my $ac = {
+        monlist   => '1',
+        intlist   => '0',
+        type      => FCM,
+        pushstate => 'enabled',
+        state     => VALID_CONNECTION,
+        token     => 'tok_prune_1234567890',
+        id        => 17,
+    };
+    sendEvent($alarm, $ac, 'event_start', 0);
+    open(my $fh, '<', $store) or die "read $store: $!";
+    my $times = decode_json(do { local $/; <$fh> });
+    is($times->{tok_longgone_1234567890}{1}, $old, 'old token time kept');
+    ok(!exists $times->{'conn-77'}, 'old connection-id time pruned');
 }
 
 # ===== Unusable store does not block notifications =====

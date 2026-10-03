@@ -10,6 +10,8 @@ import os
 import requests
 from datetime import datetime
 
+DEFAULT_BASE_DATA_PATH = '/var/lib/zmeventnotification'
+
 
 def send_push_notifications(zm, config, monitor_id, event_id, monitor_name, cause, logger, no_match=False):
     """Send FCM push notifications to all qualifying registered tokens.
@@ -30,7 +32,7 @@ def send_push_notifications(zm, config, monitor_id, event_id, monitor_name, caus
         no_match: bool, if True use fid=alarm instead of objdetect in picture URL.
     """
     lock_path = os.path.join(
-        config.get('base_data_path', '/var/lib/zmeventnotification'), 'misc', 'push.lock')
+        config.get('base_data_path', DEFAULT_BASE_DATA_PATH), 'misc', 'push.lock')
     try:
         lock = open(lock_path, 'a')
     except OSError as e:

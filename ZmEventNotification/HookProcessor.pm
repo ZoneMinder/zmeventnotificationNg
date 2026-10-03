@@ -142,8 +142,15 @@ sub sendEvent {
 
   return unless $send;
 
-  # Record before sending so a parallel fork's interval check sees it
-  _markSent( $ac, $alarm->{MonitorId} );
+  # The interval applies to start notifications only. It is checked again
+  # here, under the lock, because another fork may have sent since
+  # shouldSendEventToConn looked.
+  if ( $event_type eq 'event_start' ) {
+    my $forced = $escontrol_config{enabled}
+      && getNotificationStatusEsControl( $alarm->{MonitorId} ) == ESCONTROL_FORCE_NOTIFY;
+    my $mint = $forced ? 0 : getInterval( $ac->{intlist}, $ac->{monlist}, $alarm->{MonitorId} );
+    return unless _claimSend( $ac, $alarm->{MonitorId}, $mint );
+  }
   $send->( $alarm, $ac, $event_type, $resCode );
 }
 
@@ -165,9 +172,11 @@ sub _openLastSent {
   return ( $fh, $times );
 }
 
+# Device tokens are stable; other connections are keyed by their
+# per-connection id, prefixed so they can be pruned.
 sub _lastSentKey {
   my $ac = shift;
-  return $ac->{token} || $ac->{id} // '';
+  return $ac->{token} ? $ac->{token} : 'conn-' . ( $ac->{id} // '' );
 }
 
 sub _lastSentTime {
@@ -178,28 +187,39 @@ sub _lastSentTime {
   return $times->{ _lastSentKey($ac) }->{$mid};
 }
 
-# ponytail: check (_lastSentTime) and record (_markSent) take the lock
-# separately, so two forks deciding within the same few ms can both send.
-# Hold one lock across both if that is ever seen.
-sub _markSent {
-  my ( $ac, $mid ) = @_;
+# Records the send time unless one was recorded within the last $mint
+# seconds. Check and record happen under one lock, so parallel forks
+# cannot both pass. Returns 1 if the caller should send.
+sub _claimSend {
+  my ( $ac, $mid, $mint ) = @_;
   my ( $fh, $times ) = _openLastSent(LOCK_EX);
-  return if !$fh;
-  my $now = time();
-  $times->{ _lastSentKey($ac) }->{$mid} = $now;
+  return 1 if !$fh;
+  my $now  = time();
+  my $key  = _lastSentKey($ac);
+  my $last = $times->{$key}->{$mid};
+  if ( $last && ( $now - $last ) < ( $mint // 0 ) ) {
+    close($fh);
+    main::Debug(1, "Monitor $mid: last notification was "
+        . ( $now - $last )
+        . "s ago, within interval of $mint. Not sending");
+    return 0;
+  }
+  $times->{$key}->{$mid} = $now;
 
-  # ponytail: drops times older than a week so per-connection websocket
-  # keys do not pile up; intervals longer than a week are not honored.
-  foreach my $key ( keys %$times ) {
-    my $mids = $times->{$key};
-    delete $mids->{$_} for grep { $now - $mids->{$_} > 7 * 86400 } keys %$mids;
-    delete $times->{$key} if !%$mids;
+  # Connection ids change on every reconnect, so their entries are dropped
+  # after a day without a send. Device tokens are kept. A websocket client
+  # connected for over a day with a longer interval may get one early send.
+  foreach my $k ( grep { /^conn-/ } keys %$times ) {
+    my $mids = $times->{$k};
+    delete $mids->{$_} for grep { $now - $mids->{$_} > 86400 } keys %$mids;
+    delete $times->{$k} if !%$mids;
   }
 
   seek( $fh, 0, 0 );
   truncate( $fh, 0 );
   print $fh encode_json($times);
   close($fh);
+  return 1;
 }
 
 sub isAllowedChannel {
