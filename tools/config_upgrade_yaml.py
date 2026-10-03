@@ -12,7 +12,9 @@ Usage:
 
 import argparse
 import copy
+import shutil
 import sys
+import time
 
 try:
     import yaml
@@ -190,6 +192,11 @@ def main():
         return
 
     out_path = args.output or args.config
+    if out_path == args.config:
+        # The rewrite drops comments; keep the original next to it.
+        backup = '{}.{}.bak'.format(args.config, time.strftime('%Y%m%d-%H%M%S'))
+        shutil.copy2(args.config, backup)
+        print("Backup of original config: {}".format(backup))
     with open(out_path, 'w') as f:
         yaml.dump(user, f, default_flow_style=False, sort_keys=False,
                   allow_unicode=True)

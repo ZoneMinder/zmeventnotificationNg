@@ -778,7 +778,10 @@ Several tools are provided in the ``tools/`` directory of the source tree:
 - ``tools/es_config_migrate_yaml.py`` — migrates ``zmeventnotification.ini`` and ``secrets.ini``
   to their YAML equivalents
 - ``tools/config_upgrade_yaml.py`` — merges new keys from example configs into your existing YAML
-  config (used during upgrades to add new options without overwriting your settings)
+  config (used during upgrades to add new options without overwriting your settings). When it
+  rewrites a file it drops comments, so it first saves the original as
+  ``<file>.<YYYYmmdd-HHMMSS>.bak`` next to it. Entries under ``monitors`` in the example files are
+  samples and are not copied into your config.
 - ``tools/config_edit.py`` — programmatic config editor
 
 See :doc:`breaking` for details on the INI-to-YAML migration.

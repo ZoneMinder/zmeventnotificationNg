@@ -222,6 +222,14 @@ class TestMainCharacterization:
 
 
 class TestMainBugs:
+    def test_in_place_rewrite_keeps_backup_of_original(self, tmp_path, monkeypatch):
+        # The rewrite drops comments, so the original must be kept.
+        text = "# my precious comment\na: 1\n"
+        _run_upgrade(tmp_path, monkeypatch, text, "a: 1\nb: 2\n")
+        backups = list(tmp_path.glob("user.yml.*.bak"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == text
+
     def test_example_monitor_entries_not_merged_into_es_rules(self, tmp_path, monkeypatch):
         import yaml
         repo = os.path.join(os.path.dirname(__file__), "..", "..")
