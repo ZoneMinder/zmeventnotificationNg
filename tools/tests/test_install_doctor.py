@@ -100,6 +100,12 @@ class TestCollectEnabledModels:
     def test_no_ml_section(self):
         assert collect_enabled_models({"general": {}}) == []
 
+    def test_yaml_booleans(self):
+        # Unquoted yes/no load as Python bools.
+        cfg = {"ml": {"ml_sequence": {"object": {"sequence": [
+            {"name": "on", "enabled": True}, {"name": "off", "enabled": False}]}}}}
+        assert collect_enabled_models(cfg) == [("object", {"name": "on", "enabled": True})]
+
     def test_default_disabled_when_no_enabled_key(self):
         cfg = {"ml": {"ml_sequence": {"object": {"sequence": [{"name": "x"}]}}}}
         assert collect_enabled_models(cfg) == []
