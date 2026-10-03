@@ -85,7 +85,6 @@ sub initMQTT {
     time         => time(),
     monlist      => '',
     intlist      => '',
-    last_sent    => {},
     extra_fields => '',
     mqtt_conn    => $mqtt_connection,
     };

@@ -129,7 +129,8 @@ Perl test reference
    * - ``t/09-send-event-routing.t``
      - ``sendEvent`` channel routing
    * - ``t/10-should-send-event.t``
-     - ``shouldSendEventToConn`` gating
+     - ``shouldSendEventToConn`` gating, interval held across forks via the
+       shared last-sent file
    * - ``t/11-db-operations.t``
      - DB tagging / user-id lookup
    * - ``t/12-fcm-token-file.t``

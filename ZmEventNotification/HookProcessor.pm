@@ -4,7 +4,7 @@ use warnings;
 use Exporter 'import';
 use JSON;
 use POSIX qw(strftime);
-use Time::HiRes qw(gettimeofday);
+use Fcntl qw(:flock O_RDWR O_CREAT);
 use ZmEventNotification::Constants qw(:all);
 use ZmEventNotification::Config qw(:all);
 use ZmEventNotification::Util qw(getConnectionIdentity isInList getInterval parseDetectResults buildPictureUrl appendImagePath getFrameId);
@@ -77,7 +77,6 @@ sub sendEvent {
 
   my $hook = $event_type eq 'event_start' ? $hooks_config{event_start_hook} : $hooks_config{event_end_hook};
 
-  my $t   = gettimeofday;
   my $str = encode_json(
     { event  => 'alarm',
       type   => '',
@@ -85,6 +84,8 @@ sub sendEvent {
       events => [$alarm]
     }
   );
+
+  my $send;
 
   if ( $ac->{type} == FCM
     && $ac->{pushstate} ne 'disabled'
@@ -98,7 +99,7 @@ sub sendEvent {
       || !$hooks_config{enabled} )
     {
       main::Info("Sending $event_type notification over FCM");
-      sendOverFCM( $alarm, $ac, $event_type, $resCode );
+      $send = \&sendOverFCM;
     } else {
       main::Info(
         "Not sending over FCM as notify filters are on_success:$hooks_config{event_start_notify_on_hook_success} and on_fail:$hooks_config{event_end_notify_on_hook_fail}"
@@ -116,7 +117,7 @@ sub sendEvent {
       main::Info( "Sending $event_type notification for EID:"
           . $alarm->{EventId}
           . 'over web' );
-      sendOverWebSocket( $alarm, $ac, $event_type, $resCode );
+      $send = \&sendOverWebSocket;
     } else {
       main::Info(
         "Not sending over Web as notify filters are on_success:$hooks_config{event_start_notify_on_hook_success} and on_fail:$hooks_config{event_start_notify_on_hook_fail}"
@@ -131,7 +132,7 @@ sub sendEvent {
       main::Info( "Sending $event_type notification for EID:"
           . $alarm->{EventId}
           . ' over MQTT' );
-      sendOverMQTTBroker( $alarm, $ac, $event_type, $resCode );
+      $send = \&sendOverMQTTBroker;
     } else {
       main::Info(
         "Not sending over MQTT as notify filters are on_success:$hooks_config{event_start_notify_on_hook_success} and on_fail:$hooks_config{event_start_notify_on_hook_fail}"
@@ -139,14 +140,66 @@ sub sendEvent {
     }
   }
 
-  print main::WRITER 'timestamp--TYPE--'
-    . ($ac->{id} // '')
-    . '--SPLIT--'
-    . ($alarm->{MonitorId} // '')
-    . '--SPLIT--'
-    . $t . "\n";
+  return unless $send;
 
-  main::Debug(2, 'child finished writing to parent');
+  # Record before sending so a parallel fork's interval check sees it
+  _markSent( $ac, $alarm->{MonitorId} );
+  $send->( $alarm, $ac, $event_type, $resCode );
+}
+
+# Last-sent times are shared through a file, not kept in active_connections:
+# each event is handled in its own fork, and a fork's copy of
+# active_connections is stale as soon as another fork sends.
+# Returns ($fh, \%times) with $fh locked, or () if the file cannot be opened.
+sub _openLastSent {
+  my $lock = shift;
+  my $file = $server_config{base_data_path} . '/push/last_sent.json';
+  my $fh;
+  if ( !sysopen( $fh, $file, O_RDWR | O_CREAT, 0600 ) ) {
+    main::Error("Cannot open $file: $!. Notification intervals are not enforced");
+    return;
+  }
+  flock( $fh, $lock );
+  my $raw = do { local $/; <$fh> };
+  my $times = eval { decode_json($raw) } // {};
+  return ( $fh, $times );
+}
+
+sub _lastSentKey {
+  my $ac = shift;
+  return $ac->{token} || $ac->{id} // '';
+}
+
+sub _lastSentTime {
+  my ( $ac, $mid ) = @_;
+  my ( $fh, $times ) = _openLastSent(LOCK_SH);
+  return undef if !$fh;
+  close($fh);
+  return $times->{ _lastSentKey($ac) }->{$mid};
+}
+
+# ponytail: check (_lastSentTime) and record (_markSent) take the lock
+# separately, so two forks deciding within the same few ms can both send.
+# Hold one lock across both if that is ever seen.
+sub _markSent {
+  my ( $ac, $mid ) = @_;
+  my ( $fh, $times ) = _openLastSent(LOCK_EX);
+  return if !$fh;
+  my $now = time();
+  $times->{ _lastSentKey($ac) }->{$mid} = $now;
+
+  # ponytail: drops times older than a week so per-connection websocket
+  # keys do not pile up; intervals longer than a week are not honored.
+  foreach my $key ( keys %$times ) {
+    my $mids = $times->{$key};
+    delete $mids->{$_} for grep { $now - $mids->{$_} > 7 * 86400 } keys %$mids;
+    delete $times->{$key} if !%$mids;
+  }
+
+  seek( $fh, 0, 0 );
+  truncate( $fh, 0 );
+  print $fh encode_json($times);
+  close($fh);
 }
 
 sub isAllowedChannel {
@@ -177,7 +230,6 @@ sub shouldSendEventToConn {
 
   my $monlist   = $ac->{monlist};
   my $intlist   = $ac->{intlist};
-  my $last_sent = $ac->{last_sent};
 
   if ($escontrol_config{enabled}) {
     my $id   = $alarm->{MonitorId};
@@ -199,8 +251,9 @@ sub shouldSendEventToConn {
 
   if ( isInList( $monlist, $alarm->{MonitorId} ) ) {
     my $mint = getInterval( $intlist, $monlist, $alarm->{MonitorId} );
-    if ( $last_sent->{ $alarm->{MonitorId} } ) {
-      my $elapsed = time() - $last_sent->{ $alarm->{MonitorId} };
+    my $last_sent = _lastSentTime( $ac, $alarm->{MonitorId} );
+    if ( $last_sent ) {
+      my $elapsed = time() - $last_sent;
       if ( $elapsed >= $mint ) {
         main::Debug(1, 'Monitor '
             . $alarm->{MonitorId}

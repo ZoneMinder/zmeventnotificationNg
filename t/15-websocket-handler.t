@@ -471,7 +471,7 @@ subtest 'processIncomingMessage - push token with profile passes to saveFCMToken
         { conn => $mock_conn, state => VALID_CONNECTION, type => WEB, token => '',
           monlist => '1,2', intlist => '0,0', platform => 'android', pushstate => 'enabled',
           appversion => '2.0', invocations => { count => 0, at => 0 }, badge => 0,
-          extra_fields => '', last_sent => {} },
+          extra_fields => '' },
     );
 
     my $msg = encode_json({
@@ -503,7 +503,7 @@ subtest 'processIncomingMessage - push token without profile passes undef' => su
         { conn => $mock_conn, state => VALID_CONNECTION, type => WEB, token => '',
           monlist => '1', intlist => '0', platform => 'ios', pushstate => 'enabled',
           appversion => '2.0', invocations => { count => 0, at => 0 }, badge => 0,
-          extra_fields => '', last_sent => {} },
+          extra_fields => '' },
     );
 
     my $msg = encode_json({

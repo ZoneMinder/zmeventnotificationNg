@@ -501,7 +501,6 @@ sub initFCMTokens {
       badge        => 0,
       monlist      => $monlist,
       intlist      => $intlist,
-      last_sent    => {},
       platform     => $platform,
       extra_fields => '',
       pushstate    => $pushstate,

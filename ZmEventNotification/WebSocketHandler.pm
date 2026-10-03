@@ -334,7 +334,6 @@ sub processIncomingMessage {
       }
 
       my $stored_invocations = undef;
-      my $stored_last_sent = undef;
 
       foreach (@main::active_connections) {
         if ($_->{token} eq $data->{token}) {
@@ -354,11 +353,9 @@ sub processIncomingMessage {
 
             $_->{state} = PENDING_DELETE;
             $stored_invocations = $_->{invocations};
-            $stored_last_sent = $_->{last_sent};
           } else {
             main::Debug(2, 'JOB: token matched, updating entry in active connections');
             $_->{invocations} = $stored_invocations if defined($stored_invocations);
-            $_->{last_sent} = $stored_last_sent if defined($stored_last_sent);
             $_->{type}     = FCM;
             $_->{platform} = $data->{platform};
             $_->{monlist} = $data->{monlist} if isValidMonIntList($data->{monlist});

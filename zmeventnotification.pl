@@ -607,21 +607,6 @@ sub processJobs {
         my ( $mid, $eid, $desc ) = @fields;
         Debug(2, 'Job: Update monitor ' . $mid . ' description:' . $desc);
         updateEventinZmDB( $eid, $desc );
-      } elsif ( $job eq 'timestamp' ) {
-        # marks the latest time an event was sent out. Needed for interval mgmt.
-        my ( $id, $mid, $timeval ) = @fields;
-        Debug(2, 'Job: Update last sent timestamp of monitor:'
-            . $mid . ' to '
-            . $timeval
-            . ' for id:'
-            . $id);
-        foreach (@active_connections) {
-          next unless defined $_->{id};
-          if ( $_->{id} eq $id ) {
-            $_->{last_sent}->{$mid} = $timeval;
-          }
-        }
-
       } elsif ( $job eq 'active_event_update' ) {
         my ( $mid, $eid, $type, $key, $val ) = @fields;
         Debug(2, "Job: Update active_event eid:$eid, mid:$mid, type:$type, field:$key to: $val");
@@ -830,7 +815,6 @@ sub initSocketServer {
             time         => $connect_time,
             monlist      => '',
             intlist      => '',
-            last_sent    => {},
             platform     => 'websocket',
             pushstate    => '',
             extra_fields => $fields,

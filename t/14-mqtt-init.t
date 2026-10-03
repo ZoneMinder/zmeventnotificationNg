@@ -190,7 +190,6 @@ subtest 'initMQTT sets correct connection metadata' => sub {
     is($conn->{state}, VALID_CONNECTION, 'state is VALID_CONNECTION');
     is($conn->{monlist}, '', 'monlist is empty string');
     is($conn->{intlist}, '', 'intlist is empty string');
-    ok(exists $conn->{last_sent}, 'last_sent hash exists');
     ok(exists $conn->{mqtt_conn}, 'mqtt_conn exists');
 };
 
