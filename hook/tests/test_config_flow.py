@@ -299,6 +299,26 @@ class TestMonitorIdInjection:
 
         assert g.config["image_path"] == "/var/lib/zmeventnotification/custom_images"
 
+    def _image_path_for(self, tmp_path, ctx, args=None, **general):
+        cfg = {
+            "general": _minimal_general(**general),
+            "ml": {"ml_sequence": {"general": {}}, "stream_sequence": {}},
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config(dict({"config": cfg_path}, **(args or {})), ctx)
+        return g.config["image_path"]
+
+    def test_image_path_default_with_default_base(self, tmp_path, ctx):
+        assert self._image_path_for(tmp_path, ctx) == "/var/lib/zmeventnotification/images"
+
+    def test_explicit_image_path_kept(self, tmp_path, ctx):
+        assert self._image_path_for(
+            tmp_path, ctx, base_data_path="/data/zmes", image_path="/srv/img") == "/srv/img"
+
+    def test_output_path_overrides_image_path(self, tmp_path, ctx):
+        assert self._image_path_for(
+            tmp_path, ctx, args={"output_path": "/tmp/out"}) == "/tmp/out"
+
 
 # ===========================================================================
 # 3. TestRemoteConfigInjection
