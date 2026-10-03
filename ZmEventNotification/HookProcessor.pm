@@ -395,6 +395,7 @@ sub _run_api_push {
     || !$hooks_config{enabled} )
   {
     main::Info("Sending push over API as it is allowed for $event_type");
+    main::Info("Executing API script command for $event_type: $push_config{script}");
 
     my ( $api_res, $retcode ) = _run_cmd( "Executing API script command for $event_type",
       $push_config{script}, $eid, $eid, $mid, $temp_alarm_obj->{Name},
