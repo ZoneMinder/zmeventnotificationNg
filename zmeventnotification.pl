@@ -618,8 +618,12 @@ sub processJobs {
 
           # if detection is not used, this may be empty
           $causeJson = '[]' if !$causeJson;
-          $active_events{$mid}->{$eid}->{$type}->{DetectionJson} =
-            decode_json($causeJson);
+          my $detection = eval { decode_json($causeJson) };
+          if ($@) {
+            Error("Job: bad detection JSON for eid:$eid, mid:$mid, ignoring it: $@");
+          } else {
+            $active_events{$mid}->{$eid}->{$type}->{DetectionJson} = $detection;
+          }
         }
       } elsif ( $job eq 'active_event_delete' ) {
         my ( $mid, $eid ) = @fields;

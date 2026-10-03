@@ -106,4 +106,18 @@ subtest 'unknown job is logged' => sub {
     like( $errors[0], qr/not recognized/, 'error logged' );
 };
 
+subtest 'corrupted active_event_update JSON does not kill the daemon' => sub {
+    %active_events = ( 3 => { 555 => { Start => { State => 'pending' } } } );
+    @errors = ();
+    $child_forks = 1;
+    my $ok = eval {
+        feed( 'active_event_update--TYPE--3--SPLIT--555--SPLIT--Start--SPLIT--Cause--SPLIT--detected:car--JSON--{"labels":["ca',
+              'active_event_delete--TYPE--3--SPLIT--555' );
+        1;
+    };
+    ok( $ok, 'processJobs did not die' ) or diag $@;
+    ok( scalar(@errors), 'error logged' );
+    is( $child_forks, 0, 'following job still processed' );
+};
+
 done_testing();
