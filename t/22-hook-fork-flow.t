@@ -246,4 +246,28 @@ subtest 'configured command may carry shell quoting (documented example form)' =
         'quoted command path still runs with the same argv');
 };
 
+subtest 'monitor name and cause are passed literally, never run by a shell' => sub {
+    set_hooks();
+    my $pwn = "$dir/pwned";
+    unlink $pwn;
+    my $name  = qq{Yard \$(touch $pwn) `touch $pwn` "q};
+    my $cause = qq{Linked: a"b \$HOME 'x'};
+    run_event(name => $name, cause => $cause);
+    ok(!-e $pwn, 'no command embedded in the name was executed');
+    my $log = argv_log();
+    is_deeply($log->{start}, [[ 'start', 100, 5, $name, $cause, $img ]], 'start hook argv literal');
+    is($log->{api}->[0]->[3], $name, 'api push gets literal name');
+    is($log->{api}->[0]->[4], "detected:person $cause", 'api push gets literal cause');
+};
+
+subtest 'user script receives the detection JSON as one intact argument' => sub {
+    set_hooks();
+    my $json = '{"labels": ["person"], "boxes": [[1, 2, 3, 4]]}';
+    local $ENV{ZMT_OUT_start} = "detected:person--SPLIT--$json";
+    run_event();
+    my $u = argv_log()->{ustart}->[0];
+    is($u->[6], $json, 'json argument intact');
+    is(scalar(@$u), 8, 'argument count unchanged');
+};
+
 done_testing();
