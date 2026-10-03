@@ -126,7 +126,7 @@ sub run_event {
     my $pipe = '';
     open(my $w, '>', \$pipe) or die $!;
     *main::WRITER = *$w;
-    @main::active_connections = ({
+    @main::active_connections = $a{conns} ? @{ $a{conns} } : ({
         type      => FCM,
         pushstate => 'enabled',
         state     => VALID_CONNECTION,
@@ -367,5 +367,48 @@ for my $case (sort keys %hang) {
         ok(!$alive, 'no process left in the hook process group');
     };
 }
+
+{
+    package FakeWSConn;
+    sub new  { bless { ip => '127.0.0.1', port => $_[1] }, $_[0] }
+    sub ip   { $_[0]{ip} }
+    sub port { $_[0]{port} }
+}
+
+sub ws_causes {
+    my ( $lines, $id ) = @_;
+    return [ map { decode_json( ( split /--SPLIT--/, $_, 2 )[1] )->{events}[0]{Cause} }
+             grep { /^message--TYPE--\Q$id\E--SPLIT--/ } @$lines ];
+}
+
+subtest 'end notification: every client gets one "End:" prefix' => sub {
+    # sendOverWebSocket used to prefix the shared alarm object, so each
+    # later websocket client got another "End:" and FCM got one too
+    set_hooks();
+    $hooks_config{enabled} = 0;
+    $push_config{enabled} = 0;
+    my $ws = sub { { type => WEB, state => VALID_CONNECTION, id => $_[0], conn => FakeWSConn->new($_[1]), monlist => '5', intlist => '0', token => '' } };
+    my $lines = run_event( conns => [
+        $ws->( 'web-1', 1001 ),
+        $ws->( 'web-2', 1002 ),
+        { type => FCM, pushstate => 'enabled', state => VALID_CONNECTION, id => 'fcm-1',
+          token => 'tok_aaaaaaaaaaaaaaaa', monlist => '5', intlist => '0' },
+    ] );
+    is_deeply( ws_causes( $lines, 'web-1' ), [ 'Motion All', 'End:Motion All' ], 'first websocket client' );
+    is_deeply( ws_causes( $lines, 'web-2' ), [ 'Motion All', 'End:Motion All' ], 'second websocket client' );
+    is_deeply( \@sent, [ [ 'event_start', 'Motion All' ], [ 'event_end', 'Motion All' ] ],
+        'FCM end cause has no websocket prefix' );
+};
+
+subtest 'end notification when the event has no Notes in the DB' => sub {
+    # Notes NULL used to give an end notification with an undefined cause
+    set_hooks();
+    $hooks_config{enabled} = 0;
+    $push_config{enabled} = 0;
+    $db_notes = undef;
+    run_event( cause => 'Linked: Garage' );
+    is_deeply( \@sent, [ [ 'event_start', 'Linked: Garage' ], [ 'event_end', 'Linked: Garage' ] ],
+        'end cause falls back to the start cause' );
+};
 
 done_testing();

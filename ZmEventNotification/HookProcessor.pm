@@ -35,6 +35,8 @@ sub sendOverWebSocket {
 
   my $frame_id = getFrameId($alarm);
 
+  # the alarm object is shared with the other clients of this event: change a copy
+  $alarm = {%$alarm};
   if ( $notify_config{picture_url} && $notify_config{include_picture} ) {
     $alarm->{Picture} = buildPictureUrl($eid, $alarm->{Cause}, $resCode, 'websocket', $frame_id);
   }
@@ -735,7 +737,8 @@ sub processNewAlarmsInFork {
         $alarm->{End} = {
           State => 'pending',
           Time  => time(),
-          Cause => getNotesFromEventDB($eid)
+          # Notes can be NULL; fall back to what the start notification said
+          Cause => getNotesFromEventDB($eid) // $alarm->{Start}->{Cause}
         };
 
         main::Debug(2, 'Event end object is: state=>'
