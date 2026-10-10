@@ -238,12 +238,10 @@ sub _format_fcm_timestamp {
   my $format = defined $fcm_config{date_format} ? $fcm_config{date_format} : DEFAULT_FCM_DATE_FORMAT;
   my $current_locale = undef;
 
-  if (defined $fcm_config{date_locale} && $fcm_config{date_locale} ne '') {
+  # date_locale is validated once in loadEsConfigSettings
+  if ($fcm_config{date_locale}) {
     $current_locale = setlocale(LC_TIME);
-    my $locale_set = setlocale(LC_TIME, $fcm_config{date_locale});
-    if (!defined $locale_set) {
-      main::Error("fcm: invalid date_locale '$fcm_config{date_locale}'; using current locale instead");
-    }
+    setlocale(LC_TIME, $fcm_config{date_locale});
   }
 
   my $formatted = strftime($format, localtime);

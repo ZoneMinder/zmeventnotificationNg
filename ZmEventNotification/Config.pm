@@ -6,6 +6,7 @@ use Storable qw(store retrieve);
 use JSON;
 use YAML::XS;
 use File::Spec;
+use POSIX qw(setlocale LC_TIME);
 use Exporter 'import';
 use ZmEventNotification::Constants qw(:all);
 
@@ -145,6 +146,15 @@ sub loadEsConfigSettings {
     DEFAULT_FCM_DATE_FORMAT);
   $fcm_config{date_locale} = config_get_val($cfg, 'fcm', 'date_locale',
     DEFAULT_FCM_DATE_LOCALE);
+  if ($fcm_config{date_locale}) {
+    my $saved_locale = setlocale(LC_TIME);
+    if (setlocale(LC_TIME, $fcm_config{date_locale})) {
+      setlocale(LC_TIME, $saved_locale);
+    } else {
+      main::Error("fcm: invalid date_locale '$fcm_config{date_locale}', using process locale");
+      $fcm_config{date_locale} = undef;
+    }
+  }
   $fcm_config{android_priority} = config_get_val($cfg, 'fcm', 'fcm_android_priority',
     DEFAULT_FCM_ANDROID_PRIORITY);
   $fcm_config{android_ttl} = config_get_val($cfg, 'fcm', 'fcm_android_ttl');
