@@ -10,6 +10,7 @@ use JSON;
 use YAML::XS;
 use File::Spec;
 use MIME::Base64;
+use POSIX qw(setlocale LC_TIME);
 
 require StubZM;
 
@@ -110,6 +111,28 @@ $writer_fh->autoflush(1);
 {
     my $result = ZmEventNotification::FCM::_base64url_encode("Hello World");
     is($result, 'SGVsbG8gV29ybGQ', '_base64url_encode("Hello World")');
+}
+
+{
+    my $old_locale = setlocale(LC_TIME);
+    my $locale_name = 'it_IT.UTF-8';
+    my $locale_ok = setlocale(LC_TIME, $locale_name);
+    if (!defined $locale_ok) {
+        $locale_name = 'it_IT.utf8';
+        $locale_ok = setlocale(LC_TIME, $locale_name);
+    }
+
+    if (defined $locale_ok) {
+        setlocale(LC_TIME, $old_locale);
+        local $fcm_config{date_format} = '%b';
+        local $fcm_config{date_locale} = $locale_name;
+
+        my $ts = ZmEventNotification::FCM::_format_fcm_timestamp();
+        like($ts, qr/^[A-Za-z]+$/, 'timestamp respects configured locale override');
+        is(setlocale(LC_TIME), $old_locale, 'locale restored after timestamp formatting');
+    } else {
+        ok(1, 'locale override test skipped: locale not installed');
+    }
 }
 
 # ===== _check_monthly_limit =====

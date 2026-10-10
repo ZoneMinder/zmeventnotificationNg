@@ -143,6 +143,8 @@ sub loadEsConfigSettings {
     DEFAULT_REPLACE_PUSH_MSGS);
   $fcm_config{date_format} = config_get_val($cfg, 'fcm', 'date_format',
     DEFAULT_FCM_DATE_FORMAT);
+  $fcm_config{date_locale} = config_get_val($cfg, 'fcm', 'date_locale',
+    DEFAULT_FCM_DATE_LOCALE);
   $fcm_config{android_priority} = config_get_val($cfg, 'fcm', 'fcm_android_priority',
     DEFAULT_FCM_ANDROID_PRIORITY);
   $fcm_config{android_ttl} = config_get_val($cfg, 'fcm', 'fcm_android_ttl');
@@ -308,6 +310,7 @@ API Push Script....................... ${\(_value_or_undef($push_config{script})
 Use FCM .............................. ${\(_yes_or_no($fcm_config{enabled}))}
 Use FCM V1 APIs....................... ${\(_yes_or_no($fcm_config{use_v1}))}
 FCM Date Format....................... ${\(_value_or_undef($fcm_config{date_format}))}
+FCM Date Locale....................... ${\(_value_or_undef($fcm_config{date_locale}))}
 Only show latest FCMv1 message........ ${\(_yes_or_no($fcm_config{replace_push_messages}))}
 Android FCM push priority............. ${\(_value_or_undef($fcm_config{android_priority}))}
 Android FCM push ttl.................. ${\(_value_or_undef($fcm_config{android_ttl}))}
