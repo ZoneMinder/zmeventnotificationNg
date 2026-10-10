@@ -4,7 +4,7 @@ use warnings;
 use Exporter 'import';
 use JSON;
 use MIME::Base64;
-use POSIX qw(strftime);
+use POSIX qw(strftime setlocale LC_TIME);
 use Time::HiRes qw(gettimeofday);
 use Fcntl qw(:flock);
 use File::Temp qw(tempfile);
@@ -234,6 +234,27 @@ sub sendOverFCM {
   sendOverFCMV1(@_);
 }
 
+sub _format_fcm_timestamp {
+  my $format = defined $fcm_config{date_format} ? $fcm_config{date_format} : DEFAULT_FCM_DATE_FORMAT;
+  my $current_locale = undef;
+
+  if (defined $fcm_config{date_locale} && $fcm_config{date_locale} ne '') {
+    $current_locale = setlocale(LC_TIME);
+    my $locale_set = setlocale(LC_TIME, $fcm_config{date_locale});
+    if (!defined $locale_set) {
+      main::Error("fcm: invalid date_locale '$fcm_config{date_locale}'; using current locale instead");
+    }
+  }
+
+  my $formatted = strftime($format, localtime);
+
+  if (defined $current_locale) {
+    setlocale(LC_TIME, $current_locale);
+  }
+
+  return $formatted;
+}
+
 sub _prepare_fcm_common {
   my ($alarm, $obj, $event_type, $resCode, $label) = @_;
 
@@ -249,7 +270,7 @@ sub _prepare_fcm_common {
 
   my $body = $alarm->{Cause};
   $body .= ' ended' if $event_type eq 'event_end';
-  $body .= ' at ' . strftime($fcm_config{date_format}, localtime);
+  $body .= ' at ' . _format_fcm_timestamp();
 
   my $badge = $obj->{badge} + 1;
   my $count = defined($obj->{invocations}) ? $obj->{invocations}->{count} + 1 : 0;

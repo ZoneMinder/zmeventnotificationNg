@@ -73,6 +73,7 @@ use constant {
   DEFAULT_ESCONTROL_INTERFACE_FILE =>
     '/var/lib/zmeventnotification/misc/escontrol_interface.dat',
   DEFAULT_FCM_DATE_FORMAT => '%I:%M %p, %d-%b',
+  DEFAULT_FCM_DATE_LOCALE => undef,
   DEFAULT_FCM_ANDROID_PRIORITY => 'high',
   DEFAULT_FCM_LOG_RAW_MESSAGE  => 'no',
   DEFAULT_FCM_LOG_MESSAGE_ID   => 'NONE',

@@ -94,6 +94,11 @@ fcm:
   # date_format: "%H:%M, %d-%b"
   date_format: "%I:%M %p, %d-%b"
 
+  # Optional locale override used only while formatting the FCM timestamp.
+  # This lets you localize the month/day names for zmeventnotification.pl
+  # without changing the system-wide ZoneMinder locale.
+  # date_locale: "it_IT.UTF-8"
+
   # Set priority for android push. Default is high.
   # You can set it to high or normal.
   # There is weird foo going on here. If you set it to high,
