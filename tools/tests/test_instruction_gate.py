@@ -42,7 +42,8 @@ DOCS_DIR = "docs"
 GREP_GATES = [
     ("Fork IPC: no --TYPE-- split outside parse_job_line",
      re.compile(r"""split\(\s*['"]--TYPE--"""),
-     lambda rel: rel == "ZmEventNotification/Util.pm"),
+     # The mutation smoke holds the pattern as data, not as a split.
+     lambda rel: rel in ("ZmEventNotification/Util.pm", "scripts/gates/mutation_smoke.py")),
 ]
 PLAN_FILE_RE = re.compile(r"(^|/)PLAN\.md$|\.plan\.md$|^docs/plans/", re.I)
 # ---- end config -----------------------------------------------------------

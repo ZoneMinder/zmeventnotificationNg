@@ -17,7 +17,7 @@ Path: `readTokenFile`, `writeTokenFile` (temp file plus rename), and
 Never: writing the token file with a plain `open`, which a concurrent reader
 sees truncated; a read-modify-write without the lock, which loses a fork's
 update.
-Gate: `t/12-fcm-token-file.t`; the ratchet
+Gate: `t/12-fcm-token-file.t`; `scripts/gates/mutation_smoke.py`; the ratchet
 holds fcm_token_file_raw_writes; review for the lock.
 
 ### Token masking in logs
@@ -38,7 +38,7 @@ change is lost (f7360cc, revert 3ea5154); splitting `--TYPE--` outside
 `parse_job_line`.
 Gate: `t/20-job-pipe-contract.t`; `t/23-process-jobs.t`;
 `tools/tests/test_instruction_gate.py` (no --TYPE-- split outside
-`ZmEventNotification/Util.pm`).
+`ZmEventNotification/Util.pm`); `scripts/gates/mutation_smoke.py`.
 
 ### Config keys
 Owns: every key the ES and the hook read from their YAML configs.
@@ -49,7 +49,8 @@ Never: a key read by code but missing from its example config
 docs/guides/config.rst; a flat hook key read from g.config without a
 config_vals entry.
 Gate: `scripts/gates/config_key_drift.py`; the ratchet holds
-config_keys_missing_from_examples; review for undeclared hook keys.
+config_keys_missing_from_examples; `scripts/gates/mutation_smoke.py` (secret
+lookup in `config_get_val`); review for undeclared hook keys.
 
 ### pyzm interface
 Owns: the shape of pyzmNg that the hook consumes (`Detector`, `ZMClient`,
