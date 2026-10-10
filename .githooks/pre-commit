@@ -1,0 +1,12 @@
+#!/bin/sh
+# ES pre-commit gate: the instruction gate and the ratchet. Both run in about
+# a second. The full test suite runs on pre-push (make gate) and in CI.
+# Install once with: make hooks   (sets core.hooksPath -> .githooks)
+python3 -m pytest -q tools/tests/test_instruction_gate.py || {
+	echo "pre-commit: BLOCKED -- instruction gate failed."
+	exit 1
+}
+sh scripts/gates/ratchet.sh || {
+	echo "pre-commit: BLOCKED -- ratchet failed."
+	exit 1
+}

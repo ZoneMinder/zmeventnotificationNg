@@ -32,6 +32,53 @@ Running all tests
    cd hook && python3 -m pytest tests/test_e2e/ -q && cd ..
 
 
+Gates
+-----
+
+``make gate`` runs the Perl tests, the hook and tools tests, the
+instruction gate, and the ratchet. It takes about 30 seconds and needs no
+models. Run ``make hooks`` once per clone: the pre-commit hook then runs the
+instruction gate and the ratchet, and the pre-push hook runs ``make gate``.
+
+.. code-block:: bash
+
+   make hooks                         # once per clone
+   make gate                          # before every push
+   make mutation                      # mutation smoke, also run in CI
+   sh scripts/gates/proven-red.sh origin/master HEAD
+
+The pieces, and what each one fails on:
+
+- ``tools/tests/test_instruction_gate.py`` checks the agent instruction
+  files. It fails when a contract in ``AGENTS.project.md`` names a file or
+  symbol that does not exist, when a cited commit is missing, when a plan
+  file is tracked, or when a job line is split outside ``parse_job_line``.
+- ``scripts/gates/ratchet.sh`` counts known problems listed in
+  ``.ratchet-counters`` (files over 400 lines, full FCM tokens in log lines,
+  config keys missing from the example configs, test files missing from
+  this page) and fails when a count rises above ``.ratchet-baseline``. When
+  you fix one, run ``sh scripts/gates/ratchet.sh --update`` to lower the
+  baseline. It refuses to raise a number; a raise is a hand edit with the
+  reason in the commit message.
+- ``scripts/gates/proven-red.sh <base> <head>`` copies the test files a
+  branch changed into a worktree of the code before the branch and runs
+  them there. It fails when a changed test passes on the old code, because
+  that test cannot catch the bug it was written for. It also fails when
+  source changed and no test did.
+- ``scripts/gates/mutation_smoke.py`` breaks one line in each of four risky
+  places (token file write, job line parsing, ``!secret`` lookup in the ES
+  and in the hook) and fails when the tests for that module still pass.
+- ``scripts/gates/pr-body-check.sh`` runs on pull requests. It fails when
+  the body has no ``## Acceptance`` content, when a ``feat`` PR has no
+  ``## Spec`` section, or when the PR edits ``CHANGELOG.md``.
+
+GitHub Actions (``.github/workflows/ci.yml``) runs ``make gate``, proven red,
+the mutation smoke, and the PR body check on every push to ``master`` and
+every pull request. CI checks out ``ZoneMinder/pyzmNg`` master and sets
+``ZM_E2E_REQUIRE=1``, so the pyzm contract test fails instead of skipping
+when pyzm cannot be imported.
+
+
 Unit / integration tests
 -------------------------
 
