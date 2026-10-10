@@ -17,6 +17,7 @@ import importlib
 import os
 import pwd
 import shutil
+import site
 import stat
 import sys
 
@@ -125,9 +126,34 @@ def check_cv2_import():
         f"    numpy in use: {np_detail}\n"
         f"    A module built against NumPy 1.x cannot run on NumPy 2.x. Either\n"
         f"    match the numpy your OpenCV was built against:\n"
-        f"        {pip} install \"numpy<2\"\n"
+        f"        sudo {pip} install \"numpy<2\"\n"
         f"    or install an OpenCV built for the numpy you have:\n"
-        f"        {pip} install \"opencv-contrib-python<5\""
+        f"        sudo {pip} install \"opencv-contrib-python<5\""
+    )
+
+
+def check_cv2_user_site():
+    """Warn if cv2 is loaded from this user's ~/.local site-packages.
+
+    install.sh gives the venv to the web user and enables system site
+    packages, which also enables the user site. Running the venv's pip
+    without sudo then falls back to "Defaulting to user installation", so cv2
+    lands in ~/.local: importable for you, invisible to the web user that
+    runs zm_detect.py. Refs #64.
+    """
+    cv2, err = _import_cv2()
+    if err is not None:
+        return None
+    user_site = site.getusersitepackages()
+    if not os.path.abspath(getattr(cv2, "__file__", None) or "").startswith(user_site + os.sep):
+        return None
+    pip = os.path.join(sys.prefix, "bin", "pip")
+    return (
+        f"cv2 is loaded from your user site-packages ({user_site}).\n"
+        f"    The web user running zm_detect.py cannot see it. Remove the user\n"
+        f"    copy, then install into the venv as root:\n"
+        f"        {pip} uninstall opencv-contrib-python\n"
+        f"        sudo {pip} install \"opencv-contrib-python<5\""
     )
 
 
@@ -636,6 +662,10 @@ def main():
 
     # --- Python dependency checks ---
     w = check_cv2_import()
+    if w:
+        warnings.append(w)
+
+    w = check_cv2_user_site()
     if w:
         warnings.append(w)
 

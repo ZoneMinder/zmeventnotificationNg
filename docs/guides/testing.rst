@@ -247,7 +247,8 @@ Tools test reference
    * - ``tools/tests/test_config_edit.py``
      - ``config_edit`` parse/apply, comment-out, ``_global_`` cross-section
    * - ``tools/tests/test_install_doctor.py``
-     - ``install_doctor`` model discovery, OpenCV-version + model classification
+     - ``install_doctor`` model discovery, OpenCV-version + model classification,
+       cv2 import failures, cv2 loaded from the user site-packages
    * - ``tools/tests/test_install_sh.py``
      - ``install.sh`` functions (sourced in a sandboxed repo copy, no system
        paths): flag parsing, venv handling, config install/upgrade, path

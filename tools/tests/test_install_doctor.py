@@ -8,6 +8,7 @@ OpenCV-version comparison is deterministic and independent of what's installed.
 
 import importlib.util
 import os
+import site
 import sys
 import types
 
@@ -25,6 +26,7 @@ check_opencv_version = mod.check_opencv_version
 check_onnx_package = mod.check_onnx_package
 check_model_files = mod.check_model_files
 check_cv2_import = mod.check_cv2_import
+check_cv2_user_site = mod.check_cv2_user_site
 check_gpu_cuda = mod.check_gpu_cuda
 resolve_path = mod.resolve_path
 
@@ -375,6 +377,27 @@ class TestCheckCv2Import:
     def test_working_cv2_no_warning(self, cv2_state):
         cv2_state("ok")
         assert check_cv2_import() is None
+
+
+class TestCheckCv2UserSite:
+    # Refs #64: venv pip run without sudo falls back to ~/.local, which the
+    # web user running zm_detect.py cannot see.
+    def test_cv2_in_user_site_warns(self, cv2_state):
+        user_site = site.getusersitepackages()
+        cv2_state("ok").__file__ = os.path.join(user_site, "cv2", "__init__.py")
+        w = check_cv2_user_site()
+        assert w is not None
+        assert user_site in w
+        assert "sudo" in w
+
+    def test_cv2_in_venv_no_warning(self, cv2_state):
+        cv2_state("ok").__file__ = os.path.join(
+            sys.prefix, "lib", "site-packages", "cv2", "__init__.py")
+        assert check_cv2_user_site() is None
+
+    def test_missing_cv2_no_warning(self, cv2_state):
+        cv2_state("missing")
+        assert check_cv2_user_site() is None
 
 
 # ── check_gpu_cuda ──────────────────────────────────────────────────────
