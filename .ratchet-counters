@@ -1,0 +1,7 @@
+# Ratchet counters (AGENTS.md C7): name<TAB>shell command printing one number.
+# Run from the repo root by scripts/gates/ratchet.sh.
+files_over_400	git ls-files '*.pm' '*.pl' '*.py' '*.sh' | grep -vE '^(t|legacy)/|(^|/)tests/|/build/' | while read f; do grep -cvE '^[[:space:]]*(#.*)?$' "$f"; done | awk '$1>400' | wc -l
+fcm_token_file_raw_writes	cat ZmEventNotification/*.pm zmeventnotification.pl | grep -E "open *\\(.*'>'.*fcm_config\\{token_file\\}" | wc -l
+unmasked_token_logs	ls ZmEventNotification/*.pm zmeventnotification.pl | grep -v Config.pm | xargs cat | grep -E '(Debug|Info|Warning|Error|Fatal)\(.*\$(token|new_token|existing_token|dtoken)\b' | grep -v substr | wc -l
+config_keys_missing_from_examples	python3 scripts/gates/config_key_drift.py --count
+test_files_missing_from_test_map	git ls-files 't/*.t' 'hook/tests/test_*.py' 'tools/tests/test_*.py' | grep -E '(^t/.*\.t|/test_[^/]*\.py)$' | while read f; do grep -qF "$(basename "$f")" docs/guides/testing.rst || echo "$f"; done | wc -l

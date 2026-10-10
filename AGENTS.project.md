@@ -48,7 +48,7 @@ Never: a key read by code but missing from its example config
 (zmeventnotification.example.yml, hook/objectconfig.example.yml) or from
 docs/guides/config.rst; a flat hook key read from g.config without a
 config_vals entry.
-Gate: the ratchet holds
+Gate: `scripts/gates/config_key_drift.py`; the ratchet holds
 config_keys_missing_from_examples; review for undeclared hook keys.
 
 ### pyzm interface
