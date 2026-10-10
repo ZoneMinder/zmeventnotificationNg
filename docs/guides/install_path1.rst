@@ -139,12 +139,26 @@ GPU support or a specific version.
 
 .. code:: bash
 
-   /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
+   sudo /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
 
 The ``<5`` matters: PyPI now ships OpenCV 5 wheels, and OpenCV 5 cannot load
 the YOLOv4/YOLOv3 weights the installer downloads. The shipped config does not
 enable those models, so an OpenCV 5 build works until you switch one on. The
 ``<5`` keeps that option open.
+
+The ``sudo`` matters too. The installer hands the venv to the web user, so
+your own account cannot write to it. Without ``sudo``, pip prints
+``Defaulting to user installation because normal site-packages is not
+writeable`` and installs into ``~/.local`` instead. You can import it from
+there, but the web user that runs ``zm_detect.py`` cannot, and the hook fails
+with ``No module named 'cv2'``. The same applies to every venv ``pip`` command
+in these docs.
+
+Packages installed with ``sudo`` are owned by root. The hook can still read
+them. If you later run pip as the web user, hand the venv back to it first:
+``sudo chown -R www-data:www-data /opt/zoneminder/venv`` (use your web
+server's user if it is not ``www-data``). Re-running ``install.sh`` does the
+same.
 
 **For GPU support**, compile from source with CUDA enabled. See the
 `official OpenCV build guide <https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html>`__.
@@ -168,14 +182,26 @@ built from source is automatically visible inside the venv.
 
    .. code:: bash
 
-      /opt/zoneminder/venv/bin/pip uninstall opencv-python opencv-python-headless
+      sudo /opt/zoneminder/venv/bin/pip uninstall opencv-python opencv-python-headless
       # Rebuild / reinstall your custom OpenCV
 
 Verify it works:
 
 .. code:: bash
 
-   /opt/zoneminder/venv/bin/python -c "import cv2; print(cv2.__version__)"
+   /opt/zoneminder/venv/bin/python -s -c "import cv2; print(cv2.__version__)"
+
+``-s`` makes Python ignore your ``~/.local`` packages, so it sees the same
+packages the hook does. If this fails but works without ``-s``, OpenCV went
+into ``~/.local``. Remove the user copy first, then install into the venv:
+
+.. code:: bash
+
+   /opt/zoneminder/venv/bin/pip uninstall opencv-contrib-python
+   sudo /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
+
+Do the uninstall first: once the venv has its own copy, pip finds that one
+before the ``~/.local`` one.
 
 .. _numpy_abi_mismatch:
 
@@ -198,10 +224,10 @@ Pick whichever side is easier to move:
 .. code:: bash
 
    # Match numpy to the OpenCV you already built
-   /opt/zoneminder/venv/bin/pip install "numpy<2"
+   sudo /opt/zoneminder/venv/bin/pip install "numpy<2"
 
    # Or use an OpenCV built for NumPy 2.x (no CUDA in these wheels)
-   /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
+   sudo /opt/zoneminder/venv/bin/pip install "opencv-contrib-python<5"
 
 Use the venv's ``pip``, not the system one — a plain ``pip install`` outside
 the venv changes a numpy that the hooks never load.
@@ -301,7 +327,7 @@ automatically.
 .. code:: bash
 
    sudo apt-get install libopenblas-dev liblapack-dev libblas-dev  # not mandatory, but gives a good speed boost
-   /opt/zoneminder/venv/bin/pip install face_recognition            # installs dlib automatically
+   sudo /opt/zoneminder/venv/bin/pip install face_recognition            # installs dlib automatically
 
 If you installed ``face_recognition`` earlier **without** the BLAS libraries,
 reinstall both ``dlib`` and ``face_recognition`` so dlib is built with OpenBLAS
@@ -309,10 +335,10 @@ support:
 
 .. code:: bash
 
-   /opt/zoneminder/venv/bin/pip uninstall dlib face-recognition
+   sudo /opt/zoneminder/venv/bin/pip uninstall dlib face-recognition
    sudo apt-get install libopenblas-dev liblapack-dev libblas-dev   # the important part
-   /opt/zoneminder/venv/bin/pip install dlib --verbose --no-cache-dir  # make sure it finds openblas
-   /opt/zoneminder/venv/bin/pip install face_recognition
+   sudo /opt/zoneminder/venv/bin/pip install dlib --verbose --no-cache-dir  # make sure it finds openblas
+   sudo /opt/zoneminder/venv/bin/pip install face_recognition
 
 Optional: Google Coral EdgeTPU
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -339,7 +365,7 @@ After installation, run the diagnostic tool to check your environment:
 
 ::
 
-   sudo -u www-data python3 tools/install_doctor.py \
+   sudo -u www-data /opt/zoneminder/venv/bin/python tools/install_doctor.py \
        --hook-config /etc/zm/objectconfig.yml \
        --es-config /etc/zm/zmeventnotification.yml \
        --web-owner www-data --web-group www-data \

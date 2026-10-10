@@ -270,7 +270,7 @@ Which models should I use?
 
 - **BirdNET audio recognition**: Identifies 6500+ bird species from audio in ZM events.
   Install via the installer with ``--install-birdnet`` (or ``INSTALL_BIRDNET=yes``),
-  or manually: ``/opt/zoneminder/venv/bin/pip install birdnet-analyzer``
+  or manually: ``sudo /opt/zoneminder/venv/bin/pip install birdnet-analyzer``
 
 - For face recognition, use ``face_model: cnn`` for more accuracy and ``face_model: hog`` for better speed
 
@@ -1055,7 +1055,7 @@ Face Detection + Face Recognition
 Face Recognition uses
 `this <https://github.com/ageitgey/face_recognition>`__ library. Before
 you try and use face recognition, please make sure you did a
-``/opt/zoneminder/venv/bin/pip install face_recognition`` The reason this is not
+``sudo /opt/zoneminder/venv/bin/pip install face_recognition`` The reason this is not
 automatically done during setup is that it installs a lot of
 dependencies that takes time (including dlib) and not everyone wants it.
 
@@ -1152,7 +1152,7 @@ BirdNET is not installed by default. Use the installer flag::
 
 Or install manually into the venv::
 
-   /opt/zoneminder/venv/bin/pip install birdnet-analyzer
+   sudo /opt/zoneminder/venv/bin/pip install birdnet-analyzer
 
 **Configuration** (in ``objectconfig.yml``):
 
