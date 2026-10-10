@@ -258,6 +258,12 @@ Tools test reference
        origin, stub ``gh``/``git-cliff``/``curl``): aborts before any push;
        pyzm pin sync (incl. ``pyzm[ml]>=``); existing tag: 1 = new version,
        2 = overwrite
+   * - ``tools/tests/test_instruction_gate.py``
+     - The agent instruction files (``AGENTS.md``, ``AGENTS.project.md``,
+       ``agents/``): every file and symbol a contract names exists, the
+       portable core holds no project names, the always-loaded files stay
+       under the word budget, cited commits exist, no plan file is tracked,
+       and no ``--TYPE--`` job line is split outside ``parse_job_line``
 
 
 e2e test reference
