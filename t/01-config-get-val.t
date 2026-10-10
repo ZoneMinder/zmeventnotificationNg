@@ -92,4 +92,13 @@ is($ZmEventNotification::Config::hooks_config{hook_timeout}, 0, 'hook_timeout de
     is($ZmEventNotification::Config::hooks_config{hook_timeout}, 45, 'hook_timeout read from hook section');
 }
 
+{
+    local $cfg->{fcm}{date_locale} = 'xx_INVALID.LOCALE';
+    loadEsConfigSettings($cfg);
+    is($ZmEventNotification::Config::fcm_config{date_locale}, undef, 'invalid fcm date_locale is dropped at load');
+    $cfg->{fcm}{date_locale} = 'C';
+    loadEsConfigSettings($cfg);
+    is($ZmEventNotification::Config::fcm_config{date_locale}, 'C', 'valid fcm date_locale is kept');
+}
+
 done_testing();

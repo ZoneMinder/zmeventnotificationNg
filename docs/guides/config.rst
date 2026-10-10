@@ -217,7 +217,7 @@ Every key accepted by ``zmeventnotification.yml``, grouped by YAML section.
      - strftime format for notification timestamps
    * - ``date_locale``
      - *(none)*
-     - Optional locale name applied only while formatting the FCM timestamp, such as ``it_IT.UTF-8``. This lets the Event Server localize month names without changing the system locale used by other ZoneMinder processes.
+     - Optional locale name applied only while formatting the FCM timestamp, such as ``it_IT.UTF-8``. This lets the Event Server localize month names without changing the system locale used by other ZoneMinder processes. An invalid or uninstalled locale is logged at startup and ignored.
    * - ``fcm_android_priority``
      - ``high``
      - Android push priority (``high`` or ``normal``)

@@ -113,26 +113,20 @@ $writer_fh->autoflush(1);
     is($result, 'SGVsbG8gV29ybGQ', '_base64url_encode("Hello World")');
 }
 
-{
+SKIP: {
     my $old_locale = setlocale(LC_TIME);
-    my $locale_name = 'it_IT.UTF-8';
-    my $locale_ok = setlocale(LC_TIME, $locale_name);
-    if (!defined $locale_ok) {
-        $locale_name = 'it_IT.utf8';
-        $locale_ok = setlocale(LC_TIME, $locale_name);
-    }
+    my ($locale_name) = grep { setlocale(LC_TIME, $_) } qw(it_IT.UTF-8 it_IT.utf8);
+    setlocale(LC_TIME, $old_locale);
+    skip 'it_IT locale not installed', 2 unless $locale_name;
 
-    if (defined $locale_ok) {
-        setlocale(LC_TIME, $old_locale);
-        local $fcm_config{date_format} = '%b';
-        local $fcm_config{date_locale} = $locale_name;
+    local $fcm_config{date_format} = '%B';
+    local $fcm_config{date_locale} = $locale_name;
+    my @mesi = qw(gennaio febbraio marzo aprile maggio giugno
+                  luglio agosto settembre ottobre novembre dicembre);
 
-        my $ts = ZmEventNotification::FCM::_format_fcm_timestamp();
-        like($ts, qr/^[A-Za-z]+$/, 'timestamp respects configured locale override');
-        is(setlocale(LC_TIME), $old_locale, 'locale restored after timestamp formatting');
-    } else {
-        ok(1, 'locale override test skipped: locale not installed');
-    }
+    my $ts = ZmEventNotification::FCM::_format_fcm_timestamp();
+    is($ts, $mesi[(localtime)[4]], 'timestamp uses configured date_locale');
+    is(setlocale(LC_TIME), $old_locale, 'locale restored after timestamp formatting');
 }
 
 # ===== _check_monthly_limit =====
