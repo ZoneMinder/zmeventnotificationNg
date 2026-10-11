@@ -1,101 +1,108 @@
 # Development Guidelines
 
-Read this file before work. It is the single source of truth for how to work in
-this repo; `CLAUDE.md` just points here.
+Portable core. This file contains no project-specific names and copies
+verbatim into any project. Load order: this file, then
+`AGENTS.project.md` (architecture contracts, project rules, verification
+commands, playbooks), then the playbook it lists for your work area.
 
-| Work | Read first |
-|---|---|
-| Any code, test, or config change | This file, then run the test gate below |
-| Hook / ML detection (`hook/`) | pyzmNg source at `~/fiddle/pyzmNg` is the source of truth |
-| Config keys | The config-key checklist below |
-| Docs | `docs/guides/testing.rst` for the test map |
+Adopting this core in another project: copy this file unchanged, then write
+your own `AGENTS.project.md` and the gates it names. Project facts never
+belong in this file.
 
-## Core rules
+## Rule format
 
-1. Write plain, factual prose. No marketing claims, filler, or recap sections.
-2. Create or use a GitHub issue before feature or bug work, on
-   `ZoneMinder/zmeventnotificationNg` (origin). Label it. A user instruction to
-   use an existing issue overrides creating one.
-3. **Test first.** Before any commit, run the full gate (see Verification) and
-   confirm it is green. Never commit after a failed or unrun gate.
-4. Every new feature or bugfix ships with a test that fails before the change
-   and passes after. If you cannot write one, say why in the PR.
-5. `zm_detect.py` and its helpers lean on pyzmNg. Validate what is true by
-   reading pyzmNg (`~/fiddle/pyzmNg`), not by guessing. Mocks in tests must
-   match the real pyzmNg interface.
-6. Follow DRY. Write simple code. Match the style of the file you are editing.
-7. Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`,
-   `test:`. Scope optional (`feat(hook):`). One logical change per commit.
-   Reference the issue in the body (`refs #<id>`); close only after the user
-   confirms.
-8. Never edit `CHANGELOG.md`. It is auto-generated.
-9. Do not commit plan files (`PLAN.md`, `*.plan.md`, implementation plans).
-   They are temporary; delete them when the task is done.
-10. When responding to issues or PRs from others, add comments, never overwrite
-    anyone's (including an AI agent's). Identify yourself as Claude assisting
-    @pliablepixels.
-11. Run Event Server commands as the ZM user: `sudo -u www-data ./zmeventnotification.pl <options>`.
-    Access DB/configs/secrets as `sudo -u www-data`.
-12. Read failures. Fix the cause. Do not blindly retry or weaken a test to make
-    it pass.
+Every rule is a statement, a one-clause why, and a gate. A rule a script
+could check but names no gate is a defect here. Rules carry stable IDs by
+tier; docs reference IDs, never copied text.
 
-## Verification (the test gate)
+## Invariants (never simplified away)
 
-Install the pre-push hook once per clone: `make hooks`. It runs `make gate`
-on `git push` and blocks a red push (`--no-verify` overrides an emergency).
+- I1. Validate at trust boundaries: server responses, user input, IPC.
+  Malformed input is routine, not rare.
+- I2. Destructive operations need error handling and a recovery path. Lost
+  user data cannot be patched later.
+- I3. Security and accessibility are never traded for simplicity or speed.
+  Gate: n/a, no UI in this repo.
 
-- `make gate` — Tier-1: perl + hook (not e2e) + tools. This is the per-push gate.
-- `make release-gate` — Tier-1 + real-pyzm e2e with `ZM_E2E_REQUIRE=1` (a missing
-  model or unimportable pyzm FAILS instead of skipping). Run before a release.
+## Process
 
-The gate puts the pyzm checkout (`PYZM_SRC`, default `~/fiddle/pyzmNg`) on
-`PYTHONPATH` so `hook/tests/test_pyzm_contract.py` imports the REAL pyzm and
-catches cross-repo drift (a renamed `DetectionResult` key, a changed
-`detect_event` signature) on every push.
+- P1. Create or use an issue before feature or bug work, after checking the
+  out-of-scope ledger; land through an issue-linked PR whose body quotes the
+  issue's acceptance lines. Commits reference the issue; closing keywords
+  only after the user confirms. If instructed to push directly to the default branch,
+  do so and verify the issue timeline. Typo-level fixes and doc
+  corrections with no behavior change need no issue.
+- P2. Test first: a failing test precedes the implementation of every
+  feature and bugfix. A test that has never failed does not demonstrate it
+  can catch the bug. Changes an existing gate already covers fully rely on
+  that gate instead of a bespoke new test. Gate: the proven-red CI job runs
+  each change's tests against the pre-change code, fails when they pass, and
+  says whether the red was an assertion or only a missing symbol.
+- P3. Run the gates covering the change before every commit; run the full
+  suite before push or PR. Never commit after a failed or unrun gate.
+- P4. Read failures and fix the cause. Never blindly retry.
+- P5. One logical change per conventional commit.
+- P6. Verification runs direct commands. Tooling that transforms output,
+  such as wrappers, compressors, or summarizers, is untrusted until
+  validated once against raw output.
+- P7. Finish the requested behavior. Materially different UX options need
+  approval before choosing.
+- P8. Never merge the default branch without approval.
+- P10. Docs move with behavior: user docs for changed behavior, developer
+  docs and call flows for new APIs, components, hooks, and utilities. All
+  prose reads like a developer explaining to a colleague: no marketing
+  language, filler, headline headings, aphorisms, or news cadence.
 
-The raw commands the Makefile runs, if you need them directly:
+## Code
 
-```bash
-# Perl (Event Server: zmeventnotification.pl + ZmEventNotification/*.pm)
-prove -I t/lib -I . -r t/
+- C1. Reuse ladder: existing codebase helper, then stdlib, then platform
+  feature, then installed dependency, then new code. A new dependency is a
+  last resort.
+- C2. Keep files under 400 lines of code. No dead code, commented-out
+  replacements, or speculative abstractions. Gate: the lint ratchet holds
+  the count of over-long files.
+- C3. Never hardcode user-facing text; every locale updates together.
+  Gate: n/a, no locales in this repo.
+- C4. Never inline semantic values; constants live in their dedicated
+  modules.
+- C5. New modules live in domain folders.
+- C6. Test assertions must be able to fail: assert fetched values or
+  user-visible outcomes, never element existence or child count. Gate: the
+  quality ratchet.
+- C7. The lint ratchet baseline shrinks or holds, never grows. Raising a
+  number by hand needs a reason in the commit message.
 
-# Python unit/integration (hook + tools), no models needed
-cd hook && python3 -m pytest tests/ -m "not e2e" -q && cd ..
-python3 -m pytest tools/tests/ -q
+## Meta (governs this file)
 
-# Python e2e (real pyzmNg + YOLO models). Use PYTHONPATH if pyzmNg is on a
-# non-standard path. In CI, add ZM_E2E_REQUIRE=1 so missing prereqs FAIL
-# instead of silently skipping.
-cd hook && python3 -m pytest tests/test_e2e/ -q && cd ..
-```
+- M1. A rule a script can check needs a gate, added in the same change.
+  Ungated rules drift; an audit of ungated rules found every one violated
+  while every gated rule held.
+- M2. A gate's input needs checking, not just its exit code. Confirm the
+  number a gate reports describes what it claims to measure.
+- M3. Instruction files change only through the self-improvement protocol
+  below. One-off facts go to the project file or a playbook, never here.
+- M4. This file owns process rules; other docs link to rule IDs and never
+  copy the text.
+- M5. Project facts (API quirks, platform behavior, failed approaches) go
+  to the domain playbook, proven workflow practices to the generic
+  playbooks, through the protocol, never only into agent memory, which no
+  other agent sees. Repo files carry no
+  personal or private data; only such specifics (names, hosts,
+  credentials) and unproven taste stay in agent memory.
 
-Verification runs the real commands and reads the real output. Do not claim
-green from memory. State which tiers you ran in the handoff.
+## Self-improvement protocol
 
-The test suite is a regression net: a green gate should mean a new change broke
-nothing that worked. Keep it that way. Do not add tautological tests (assertions
-that pass regardless of production correctness) or tests that re-implement the
-logic they claim to check. A useful test fails when the code it covers breaks.
+Trigger: a breakage, review finding, or wasted session an instruction or
+contract would have prevented, or an instruction that itself caused harm.
 
-`docs/guides/testing.rst` maps every test file to what it covers. Update it when
-you add or repurpose a test file.
+Action: the PR fixing the problem also proposes the instruction edit, with
+the gate M1 requires. The maintainer merges or rejects it like any diff.
+Agents never edit instruction files outside this protocol.
 
-## Documentation
+## Project knowledge
 
-Docs live in `docs/` (Read the Docs / reStructuredText). Write for the user:
-clear, correct, comprehensive, and current. When you touch a subsystem, check
-its docs still match reality and fix drift. `zm_detect.py` leans on pyzmNg, so
-validate documented hook behavior by reading pyzmNg, not by assuming.
-
-Never edit `CHANGELOG.md`; it is auto-generated.
-
-## Config-key checklist
-
-When adding, removing, or changing ANY config key, update all of:
-
-- `docs/guides/config.rst` (the "Complete Hook Config Reference" table)
-- `hook/objectconfig.example.yml`
-- `hook/zmes_hook_helpers/common_params.py` (for flat keys)
-- Any code examples in `docs/guides/hooks.rst` referencing the key
-- pyzmNg docs if the key is consumed by pyzmNg
-- A test asserting the new behavior
+Architecture contracts, project rules, verification commands, and the
+playbook table live in `AGENTS.project.md`. Each contract states what it
+owns, the sanctioned path, forbidden bypasses, and the gate. Trust the
+contract over rediscovering the invariant from code; a code/contract
+mismatch is a finding for the self-improvement protocol.

@@ -1,0 +1,110 @@
+# Gates for every push and PR (AGENTS.md P2, P3; AGENTS.project.md).
+# Make `gates` and `proven-red` required checks in branch protection; a check
+# nobody requires is advice.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  # P1: the body quotes the issue's acceptance lines; a feat PR names its
+  # spec; no PR edits CHANGELOG.md. Fork PRs and bots are exempt.
+  pr-acceptance:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type != 'Bot'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Title and body go through env, never into the script text: both are
+      # attacker-controlled.
+      - name: PR body has acceptance lines, a spec on a feat, no CHANGELOG.md edit
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: sh scripts/gates/pr-body-check.sh
+
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The instruction gate checks that cited commit hashes exist.
+          fetch-depth: 0
+      # The pyzm contract test imports the real pyzmNg (pyzm interface
+      # contract), from master so drift shows up here first.
+      - uses: actions/checkout@v4
+        with:
+          repository: ZoneMinder/pyzmNg
+          path: _pyzm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Perl modules the tests load
+        run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          libjson-perl libjson-xs-perl libyaml-libyaml-perl libtest-warn-perl
+          liburi-perl libwww-perl libio-socket-ssl-perl
+          libcrypt-openssl-rsa-perl libnet-mqtt-simple-perl
+      - name: Install Python packages the tests load
+        run: pip install pytest pyyaml numpy opencv-python-headless configupdater "./_pyzm[ml]"
+      # ZM_E2E_REQUIRE=1 makes the pyzm contract test fail instead of skip
+      # when pyzm cannot be imported. e2e tests stay deselected by `make gate`.
+      - name: make gate (perl, hook, tools, instruction gate, ratchet)
+        env:
+          ZM_E2E_REQUIRE: '1'
+        run: make gate PYZM_SRC="$GITHUB_WORKSPACE/_pyzm"
+
+  proven-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: ZoneMinder/pyzmNg
+          path: _pyzm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Perl modules the tests load
+        run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          libjson-perl libjson-xs-perl libyaml-libyaml-perl libtest-warn-perl
+          liburi-perl libwww-perl libio-socket-ssl-perl
+          libcrypt-openssl-rsa-perl libnet-mqtt-simple-perl
+      - name: Install Python packages the tests load
+        run: pip install pytest pyyaml numpy opencv-python-headless configupdater "./_pyzm[ml]"
+      # P2 by machine: the tests this range changed must fail on the code the
+      # range replaces. A push that creates a branch has no before commit.
+      - name: Changed tests go red on the pre-change code
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.event.after }}
+          PYZM_SRC: ${{ github.workspace }}/_pyzm
+        run: |
+          if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning title=Proven red skipped::new branch push has no base commit"
+            exit 0
+          fi
+          if [ -n "$PR_TITLE" ]; then
+            sh scripts/gates/proven-red.sh "$BASE" "$HEAD" --title "$PR_TITLE"
+          else
+            sh scripts/gates/proven-red.sh "$BASE" "$HEAD"
+          fi
+      # Proves the existing tests of the risky modules can fail at all.
+      - name: Mutation smoke
+        run: make mutation PYZM_SRC="$GITHUB_WORKSPACE/_pyzm"
