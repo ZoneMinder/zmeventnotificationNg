@@ -256,6 +256,7 @@ A few things to keep in mind:
 - If ``es_rules.yml`` fails to parse, the ES loads no rules and every monitor
   notifies. The ES logs ``rules: Failed loading es rules`` when this happens;
   check the log after editing the file.
+
 Note that you need to install ``Time::Piece`` in Perl.
 
 

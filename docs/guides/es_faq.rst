@@ -93,7 +93,7 @@ the following
 .. _upgrade_es_hooks:
 
 How do I safely upgrade zmeventnotificationNg to new versions?
-------------------------------------------------------------
+--------------------------------------------------------------
 
 STEP 1: get the latest code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

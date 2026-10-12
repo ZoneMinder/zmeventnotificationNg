@@ -465,7 +465,8 @@ The file is organized into these sections:
 
 .. _push_config:
 
-**Direct Push Notifications (push section)**
+Direct Push Notifications (push section)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``push`` section configures direct FCM push notifications
 from ``zm_detect`` — **Path 1 only**, requires ZM 1.39.2+. ``zm_detect`` reads registered
