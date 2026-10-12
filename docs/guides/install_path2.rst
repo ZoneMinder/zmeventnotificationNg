@@ -29,8 +29,8 @@ Step 1: Install ML dependencies
 Follow **Steps 1 and 2** from :doc:`install_path1` to install OpenCV and pyzmNg.
 These are needed for the ML hooks that the ES invokes.
 
-Step 2: Install the WebSocket Perl module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 2: Install the Perl modules
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The installer handles most Perl dependencies via apt, but ``Net::WebSocket::Server``
 must be installed separately:
