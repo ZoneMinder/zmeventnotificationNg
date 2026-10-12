@@ -43,6 +43,13 @@ must be installed separately:
    # If cpanm is not installed:
    sudo apt install cpanminus
 
+Optional: if you want MQTT notifications, also install ``Net::MQTT::Simple``. The ES
+won't start with MQTT enabled if it is missing. MQTT 3.1.1 or newer is required.
+
+.. code:: bash
+
+   sudo cpanm Net::MQTT::Simple
+
 Step 3: Run the installer
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -204,17 +211,6 @@ Logging
 
 For quick debugging, add ``--debug`` when running manually. For proper persistent logging,
 see :ref:`es-hooks-logging`.
-
-Optional: MQTT
-~~~~~~~~~~~~~~
-
-If you want MQTT notifications:
-
-.. code:: bash
-
-   sudo cpanm Net::MQTT::Simple
-
-MQTT 3.1.1 or newer is required.
 
 Troubleshooting
 ~~~~~~~~~~~~~~~
