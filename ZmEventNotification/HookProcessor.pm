@@ -539,12 +539,7 @@ sub processNewAlarmsInFork {
               . '--JSON--'
               . $resJsonString . "\n";
 
-            print main::WRITER 'event_description--TYPE--'
-              . $mid
-              . '--SPLIT--'
-              . $eid
-              . '--SPLIT--'
-              . $resTxt . "\n";
+            updateEventinZmDB( $eid, $resTxt );
 
             $hookString = $resTxt;
           }
@@ -653,12 +648,7 @@ sub processNewAlarmsInFork {
               . '--JSON--'
               . $resJsonString . "\n";
 
-            print main::WRITER 'event_description--TYPE--'
-              . $mid
-              . '--SPLIT--'
-              . $eid
-              . '--SPLIT--'
-              . $resTxt . "\n";
+            updateEventinZmDB( $eid, $resTxt );
 
             $hookString = $resTxt;
           }
