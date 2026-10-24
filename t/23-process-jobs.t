@@ -22,9 +22,7 @@ use ZmEventNotification::Config qw(:all);
 use ZmEventNotification::Util qw(parse_job_line);
 
 our ( $rin, $rout, %active_events, $child_forks, $parallel_hooks, @active_connections );
-our @db_updates;
 our @errors;
-sub updateEventinZmDB { push @db_updates, [@_] }
 { no warnings 'redefine'; *main::Error = sub { push @errors, $_[0] }; }
 
 pipe( READER, WRITER ) or die "pipe: $!";
@@ -136,12 +134,6 @@ subtest 'fcm_token_delete: token FCM rejected is dropped from memory' => sub {
     is( $active_connections[1]{state}, INVALID_CONNECTION, 'other token untouched' );
     is( $active_connections[2]{state}, VALID_CONNECTION, 'live websocket connection left alone' );
     is( $active_connections[3]{state}, PENDING_DELETE, 'disconnected websocket entry marked for removal' );
-};
-
-subtest 'event_description: written to the ZM DB' => sub {
-    @db_updates = ();
-    feed('event_description--TYPE--3--SPLIT--555--SPLIT--detected:person');
-    is_deeply( \@db_updates, [ [ 555, 'detected:person' ] ], 'updateEventinZmDB(eid, desc)' );
 };
 
 subtest 'active_event_update: State and Cause' => sub {

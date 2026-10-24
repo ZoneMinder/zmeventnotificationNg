@@ -626,11 +626,6 @@ sub processJobs {
             if $_->{type} == FCM && ( $_->{token} // '' ) eq $token
             && ( !exists $_->{conn} || $_->{state} == INVALID_CONNECTION );
         }
-      } elsif ( $job eq 'event_description' ) {
-      # hook script result will be updated in ZM DB
-        my ( $mid, $eid, $desc ) = @fields;
-        Debug(2, 'Job: Update monitor ' . $mid . ' description:' . $desc);
-        updateEventinZmDB( $eid, $desc );
       } elsif ( $job eq 'active_event_update' ) {
         my ( $mid, $eid, $type, $key, $val ) = @fields;
         Debug(2, "Job: Update active_event eid:$eid, mid:$mid, type:$type, field:$key to: $val");

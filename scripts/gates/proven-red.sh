@@ -72,7 +72,9 @@ files=$(git diff --name-only "$fork..$head")
 # nothing. Deletions still count as a source change below.
 live=$(git diff --name-only --diff-filter=d "$fork..$head")
 
-unit=$(printf '%s\n' "$live" | grep -E -- "$UNIT_TEST_RE" || true)
+# A test file whose diff only removes lines adds no test to prove, so it is
+# left out; removing dead code and its tests would otherwise always fail.
+unit=$(git diff --numstat --no-renames --diff-filter=d "$fork..$head" | awk '$1 > 0 { print $3 }' | grep -E -- "$UNIT_TEST_RE" || true)
 e2e=$(printf '%s\n' "$live" | grep -E -- "$E2E_TEST_RE" | grep -vE -- "$UNIT_TEST_RE" || true)
 source_files=$(printf '%s\n' "$files" | grep -vE -- "$UNIT_TEST_RE" | grep -vE -- "$E2E_TEST_RE" | grep -vE -- "$TEST_SUPPORT_RE" | grep -vE -- "$NON_CODE_RE" || true)
 support=$(printf '%s\n' "$live" | grep -E -- "$TEST_SUPPORT_RE" | grep -vE -- "$UNIT_TEST_RE" | grep -vE -- "$E2E_TEST_RE" || true)
