@@ -23,6 +23,11 @@ commit hash behind it; the instruction gate checks the hash exists.
   the parent without an event id double counted overlapping events and was
   reverted (3ea5154); the version that landed sends the event id and the
   parent counts each event once (f7360cc).
+- The parent drains the job pipe once per tick (`event_check_interval`),
+  so a job lands seconds after the fork sends it. A ZM DB write the fork
+  reads back later, such as the detection in event Notes, is made by the
+  fork on its own DB handle. Sending it over the pipe let the fork's end
+  check miss it and write the detection twice (#67).
 - A fork must release the token-file lock before it writes to the job pipe.
   A full pipe blocks the fork while the parent waits for the lock
   (3f0dc92).

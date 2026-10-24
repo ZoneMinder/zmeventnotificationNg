@@ -38,6 +38,7 @@ $server_config{base_data_path} = $dir;
 
 our @sent;           # [event_type, Cause] per sendOverFCM call
 our $db_notes = 'Motion All';
+our @db_writes;      # [eid, notes] per updateEventinZmDB call
 our $esc_status = 0;
 
 BEGIN {
@@ -63,7 +64,11 @@ BEGIN {
         no strict 'refs';
         *{"${caller}::sendOverMQTTBroker"} = \&ZmEventNotification::MQTT::sendOverMQTTBroker;
     };
-    *{'ZmEventNotification::DB::updateEventinZmDB'} = sub { };
+    # Prepends like the real UPDATE ... CONCAT(?,Notes)
+    *{'ZmEventNotification::DB::updateEventinZmDB'} = sub {
+        push @main::db_writes, [@_];
+        $main::db_notes = $_[1] . ' ' . ( $main::db_notes // '' );
+    };
     *{'ZmEventNotification::DB::getNotesFromEventDB'} = sub { $main::db_notes };
     *{'ZmEventNotification::DB::tagEventObjects'} = sub { };
     *{'ZmEventNotification::DB::import'} = sub {
@@ -123,6 +128,7 @@ sub run_event {
     unlink $log;
     unlink "$dir/push/last_sent.json";
     @sent = ();
+    @db_writes = ();
     my $pipe = '';
     open(my $w, '>', \$pipe) or die $!;
     *main::WRITER = *$w;
@@ -200,8 +206,11 @@ subtest 'success path: exact argv for every external command' => sub {
 
     is(scalar(grep { $_ eq 'update_parallel_hooks--TYPE--add' } @$lines), 2, 'two hook add lines');
     is(scalar(grep { $_ eq 'update_parallel_hooks--TYPE--del' } @$lines), 2, 'two hook del lines');
-    ok((grep { $_ eq 'event_description--TYPE--5--SPLIT--100--SPLIT--detected:person' } @$lines),
-        'start event_description written');
+    # #67: the fork writes Notes itself, so the end check sees the start
+    # detection and does not add it a second time
+    is_deeply(\@db_writes, [ [ 100, 'detected:person' ], [ 100, 'detected:car' ] ],
+        'Notes written once per hook result, by the fork');
+    ok(!(grep { /^event_description--TYPE--/ } @$lines), 'no event_description job sent to the parent');
     ok((grep { $_ eq 'active_event_update--TYPE--5--SPLIT--100--SPLIT--Start--SPLIT--Cause--SPLIT--detected:person Motion All--JSON--[]' } @$lines),
         'start active_event_update written');
     is($lines->[-1], 'active_event_delete--TYPE--5--SPLIT--100', 'fork ends with active_event_delete');
