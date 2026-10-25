@@ -45,7 +45,7 @@ hook:
 	cd hook && PYTHONPATH=$(PYZM_SRC) $(PY) -m pytest tests/ -m "not e2e" -q
 
 tools:
-	$(PY) -m pytest tools/tests/ -q
+	PYZM_SRC=$(PYZM_SRC) $(PY) -m pytest tools/tests/ -q
 
 # Counts that may fall but never grow (AGENTS.md C7). See .ratchet-counters.
 ratchet:

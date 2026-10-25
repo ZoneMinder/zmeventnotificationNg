@@ -68,6 +68,9 @@ This handles everything:
 - Downloads ML models (YOLOv4, YOLOv11, YOLOv26 by default).
 - Installs hook scripts, creates the directory structure, and installs
   config files.
+- With pyzmNg newer than 2.5.4, removes ``mysql-connector-python`` from the
+  venv when pyzmNg works without it (see
+  :ref:`the database driver note <database-driver>`).
 
 Both pyzmNg and the hook helpers live in the venv, keeping your system
 Python clean.
@@ -78,6 +81,40 @@ Python clean.
    pyzmNg extras (remote ML server, training UI, etc.) or want to install a
    local development version of pyzmNg, see the
    `pyzmNg installation guide <https://pyzmng.readthedocs.io/en/latest/guide/installation.html>`__.
+
+.. _database-driver:
+
+.. note::
+
+   pyzmNg uses the ZM database for logging, event tagging, and finding event
+   paths for ``objdetect.jpg``. pyzmNg 2.5.4 and older did that through
+   ``mysql-connector-python``. Newer pyzmNg can use PyMySQL, but prefers
+   mysql-connector while it's installed, and pip doesn't remove it on upgrade.
+
+   The installer removes the venv's copy of mysql-connector only when all of
+   these hold, and otherwise keeps it and prints why:
+
+   - no package in the venv lists it as a requirement, including through an
+     extra
+   - no system-wide copy would take its place
+   - ``objectconfig.yml`` exists (an ``objectconfig.ini`` is migrated first)
+     and doesn't set DB settings in ``pyzm_overrides``
+   - pyzmNg connects to your ZM database through PyMySQL, with both
+     ``zm_conf_path`` (if you set it) and the default ``zm.conf``
+   - the database is MariaDB, or ``ZM_DB_HOST`` is a socket path, or the
+     ``cryptography`` package is installed
+
+   The last one is for MySQL 8. Its default login method lets PyMySQL in
+   without ``cryptography`` only while the server remembers the password,
+   so the first login after a MySQL restart would fail. Either install
+   ``cryptography`` (``sudo /opt/zoneminder/venv/bin/pip install cryptography``)
+   or set ``ZM_DB_HOST`` to the socket, for example
+   ``localhost:/run/mysqld/mysqld.sock``, then re-run the installer.
+
+   The installer can't see your own scripts in the venv that import
+   ``mysql.connector``, or ``PYZM_DB*`` environment settings. To put the
+   driver back:
+   ``sudo /opt/zoneminder/venv/bin/pip install mysql-connector-python``.
 
 To use a custom venv path:
 
