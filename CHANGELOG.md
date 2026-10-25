@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.36] - 2026-10-25
+
+### Miscellaneous
+
+- bump version to v7.0.36 ([81211bd](https://github.com/ZoneMinder/zmeventnotificationNg/commit/81211bd45eb501992b748e5192edf142d592266b))
+
 ## [7.0.35] - 2026-10-25
 
 ### Bug Fixes
@@ -20,6 +26,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.35 ([d2e62f7](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d2e62f7905f88271d7d7da8c0a50c1d5873c88d0))
 - say when install.sh drops mysql-connector in Path 2 ([dee9b65](https://github.com/ZoneMinder/zmeventnotificationNg/commit/dee9b65a4d26dda003ff0a223d9395750c125e4c))
 - describe install.sh's database driver switch ([94551a8](https://github.com/ZoneMinder/zmeventnotificationNg/commit/94551a804b4423c4f9366196a18e6d6fda5bce51))
 - note that forks write DB values they read back themselves ([15d5397](https://github.com/ZoneMinder/zmeventnotificationNg/commit/15d53970e89ca83a23fc71de4830fb638fbf0905))
