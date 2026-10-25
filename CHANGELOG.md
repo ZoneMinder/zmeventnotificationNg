@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.35] - 2026-10-25
+
+### Bug Fixes
+
+- check more before dropping mysql-connector ([265b4d2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/265b4d218916335bb95b8b77b56367e646ecf0c4))
+- write the detection to event Notes from the fork ([3803232](https://github.com/ZoneMinder/zmeventnotificationNg/commit/3803232798ed3890cf194053564196fbc58c3b11))
+- warn when cv2 loads from user site-packages ([e17fafa](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e17fafa327134320efa58d5f96f697a18bdf3b31))
+- feat: add locale override for FCM timestamps in [#63](https://github.com/ZoneMinder/zmeventnotificationNg/pull/63) ([5669636](https://github.com/ZoneMinder/zmeventnotificationNg/commit/56696369ab470e542618467ec5fec61c04caf989))
+- option 1 for an existing tag is a new version ([c604302](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c604302e7ffea78958efab395b56e2ea1dd3a3e8))
+
+### CI/CD
+
+- don't prove red a test file that only lost tests ([516abc5](https://github.com/ZoneMinder/zmeventnotificationNg/commit/516abc53497ea89940846ff04fa719b73b6dbd95))
+- run the gate, proven red, mutation smoke, and PR body check ([986bb62](https://github.com/ZoneMinder/zmeventnotificationNg/commit/986bb62b5a17832a39b6d0304bcf2393d821b47a))
+
+### Documentation
+
+- say when install.sh drops mysql-connector in Path 2 ([dee9b65](https://github.com/ZoneMinder/zmeventnotificationNg/commit/dee9b65a4d26dda003ff0a223d9395750c125e4c))
+- describe install.sh's database driver switch ([94551a8](https://github.com/ZoneMinder/zmeventnotificationNg/commit/94551a804b4423c4f9366196a18e6d6fda5bce51))
+- note that forks write DB values they read back themselves ([15d5397](https://github.com/ZoneMinder/zmeventnotificationNg/commit/15d53970e89ca83a23fc71de4830fb638fbf0905))
+- fix the Sphinx build warnings ([a86f2e4](https://github.com/ZoneMinder/zmeventnotificationNg/commit/a86f2e41fa226c7766912be4e9c33ae850cc2ff4))
+- retitle Path 2 Step 2 now that it covers MQTT too ([71ba95e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/71ba95e292c95f34d24d7cfc0f43543d7a5bcf9f))
+- move the MQTT module install up into Path 2 Step 2 ([c47eb94](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c47eb9492d89d8b3663eec78948ed89f9de1601e))
+- run venv pip with sudo, verify cv2 as the hook sees it ([7e998fd](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7e998fd1584cc942e4f71b4567fd6ebcab1c8df9))
+
+### Features
+
+- remove mysql-connector-python once PyMySQL works ([e40248b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e40248b89ac29e64868a61b5f26c19ce46a07448))
+- add locale override for FCM timestamps ([9076c73](https://github.com/ZoneMinder/zmeventnotificationNg/commit/9076c73cb49df12ef650efac2b4efaa9e39ccfbf))
+
+### Miscellaneous
+
+- bump version to v7.0.35 ([f603953](https://github.com/ZoneMinder/zmeventnotificationNg/commit/f6039535db17da8c9968e6e9d1e38a6ccb5a45ed))
+- run the instruction gate and ratchet in make gate and pre-commit ([227c435](https://github.com/ZoneMinder/zmeventnotificationNg/commit/227c4353fc7b794d9042119ed350cd98683294b1))
+- add the PR body check and a PR template ([a884669](https://github.com/ZoneMinder/zmeventnotificationNg/commit/a884669b506fa1620f73eb23065a85affe610a6b))
+- add a mutation smoke for the token file, job lines, and secrets ([62bb408](https://github.com/ZoneMinder/zmeventnotificationNg/commit/62bb408a3496f652699ab582e98edf34a4de6471))
+- add proven red, running a branch's tests against the old code ([546fa13](https://github.com/ZoneMinder/zmeventnotificationNg/commit/546fa13b93ea9945111c8fd2a3ca68accac45fa9))
+- add the count ratchet, seeded with today's violations ([630156a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/630156aeae961b687aa842f2eff656f8ef44b674))
+- move agent rules to gap-trap instruction files with a gate ([97578c5](https://github.com/ZoneMinder/zmeventnotificationNg/commit/97578c594f50305bfea2ca788bc37e16fd893acf))
+
+### Refactoring
+
+- drop the unused event_description job ([22e684f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/22e684f795c429bf79947579009db89132d7b5e9))
+
 ## [7.0.34] - 2026-10-03
 
 ### Bug Fixes
@@ -72,6 +116,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.34 ([344a97c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/344a97c7c1993894a7990958f92a09686f589650))
 - drop stale objdetect gif/mp4 note; list fid=objdetect once ([7ee1dd0](https://github.com/ZoneMinder/zmeventnotificationNg/commit/7ee1dd0b307422ae07fbf453a8aea416224e9b63))
 - document hook_timeout; max_parallel_hooks drops, not queues ([16d665f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/16d665f80a1d40fb8fd27ccc8bef8ce6854a3103))
 - note user-visible changes from the review fixes; refresh log and backup examples ([da6303f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/da6303fdce8200c7247b159a3c42bc3a1c6a32fd))
