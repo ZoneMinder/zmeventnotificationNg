@@ -66,7 +66,9 @@ Or, to run non-interactively:
    sudo -H ./install.sh --install-es --install-es-config --install-hook --install-hook-config --no-interactive
 
 This installs the ES, hooks, ML models, Perl dependencies (via apt), config files,
-and sets up the directory structure.
+and sets up the directory structure. Like Path 1, it removes the old
+``mysql-connector-python`` driver from the venv once pyzmNg can reach the ZM
+database without it (see :ref:`the database driver note in Path 1 <database-driver>`).
 
 .. note::
 

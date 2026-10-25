@@ -68,6 +68,8 @@ This handles everything:
 - Downloads ML models (YOLOv4, YOLOv11, YOLOv26 by default).
 - Installs hook scripts, creates the directory structure, and installs
   config files.
+- Removes ``mysql-connector-python`` from the venv once pyzmNg can reach
+  the ZM database through PyMySQL (see :ref:`the database driver note <database-driver>`).
 
 Both pyzmNg and the hook helpers live in the venv, keeping your system
 Python clean.
@@ -78,6 +80,18 @@ Python clean.
    pyzmNg extras (remote ML server, training UI, etc.) or want to install a
    local development version of pyzmNg, see the
    `pyzmNg installation guide <https://pyzmng.readthedocs.io/en/latest/guide/installation.html>`__.
+
+.. _database-driver:
+
+pyzmNg reads and writes the ZM database for logging,
+event tagging and ``objdetect.jpg`` paths. Older pyzmNg used
+``mysql-connector-python`` for that; current pyzmNg uses PyMySQL, but keeps
+using mysql-connector while it's installed. On upgrade, the installer opens a
+ZM database connection through PyMySQL and removes mysql-connector only if
+that works and no other package in the venv requires it. If the connection
+fails, it keeps mysql-connector and prints the reason. For example, MySQL 8
+over TCP without TLS needs ``pip install cryptography`` in the venv, or a
+socket in ``ZM_DB_HOST`` such as ``localhost:/run/mysqld/mysqld.sock``.
 
 To use a custom venv path:
 

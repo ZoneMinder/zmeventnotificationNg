@@ -11,8 +11,8 @@ URL = 'https://github.com/ZoneMinder/zmeventnotificationNg/'
 AUTHOR_EMAIL = 'pliablepixels@gmail.com'
 AUTHOR = 'Pliable Pixels'
 LICENSE = 'GPL'
-# pyzm[ml] brings Pillow, Shapely, portalocker and onnx. onnx is what reads
-# class labels and end2end metadata out of .onnx models. Refs #47.
+# pyzm[ml] brings Pillow, Shapely, portalocker, onnx and PyMySQL. onnx is what
+# reads class labels and end2end metadata out of .onnx models. Refs #47.
 # numpy stays declared here because zm_detect.py imports it directly;
 # scikit-learn and imutils are for pyzm's dlib face training and ALPR.
 INSTALL_REQUIRES = [
