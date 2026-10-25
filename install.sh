@@ -630,12 +630,46 @@ install_hook() {
 
     echo "Running: ${PY_SUDO} ${PIP} -v install hook/ ${PIP_COMPAT}"
     run_dimmed ${PY_SUDO} "${PIP}" -v install hook/ ${PIP_COMPAT} && print_opencv_message || print_error "python hooks setup failed"
+    remove_old_mysql_driver
 
     print_section 'Installing package dependencies'
     run_dimmed ${INSTALLER} install -y gifsicle -qq
 
 }
 
+
+# pyzm reaches the ZM database through PyMySQL, but keeps using
+# mysql-connector-python while it's installed (pyzm <= 2.5.4 required it, and
+# pip never removes it). Remove it from the venv once pyzm can reach the ZM
+# database without it on this box; otherwise keep it and say why.
+remove_old_mysql_driver() {
+    [[ "${USE_VENV}" == "yes" ]] || return 0
+    local info required_by reason
+    info=$("${PIP}" show mysql-connector-python 2>/dev/null) || return 0
+    required_by=$(sed -n 's/^Required-by: *//p' <<< "${info}")
+    if [[ -n "${required_by}" ]]; then
+        echo "Keeping mysql-connector-python: required by ${required_by}"
+        return 0
+    fi
+    if reason=$("${PYTHON}" - 2>&1 <<'PYEOF'
+import sys
+# Hide mysql-connector so pyzm takes the path it takes once it's gone.
+sys.modules["mysql"] = sys.modules["mysql.connector"] = None
+from pyzm.zm.db import get_zm_db
+conn = get_zm_db()
+if conn is None:
+    sys.exit(1)
+conn.close()
+PYEOF
+    ); then
+        run_dimmed ${PY_SUDO} "${PIP}" uninstall -y mysql-connector-python ${PIP_COMPAT} &&
+            print_success "Removed mysql-connector-python, pyzm now uses PyMySQL" ||
+            print_warning "Could not remove mysql-connector-python"
+    else
+        print_warning "Keeping mysql-connector-python: pyzm could not reach the ZM database through PyMySQL"
+        echo "${reason}" | tail -n 3
+    fi
+}
 
 # Point /etc/zm/ paths in ${TARGET_CONFIG}/<file> at TARGET_CONFIG.
 # Idempotent: paths already under TARGET_CONFIG (which may itself be under

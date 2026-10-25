@@ -350,3 +350,88 @@ def test_symlinked_configs_edited_through_the_link(sandbox):
         assert "secrets: {}/secrets.yml".format(target) in text, name
     assert "fcm:" in (real / "zmeventnotification.yml").read_text()
     assert "ml:" in (real / "objectconfig.yml").read_text()
+
+
+# ── remove_old_mysql_driver (#71) ───────────────────────────────────────
+# pyzm keeps using mysql-connector-python while it's installed. The
+# installer removes it once pyzm can reach the ZM database through PyMySQL.
+# The check runs the real pyzm from PYZM_SRC with a stand-in pymysql.
+
+PYZM_SRC = os.environ.get("PYZM_SRC", os.path.expanduser("~/fiddle/pyzmNg"))
+
+FAKE_PIP = """#!/bin/sh
+echo "$@" >> "$PIP_LOG"
+if [ "$1" = "show" ]; then
+    [ "$MC_INSTALLED" = "yes" ] || exit 1
+    printf 'Name: mysql-connector-python\\nRequired-by: %s\\n' "$MC_REQUIRED_BY"
+fi
+exit 0
+"""
+
+FAKE_PYMYSQL = """
+import os
+Error = type("Error", (Exception,), {})
+class _Conn:
+    def close(self):
+        pass
+def connect(**kw):
+    if os.environ.get("FAKE_PYMYSQL_FAIL"):
+        raise RuntimeError("'cryptography' package is required for caching_sha2_password")
+    return _Conn()
+"""
+
+
+@pytest.fixture
+def driver_box(sandbox):
+    if not os.path.isfile(os.path.join(PYZM_SRC, "pyzm", "zm", "db.py")):
+        pytest.skip("pyzm source not found at PYZM_SRC=" + PYZM_SRC)
+    tmp = sandbox["tmp"]
+    pip = tmp / "fakepip"
+    pip.write_text(FAKE_PIP)
+    pip.chmod(0o755)
+    mods = tmp / "mods" / "pymysql"
+    mods.mkdir(parents=True)
+    (mods / "__init__.py").write_text(FAKE_PYMYSQL)
+    conf = tmp / "zmconf"
+    conf.mkdir()
+    (conf / "zm.conf").write_text("ZM_DB_HOST=localhost\nZM_DB_USER=u\nZM_DB_PASS=p\nZM_DB_NAME=zm\n")
+    log = tmp / "pip.log"
+    log.write_text("")
+    env = dict(USE_VENV="yes", PIP=str(pip), PIP_LOG=str(log), MC_INSTALLED="yes",
+               MC_REQUIRED_BY="", PYZM_CONFPATH=str(conf),
+               PYTHONPATH=os.pathsep.join([str(tmp / "mods"), PYZM_SRC]))
+    return {"env": env, "log": log}
+
+
+def _remove(sandbox, box, **env):
+    r = run(sandbox, "PY_SUDO=''; PIP_COMPAT=''; remove_old_mysql_driver",
+            **dict(box["env"], **env))
+    assert r.returncode == 0, r.stdout + r.stderr
+    return r, box["log"].read_text()
+
+
+def test_removes_mysql_connector_when_pymysql_connects(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box)
+    assert "uninstall -y mysql-connector-python" in pip_log, r.stdout + r.stderr
+
+
+def test_keeps_mysql_connector_when_pymysql_cannot_connect(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, FAKE_PYMYSQL_FAIL="1")
+    assert "uninstall" not in pip_log
+    assert "cryptography" in r.stdout
+
+
+def test_keeps_mysql_connector_another_package_needs(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, MC_REQUIRED_BY="pyzm")
+    assert "uninstall" not in pip_log
+    assert "required by pyzm" in r.stdout
+
+
+def test_no_op_without_mysql_connector(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, MC_INSTALLED="no")
+    assert pip_log.split() == ["show", "mysql-connector-python"]
+
+
+def test_leaves_global_python_alone(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, USE_VENV="no")
+    assert pip_log == ""
