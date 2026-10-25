@@ -354,8 +354,9 @@ def test_symlinked_configs_edited_through_the_link(sandbox):
 
 # ── remove_old_mysql_driver (#71) ───────────────────────────────────────
 # pyzm keeps using mysql-connector-python while it's installed. The
-# installer removes it once pyzm can reach the ZM database through PyMySQL.
-# The check runs the real pyzm from PYZM_SRC with a stand-in pymysql.
+# installer removes the venv's copy once pyzm provably works without it.
+# The check runs the real pyzm from PYZM_SRC. Stand-in pymysql, mysql and
+# cryptography packages on PYTHONPATH shadow whatever the test machine has.
 
 PYZM_SRC = os.environ.get("PYZM_SRC", os.path.expanduser("~/fiddle/pyzmNg"))
 
@@ -363,22 +364,29 @@ FAKE_PIP = """#!/bin/sh
 echo "$@" >> "$PIP_LOG"
 if [ "$1" = "show" ]; then
     [ "$MC_INSTALLED" = "yes" ] || exit 1
-    printf 'Name: mysql-connector-python\\nRequired-by: %s\\n' "$MC_REQUIRED_BY"
+    printf 'Name: mysql-connector-python\\nVersion: 9.5.0\\nLocation: %s\\nRequired-by: %s\\n' "$MC_LOCATION" "$MC_REQUIRED_BY"
 fi
 exit 0
 """
 
 FAKE_PYMYSQL = """
-import os
+import json, os
 Error = type("Error", (Exception,), {})
 class _Conn:
+    unix_socket = os.environ.get("FAKE_SOCKET")
+    def get_server_info(self):
+        return os.environ.get("FAKE_SERVER", "10.11.14-MariaDB")
     def close(self):
         pass
 def connect(**kw):
+    with open(os.environ["CONNECT_LOG"], "a") as f:
+        f.write(json.dumps(kw) + "\\n")
     if os.environ.get("FAKE_PYMYSQL_FAIL"):
-        raise RuntimeError("'cryptography' package is required for caching_sha2_password")
+        raise Error("(2003, Can't connect to MySQL server)")
     return _Conn()
 """
+
+GONE = "raise ImportError('not installed')\n"
 
 
 @pytest.fixture
@@ -389,18 +397,29 @@ def driver_box(sandbox):
     pip = tmp / "fakepip"
     pip.write_text(FAKE_PIP)
     pip.chmod(0o755)
-    mods = tmp / "mods" / "pymysql"
-    mods.mkdir(parents=True)
-    (mods / "__init__.py").write_text(FAKE_PYMYSQL)
+    mods = tmp / "mods"
+    for pkg in ("mysql", "cryptography"):
+        (mods / pkg).mkdir(parents=True)
+        (mods / pkg / "__init__.py").write_text(GONE)
+    # The venv: PyMySQL lives here, and so does its own mysql-connector,
+    # which is importable but must not be what the check uses.
+    site = tmp / "venv" / "lib" / "site-packages"
+    (site / "pymysql").mkdir(parents=True)
+    (site / "pymysql" / "__init__.py").write_text(FAKE_PYMYSQL)
+    (site / "mysql").mkdir()
+    (site / "mysql" / "__init__.py").write_text("")
+    (site / "mysql" / "connector.py").write_text(
+        "Error = Exception\ndef connect(**kw):\n    raise Error('the venv copy was used')\n")
     conf = tmp / "zmconf"
     conf.mkdir()
     (conf / "zm.conf").write_text("ZM_DB_HOST=localhost\nZM_DB_USER=u\nZM_DB_PASS=p\nZM_DB_NAME=zm\n")
     log = tmp / "pip.log"
     log.write_text("")
     env = dict(USE_VENV="yes", PIP=str(pip), PIP_LOG=str(log), MC_INSTALLED="yes",
-               MC_REQUIRED_BY="", PYZM_CONFPATH=str(conf),
-               PYTHONPATH=os.pathsep.join([str(tmp / "mods"), PYZM_SRC]))
-    return {"env": env, "log": log}
+               MC_LOCATION=str(site), MC_REQUIRED_BY="", PYZM_CONFPATH=str(conf),
+               CONNECT_LOG=str(tmp / "connect.log"),
+               PYTHONPATH=os.pathsep.join([str(site), str(mods), PYZM_SRC]))
+    return {"env": env, "log": log, "mods": mods, "site": site, "tmp": tmp}
 
 
 def _remove(sandbox, box, **env):
@@ -410,21 +429,104 @@ def _remove(sandbox, box, **env):
     return r, box["log"].read_text()
 
 
+def _removed(pip_log):
+    return "uninstall -y mysql-connector-python" in pip_log
+
+
 def test_removes_mysql_connector_when_pymysql_connects(sandbox, driver_box):
     r, pip_log = _remove(sandbox, driver_box)
-    assert "uninstall -y mysql-connector-python" in pip_log, r.stdout + r.stderr
+    assert _removed(pip_log), r.stdout + r.stderr
 
 
 def test_keeps_mysql_connector_when_pymysql_cannot_connect(sandbox, driver_box):
     r, pip_log = _remove(sandbox, driver_box, FAKE_PYMYSQL_FAIL="1")
-    assert "uninstall" not in pip_log
-    assert "cryptography" in r.stdout
+    assert not _removed(pip_log)
+    assert "Can't connect to MySQL server" in r.stdout
 
 
 def test_keeps_mysql_connector_another_package_needs(sandbox, driver_box):
     r, pip_log = _remove(sandbox, driver_box, MC_REQUIRED_BY="pyzm")
-    assert "uninstall" not in pip_log
+    assert not _removed(pip_log)
     assert "required by pyzm" in r.stdout
+
+
+def test_keeps_mysql_connector_needed_through_an_extra(sandbox, driver_box):
+    dist = driver_box["site"] / "SQLAlchemy-2.0.0.dist-info"
+    dist.mkdir()
+    (dist / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: SQLAlchemy\nVersion: 2.0.0\n"
+        "Requires-Dist: mysql-connector-python; extra == \"mysql-connector\"\n")
+    r, pip_log = _remove(sandbox, driver_box)
+    assert not _removed(pip_log)
+    assert "required by SQLAlchemy" in r.stdout
+
+
+def test_keeps_venv_copy_that_hides_a_system_wide_one(sandbox, driver_box):
+    (driver_box["mods"] / "mysql" / "__init__.py").write_text("")
+    (driver_box["mods"] / "mysql" / "connector.py").write_text("")
+    r, pip_log = _remove(sandbox, driver_box)
+    assert not _removed(pip_log)
+    assert "system-wide copy" in r.stdout
+
+
+def test_keeps_mysql_connector_for_mysql8_tcp_without_cryptography(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, FAKE_SERVER="8.0.36")
+    assert not _removed(pip_log)
+    assert "cryptography" in r.stdout
+
+
+def test_removes_mysql_connector_for_mysql8_over_a_socket(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, FAKE_SERVER="8.0.36",
+                         FAKE_SOCKET="/run/mysqld/mysqld.sock")
+    assert _removed(pip_log), r.stdout + r.stderr
+
+
+def test_keeps_mysql_connector_until_objectconfig_ini_is_migrated(sandbox, driver_box):
+    with open(cfg(sandbox, "objectconfig.ini"), "w") as f:
+        f.write("[general]\nzm_conf_path=/somewhere\n")
+    r, pip_log = _remove(sandbox, driver_box)
+    assert not _removed(pip_log)
+    assert "objectconfig.ini" in r.stdout
+
+
+def test_removes_mysql_connector_for_mysql8_tcp_with_cryptography(sandbox, driver_box):
+    (driver_box["mods"] / "cryptography" / "__init__.py").write_text("")
+    r, pip_log = _remove(sandbox, driver_box, FAKE_SERVER="8.0.36")
+    assert _removed(pip_log), r.stdout + r.stderr
+
+
+def test_checks_the_hooks_zm_conf_path(sandbox, driver_box):
+    hook_conf = driver_box["tmp"] / "hookconf"
+    hook_conf.mkdir()
+    (hook_conf / "zm.conf").write_text("ZM_DB_HOST=dbhost\nZM_DB_USER=hookuser\nZM_DB_PASS=p\nZM_DB_NAME=zm\n")
+    with open(cfg(sandbox, "objectconfig.yml"), "w") as f:
+        f.write("general:\n  zm_conf_path: {}\n".format(hook_conf))
+    r, pip_log = _remove(sandbox, driver_box)
+    connects = (driver_box["tmp"] / "connect.log").read_text()
+    # tagging uses zm_conf_path; DB logging uses the default zm.conf
+    assert '"user": "hookuser"' in connects, r.stdout + r.stderr
+    assert '"user": "u"' in connects
+    assert _removed(pip_log)
+
+
+def test_keeps_mysql_connector_when_pyzm_overrides_set_the_db(sandbox, driver_box):
+    with open(cfg(sandbox, "objectconfig.yml"), "w") as f:
+        f.write("general:\n  pyzm_overrides:\n    dbhost: otherhost\n")
+    r, pip_log = _remove(sandbox, driver_box)
+    assert not _removed(pip_log)
+    assert "pyzm_overrides" in r.stdout
+
+
+def test_leaves_a_copy_outside_the_venv_alone(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, MC_LOCATION="/usr/lib/python3/dist-packages")
+    assert pip_log.split() == ["show", "mysql-connector-python"]
+    assert "installed outside the venv" in r.stdout
+    assert not (driver_box["tmp"] / "connect.log").exists()
+
+
+def test_venv_path_with_trailing_slash_still_matches(sandbox, driver_box):
+    r, pip_log = _remove(sandbox, driver_box, ZM_VENV=str(driver_box["tmp"] / "venv") + "/")
+    assert _removed(pip_log), r.stdout + r.stderr
 
 
 def test_no_op_without_mysql_connector(sandbox, driver_box):

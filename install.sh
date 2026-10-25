@@ -629,8 +629,7 @@ install_hook() {
     "${PIP}" show pyzm &>/dev/null && PYZM_PREINSTALLED=true
 
     echo "Running: ${PY_SUDO} ${PIP} -v install hook/ ${PIP_COMPAT}"
-    run_dimmed ${PY_SUDO} "${PIP}" -v install hook/ ${PIP_COMPAT} && print_opencv_message || print_error "python hooks setup failed"
-    remove_old_mysql_driver
+    run_dimmed ${PY_SUDO} "${PIP}" -v install hook/ ${PIP_COMPAT} && { print_opencv_message; remove_old_mysql_driver; } || print_error "python hooks setup failed"
 
     print_section 'Installing package dependencies'
     run_dimmed ${INSTALLER} install -y gifsicle -qq
@@ -638,37 +637,104 @@ install_hook() {
 }
 
 
-# pyzm reaches the ZM database through PyMySQL, but keeps using
-# mysql-connector-python while it's installed (pyzm <= 2.5.4 required it, and
-# pip never removes it). Remove it from the venv once pyzm can reach the ZM
-# database without it on this box; otherwise keep it and say why.
+# pyzm newer than 2.5.4 can use PyMySQL, but prefers mysql-connector-python
+# while it's installed, and pip never removes it on upgrade. Remove the venv's
+# copy only when the checks below pass on this box; otherwise keep it and say
+# why.
 remove_old_mysql_driver() {
     [[ "${USE_VENV}" == "yes" ]] || return 0
-    local info required_by reason
+    local info location version required_by out
     info=$("${PIP}" show mysql-connector-python 2>/dev/null) || return 0
+    location=$(sed -n 's/^Location: *//p' <<< "${info}")
+    version=$(sed -n 's/^Version: *//p' <<< "${info}")
+    # A copy seen through system site-packages isn't the venv's to remove.
+    if [[ "$(realpath -m "${location}")" != "$(realpath -m "${ZM_VENV}")"/* ]]; then
+        echo "Leaving mysql-connector-python alone: it's installed outside the venv (${location})"
+        return 0
+    fi
     required_by=$(sed -n 's/^Required-by: *//p' <<< "${info}")
     if [[ -n "${required_by}" ]]; then
         echo "Keeping mysql-connector-python: required by ${required_by}"
         return 0
     fi
-    if reason=$("${PYTHON}" - 2>&1 <<'PYEOF'
-import sys
-# Hide mysql-connector so pyzm takes the path it takes once it's gone.
+    if ! out=$(VENV_SITE="${location}" HOOK_CONFIG="${TARGET_CONFIG}/objectconfig" \
+            "${PYTHON}" - 2>&1 <<'PYEOF'
+import ast, os, re, sys
+import importlib.metadata as md
+
+def keep(reason):
+    print(reason)
+    sys.exit(1)
+
+site = os.path.realpath(os.environ["VENV_SITE"])
+
+# pip's Required-by misses packages that need it only through an extra.
+need = re.compile(r"mysql[-_.]connector[-_.]python\b", re.I)
+users = sorted({d.metadata["Name"] for d in md.distributions(path=[site])
+                for r in (d.requires or []) if need.match(r)})
+if users:
+    keep("required by " + ", ".join(users))
+
+# With system site-packages on, a system-wide copy would take the venv
+# copy's place, and pyzm would switch to it instead of PyMySQL.
+saved = sys.path[:]
+sys.path[:] = [p for p in saved if os.path.realpath(p or ".") != site]
+try:
+    import mysql.connector  # noqa: F401
+except ImportError:
+    pass
+else:
+    keep("a system-wide copy is installed too, and pyzm would switch to it")
+sys.path[:] = saved
+
+# Use the hook's own DB settings. An objectconfig.ini is only migrated to
+# YAML after this step, so its settings can't be read yet.
+config = os.environ["HOOK_CONFIG"]
+if not os.path.exists(config + ".yml") and os.path.exists(config + ".ini"):
+    keep("objectconfig.ini isn't migrated to objectconfig.yml yet. Re-run install.sh afterwards")
+try:
+    with open(config + ".yml") as f:
+        import yaml
+        general = (yaml.safe_load(f) or {}).get("general") or {}
+except FileNotFoundError:
+    general = {}
+overrides = general.get("pyzm_overrides") or {}
+if isinstance(overrides, str):
+    overrides = ast.literal_eval(overrides)
+if {"dbhost", "dbuser", "dbpassword", "dbname", "conf_path"} & set(overrides):
+    keep("objectconfig.yml sets DB settings in pyzm_overrides. If PyMySQL works "
+         "with them, remove mysql-connector-python by hand")
+
+# Connect the way pyzm will once mysql-connector is gone. Event tagging and
+# paths read zm_conf_path; DB logging reads the default zm.conf.
 sys.modules["mysql"] = sys.modules["mysql.connector"] = None
 from pyzm.zm.db import get_zm_db
-conn = get_zm_db()
-if conn is None:
-    sys.exit(1)
-conn.close()
+for conf_path in {general.get("zm_conf_path"), None}:
+    conn = get_zm_db(conf_path=conf_path)
+    if conn is None:
+        keep("pyzm could not reach the ZM database through PyMySQL")
+    try:
+        # MySQL 8's caching_sha2_password lets PyMySQL in without
+        # cryptography only while the server remembers the password, so the
+        # first login after a MySQL restart fails without it. MariaDB and
+        # socket connections don't need it.
+        if not (conn.unix_socket or "mariadb" in conn.get_server_info().lower()):
+            try:
+                import cryptography  # noqa: F401
+            except ImportError:
+                keep("MySQL over TCP needs the cryptography package")
+    finally:
+        conn.close()
 PYEOF
     ); then
-        run_dimmed ${PY_SUDO} "${PIP}" uninstall -y mysql-connector-python ${PIP_COMPAT} &&
-            print_success "Removed mysql-connector-python, pyzm now uses PyMySQL" ||
-            print_warning "Could not remove mysql-connector-python"
-    else
-        print_warning "Keeping mysql-connector-python: pyzm could not reach the ZM database through PyMySQL"
-        echo "${reason}" | tail -n 3
+        print_warning "Keeping mysql-connector-python: pyzm can't safely switch to PyMySQL yet"
+        echo "${out}" | tail -n 3
+        echo "  Once that's fixed, re-run install.sh to switch."
+        return 0
     fi
+    run_dimmed ${PY_SUDO} "${PIP}" uninstall -y mysql-connector-python ${PIP_COMPAT} &&
+        print_success "Removed mysql-connector-python ${version}, pyzm now uses PyMySQL. To put it back: sudo ${PIP} install mysql-connector-python" ||
+        print_warning "Could not remove mysql-connector-python"
 }
 
 # Point /etc/zm/ paths in ${TARGET_CONFIG}/<file> at TARGET_CONFIG.
