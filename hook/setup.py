@@ -17,7 +17,7 @@ LICENSE = 'GPL'
 # scikit-learn and imutils are for pyzm's dlib face training and ALPR.
 INSTALL_REQUIRES = [
     'numpy', 'requests', 'imutils',
-    'pyzm[ml]>=2.5.4', 'scikit-learn',
+    'pyzm[ml]>=2.5.5', 'scikit-learn',
     'PyYAML', 'configupdater'
 ]
 
