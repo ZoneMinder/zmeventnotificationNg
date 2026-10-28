@@ -25,6 +25,7 @@ use warnings;
     package ZoneMinder::Logger;
     $INC{'ZoneMinder/Logger.pm'} = __FILE__;
     sub import { 1 }
+    use constant WARNING => -1;
 }
 
 # ---- ZoneMinder::Monitor ----

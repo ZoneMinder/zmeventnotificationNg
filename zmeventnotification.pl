@@ -410,7 +410,10 @@ sub checkNewEvents() {
   foreach my $monitor ( values(%monitors) ) {
     my $mid = $monitor->{Id};
     if ( !zmMemVerify($monitor) ) {
-      Warning('Memory verify failed for '.$monitor->{Name}.'(id:'.$mid.')');
+      # Importance: Normal 0, Less 1, Not 2. Adding it to the level quietens the message.
+      my $importance = { Less => 1, Not => 2 }->{ $monitor->{Importance} // '' } // 0;
+      ZoneMinder::Logger::fetch()->logPrint(ZoneMinder::Logger::WARNING + $importance,
+        'Memory verify failed for '.$monitor->{Name}.'(id:'.$mid.')');
       loadMonitor($monitor);
       next;
     }
