@@ -262,6 +262,25 @@ subtest 'checkNewEvents: monitor reload saves token counters (FCM on) and reload
   is( $monitor_loads, 1, 'monitors still reloaded' );
 };
 
+subtest 'checkNewEvents: memory verify failure is quietened by monitor Importance' => sub {
+  my @printed;
+  no warnings 'redefine', 'once';
+  local *main::zmMemVerify = sub { 0 };
+  local *ZoneMinder::Logger::fetch = sub { bless {}, 'FakeLogger' };
+  local *FakeLogger::logPrint = sub { push @printed, [ $_[1], $_[2] ] };
+  foreach my $case ( [ Normal => 0 ], [ Less => 1 ], [ Not => 2 ], [ undef, 0 ] ) {
+    my ( $importance, $offset ) = @$case;
+    @printed = ();
+    %main::monitors = ( 3 => { Id => 3, Name => 'Lake', Importance => $importance } );
+    checkNewEvents();
+    my $label = $importance // 'undef';
+    is( scalar @printed, 1, "$label: logged once" );
+    is( $printed[0][0], ZoneMinder::Logger::WARNING() + $offset, "$label: level is WARNING+$offset" );
+    like( $printed[0][1], qr/Memory verify failed for Lake\(id:3\)/, "$label: message names the monitor" );
+  }
+  %main::monitors = ();
+};
+
 subtest 'initSocketServer: plain WS with default address listens on port only' => sub {
   local $ssl_config{enabled} = 0;
   local $server_config{port} = 9123;
