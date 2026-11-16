@@ -27,10 +27,11 @@ interface, you need Path 2.
 
 .. note::
 
-   Both paths require ``pip3`` (and ``python3-venv`` on Debian/Ubuntu). Install
-   with ``sudo apt install python3-pip python3-venv`` (Debian/Ubuntu),
-   ``sudo dnf install python3-pip`` (Fedora/RHEL), ``sudo zypper install python3-pip``
-   (openSUSE), or ``sudo pacman -S python-pip`` (Arch).
+   Both paths require ``git`` and ``pip3`` (and ``python3-venv`` on Debian/Ubuntu).
+   Install with ``sudo apt install git python3-pip python3-venv`` (Debian/Ubuntu),
+   ``sudo dnf install git python3-pip`` (Fedora/RHEL),
+   ``sudo zypper install git python3-pip`` (openSUSE), or
+   ``sudo pacman -S git python-pip`` (Arch).
 
 .. toctree::
 
