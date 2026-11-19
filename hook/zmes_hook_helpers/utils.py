@@ -556,6 +556,8 @@ def process_config(args, ctx):
 
 def face_train_options(config):
     """Return the dlib entry of ml_sequence.face.sequence, which holds
-    known_images_path and the training knobs, or None if there is none."""
+    known_images_path and the training knobs, or None if there is no dlib
+    entry with a known_images_path."""
     seq = config.get('ml_sequence', {}).get('face', {}).get('sequence', [])
-    return next((s for s in seq if s.get('face_detection_framework') == 'dlib'), None)
+    return next((s for s in seq if s.get('face_detection_framework') == 'dlib'
+                 and s.get('known_images_path')), None)

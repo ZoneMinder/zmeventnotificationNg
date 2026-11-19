@@ -102,3 +102,10 @@ class TestFaceTrainOptions:
     def test_no_dlib_entry_returns_none(self):
         from zmes_hook_helpers.utils import face_train_options
         assert face_train_options({'ml_sequence': {}}) is None
+
+    def test_dlib_entry_without_known_images_path_returns_none(self):
+        from zmes_hook_helpers.utils import face_train_options
+        config = {'ml_sequence': {'face': {'sequence': [
+            {'name': 'DLIB', 'face_detection_framework': 'dlib'},
+        ]}}}
+        assert face_train_options(config) is None

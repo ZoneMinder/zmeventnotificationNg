@@ -30,5 +30,5 @@ if __name__ == "__main__":
     utils.process_config(args, g.ctx)
     options = utils.face_train_options(g.config)
     if not options:
-        g.logger.Fatal('No dlib entry in ml_sequence.face.sequence of {}'.format(args['config']))
+        g.logger.Fatal('No dlib entry with known_images_path in ml_sequence.face.sequence of {}'.format(args['config']))
     train.FaceTrain(options=options).train(size=args['size'])
