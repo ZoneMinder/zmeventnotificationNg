@@ -3,7 +3,34 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.37] - 2026-11-19
+
+### Bug Fixes
+
+- stream_sequence frame_strategy wins when migrating, as in v1 ([54d085a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/54d085a20b72b0215f31b601a8cf05ebb06b7e61))
+- move frame_strategy to ml_sequence.general when migrating ini ([da8bfe3](https://github.com/ZoneMinder/zmeventnotificationNg/commit/da8bfe3db10e1c07ff2188222577e34f78dcdf21))
+- treat a dlib entry without known_images_path as missing ([329606f](https://github.com/ZoneMinder/zmeventnotificationNg/commit/329606fe3e20b602357b65252647cd0dfe622fa8))
+- train faces from the dlib entry in ml_sequence.face.sequence ([c5f42c2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/c5f42c2406103421b85b53dbd2a9ac71f36ba787))
+- weigh monitor Importance when logging memory verify failures ([e79caaa](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e79caaa7d09e238b3e4087f20a079d504cbcb40b))
+
+### Documentation
+
+- point the e2e prerequisites at pyzm's .env.zm_e2e ([493a484](https://github.com/ZoneMinder/zmeventnotificationNg/commit/493a48452af14118cc366b88c7ae3662b4a63bf2))
+- list git as an install prerequisite ([7081540](https://github.com/ZoneMinder/zmeventnotificationNg/commit/708154089677bef21e072b7ab0f75c66372214db))
+
+### Miscellaneous
+
+- bump version to v7.0.37 ([f97ee23](https://github.com/ZoneMinder/zmeventnotificationNg/commit/f97ee2374e534748f411b8a42e4a14dc30f23bab))
+
+### Testing
+
+- cover Importance-weighted memory verify warning in checkNewEvents ([45223c2](https://github.com/ZoneMinder/zmeventnotificationNg/commit/45223c292fa00dcf4c8adb02e6c279eea9fe595e))
+
 ## [7.0.36] - 2026-10-25
+
+### Documentation
+
+- update CHANGELOG for v7.0.36 ([2bed93b](https://github.com/ZoneMinder/zmeventnotificationNg/commit/2bed93b1ff8ace3cf38a461c46f26d8332c77ca0))
 
 ### Miscellaneous
 
