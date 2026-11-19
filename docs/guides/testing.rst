@@ -255,7 +255,7 @@ Python unit / integration reference
    * - ``tests/test_output_format.py``
      - ``format_detection_output`` string/JSON formatting
    * - ``tests/test_utils_helpers.py``
-     - ``str2tuple`` and helper functions
+     - ``str2tuple``, ``face_train_options``, and helper functions
    * - ``tests/test_config_errors.py``
      - ``process_config`` error/exit paths
    * - ``tests/test_import_zm_zones.py``
