@@ -87,3 +87,18 @@ class TestFindWholeWord:
 
     def test_unbalanced_zone_name_does_not_raise(self):
         assert findWholeWord("Door(")("Motion: Door(") is not None
+
+
+class TestFaceTrainOptions:
+    def test_returns_dlib_entry_from_face_sequence(self):
+        from zmes_hook_helpers.utils import face_train_options
+        config = {'ml_sequence': {'face': {'sequence': [
+            {'name': 'TPU', 'face_detection_framework': 'tpu'},
+            {'name': 'DLIB', 'face_detection_framework': 'dlib',
+             'known_images_path': '/data/known_faces'},
+        ]}}}
+        assert face_train_options(config)['known_images_path'] == '/data/known_faces'
+
+    def test_no_dlib_entry_returns_none(self):
+        from zmes_hook_helpers.utils import face_train_options
+        assert face_train_options({'ml_sequence': {}}) is None

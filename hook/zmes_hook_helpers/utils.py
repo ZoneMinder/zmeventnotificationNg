@@ -552,3 +552,10 @@ def process_config(args, ctx):
     # Apply CLI overrides last — highest priority
     if args.get('override'):
         apply_cli_overrides(args['override'])
+
+
+def face_train_options(config):
+    """Return the dlib entry of ml_sequence.face.sequence, which holds
+    known_images_path and the training knobs, or None if there is none."""
+    seq = config.get('ml_sequence', {}).get('face', {}).get('sequence', [])
+    return next((s for s in seq if s.get('face_detection_framework') == 'dlib'), None)

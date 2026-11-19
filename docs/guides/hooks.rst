@@ -1110,6 +1110,10 @@ In this example, you have 3 names, each with different images.
 
   sudo -u www-data /var/lib/zmeventnotification/bin/zm_train_faces.py
 
+It reads ``known_images_path``, ``face_train_model``, ``face_num_jitters`` and
+``face_upsample_times`` from the dlib entry (``face_detection_framework: dlib``)
+in ``ml_sequence.face.sequence``, and writes ``faces.dat`` into
+``known_images_path``.
 
 If you find yourself running out of memory while training, use the size argument like so:
 

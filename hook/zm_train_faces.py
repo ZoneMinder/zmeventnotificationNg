@@ -28,4 +28,7 @@ if __name__ == "__main__":
     args = vars(args)
 
     utils.process_config(args, g.ctx)
-    train.FaceTrain(options=g.config).train(size=args['size'])
+    options = utils.face_train_options(g.config)
+    if not options:
+        g.logger.Fatal('No dlib entry in ml_sequence.face.sequence of {}'.format(args['config']))
+    train.FaceTrain(options=options).train(size=args['size'])
