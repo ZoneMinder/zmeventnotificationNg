@@ -420,3 +420,12 @@ class TestFrameStrategyMove:
         assert mon["ml_sequence"]["general"]["frame_strategy"] == "most"
         assert "frame_strategy" not in mon["stream_sequence"]
         assert output["ml"]["ml_sequence"]["general"]["frame_strategy"] == "first"
+
+    def test_stream_value_wins_like_v1(self, tmp_path):
+        # v1 read frame_strategy only from stream_sequence; a copy in
+        # ml_sequence.general was dead and must not win.
+        ini = FRAME_STRATEGY_INI.replace(
+            "{'general': {'model_sequence': 'object'}",
+            "{'general': {'model_sequence': 'object', 'frame_strategy': 'most'}")
+        output, _, _ = build_yaml(make_cp(ini, tmp_path))
+        assert output["ml"]["ml_sequence"]["general"]["frame_strategy"] == "first"

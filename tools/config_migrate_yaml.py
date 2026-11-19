@@ -446,7 +446,7 @@ def build_yaml(cp):
     for scope in [ml, *output.get('monitors', {}).values()]:
         if isinstance(ss := scope.get('stream_sequence'), dict) and 'frame_strategy' in ss:
             general = scope.setdefault('ml_sequence', {}).setdefault('general', {})
-            general.setdefault('frame_strategy', ss.pop('frame_strategy'))
+            general['frame_strategy'] = ss.pop('frame_strategy')
 
     # Coerce numeric strings to int/float
     output = coerce_types(output)
