@@ -48,7 +48,10 @@ Adds ES e2e and pyzm e2e — this is what runs the **real-model** local↔remote
 parity. Environment required:
 - ML model files at `/var/lib/zmeventnotification/models` (override:
   `PYZM_E2E_MODELS=/path`)
-- a live ZoneMinder (DB + config under `/etc/zm`) for pyzm's `test_zm_e2e`
+- a live ZoneMinder for pyzm's `test_zm_e2e`: its API URL and login go in
+  `.env.zm_e2e` in the pyzmNg repo root (copy `tests/.env.zm_e2e.sample`
+  there), and the DB tests read `zm.conf` from `/etc/zm` (override with
+  `PYZM_CONFPATH` in that file)
 - run as the ZM user for ZM access, e.g. `sudo -u www-data make test-all-e2e`
 
 Missing prerequisites FAIL (not skip) because the e2e gates set
