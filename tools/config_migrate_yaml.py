@@ -441,6 +441,13 @@ def build_yaml(cp):
         if raw is None or (isinstance(raw, str) and raw.lower() == 'no'):
             ss.pop('resize', None)
 
+    # pyzm v1 read frame_strategy from stream_sequence; pyzmNg only reads it
+    # from ml_sequence.general, so move it (globally and per monitor).
+    for scope in [ml, *output.get('monitors', {}).values()]:
+        if isinstance(ss := scope.get('stream_sequence'), dict) and 'frame_strategy' in ss:
+            general = scope.setdefault('ml_sequence', {}).setdefault('general', {})
+            general['frame_strategy'] = ss.pop('frame_strategy')
+
     # Coerce numeric strings to int/float
     output = coerce_types(output)
 

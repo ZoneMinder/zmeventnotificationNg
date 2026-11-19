@@ -391,3 +391,41 @@ class TestInlineCommentsMatchLegacyHook:
         cp = make_cp("[general]\npassword = abc#def\n", tmp_path)
         output, _, _ = build_yaml(cp)
         assert output["general"]["password"] == "abc#def"
+
+
+# ── frame_strategy moves to ml_sequence.general (#76) ──────────────────
+
+FRAME_STRATEGY_INI = """\
+[general]
+base_data_path=/var/lib/zmen
+
+[ml]
+stream_sequence={'frame_strategy': 'first', 'frame_set': 'snapshot,alarm'}
+ml_sequence={'general': {'model_sequence': 'object'}, 'object': {'sequence': [{'name': 'yolo'}]}}
+"""
+
+
+class TestFrameStrategyMove:
+    def test_frame_strategy_moves_to_ml_sequence_general(self, tmp_path):
+        output, _, _ = build_yaml(make_cp(FRAME_STRATEGY_INI, tmp_path))
+        ml = output["ml"]
+        assert ml["ml_sequence"]["general"]["frame_strategy"] == "first"
+        assert ml["stream_sequence"] == {"frame_set": "snapshot,alarm"}
+
+    def test_monitor_frame_strategy_moves_too(self, tmp_path):
+        ini = FRAME_STRATEGY_INI.replace("frame_strategy': 'first'", "frame_strategy': '{{fs}}'").replace(
+            "[general]\n", "[general]\nfs=first\n") + "\n[monitor-2]\nfs=most\n"
+        output, _, _ = build_yaml(make_cp(ini, tmp_path))
+        mon = output["monitors"][2]
+        assert mon["ml_sequence"]["general"]["frame_strategy"] == "most"
+        assert "frame_strategy" not in mon["stream_sequence"]
+        assert output["ml"]["ml_sequence"]["general"]["frame_strategy"] == "first"
+
+    def test_stream_value_wins_like_v1(self, tmp_path):
+        # v1 read frame_strategy only from stream_sequence; a copy in
+        # ml_sequence.general was dead and must not win.
+        ini = FRAME_STRATEGY_INI.replace(
+            "{'general': {'model_sequence': 'object'}",
+            "{'general': {'model_sequence': 'object', 'frame_strategy': 'most'}")
+        output, _, _ = build_yaml(make_cp(ini, tmp_path))
+        assert output["ml"]["ml_sequence"]["general"]["frame_strategy"] == "first"

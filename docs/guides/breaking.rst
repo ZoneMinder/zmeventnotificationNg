@@ -167,6 +167,8 @@ automatically merge new defaults from the example config.
 
 - ``ml.stream_sequence.frame_strategy`` → ``ml.ml_sequence.general.frame_strategy`` —
   ``StreamConfig`` ignores this key; ``DetectorConfig`` reads it from ``ml_sequence.general``
+  (the ``objectconfig.ini`` migration moves it for you, including per-monitor
+  ``stream_sequence`` overrides; a YAML config you already have needs the manual move)
 - ``ml.disable_locks`` → ``ml.ml_sequence.general.disable_locks`` —
   was a sibling of ``ml_sequence``/``stream_sequence`` and never reached pyzmNg
 - ``monitors.<id>.resize`` → ``monitors.<id>.stream_sequence.resize`` —
