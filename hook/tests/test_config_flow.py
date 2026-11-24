@@ -110,6 +110,23 @@ class TestMonitorOverrides:
         process_config({"config": patched_config, "monitorid": "1"}, ctx)
         assert g.config["poly_thickness"] == 4
 
+    def test_unquoted_yes_no_read_as_yes_no(self, tmp_path, ctx):
+        """Unquoted yes/no load as YAML booleans; the yes/no flags must still see 'yes'/'no'."""
+        cfg = {
+            "general": _minimal_general(allow_self_signed=True, show_percent=False,
+                                        import_zm_zones=True),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "1"}, ctx)
+
+        assert g.config["allow_self_signed"] == "yes"
+        assert g.config["show_percent"] == "no"
+        assert g.config["import_zm_zones"] == "yes"
+
     def test_zone_without_coords_records_pattern_for_join(self, tmp_path, ctx):
         """A zone with patterns but no coords is kept for the ZM join, not dropped. Ref: #48"""
         cfg = {

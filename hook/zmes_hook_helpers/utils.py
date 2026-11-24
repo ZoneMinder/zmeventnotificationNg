@@ -331,6 +331,9 @@ def process_config(args, ctx):
                 return val
             return str_split(val) if val else None
         elif t == 'string':
+            # YAML reads unquoted yes/no as booleans; the flags compare against 'yes'/'no'
+            if isinstance(val, bool):
+                return 'yes' if val else 'no'
             return str(val) if val is not None else val
         elif t == 'float':
             return float(val)
