@@ -120,6 +120,42 @@ sub make_alarm {
     is($obj->{notification_type}, 'critical', 'cause fallback: notification_type is critical');
 }
 
+# ===== End notifications are judged by the End cause, not the Start cause =====
+{
+    local $ZmEventNotification::Config::es_rules{notifications}{monitors}{12} = {
+        rules => [ { time_format => '%H:%M', from => '00:00', to => '23:59',
+                     daysofweek => 'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
+                     cause_has => 'car', action => 'mute' } ] };
+    my $alarm = {
+        MonitorId => 12,
+        Name      => 'TestMon',
+        EventId   => 201,
+        Cause     => 'detected:person',
+        Start     => { Cause => 'detected:person' },
+        End       => { Cause => 'detected:car' },
+    };
+    my ($allowed, $obj) = isAllowedInRules($alarm, 'end');
+    is($allowed, 0, 'end phase: end cause car matches mute rule -> blocked');
+}
+
+# ===== End phase falls back to the Start cause when the End cause has no detection =====
+{
+    local $ZmEventNotification::Config::es_rules{notifications}{monitors}{12} = {
+        rules => [ { time_format => '%H:%M', from => '00:00', to => '23:59',
+                     daysofweek => 'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
+                     cause_has => 'car', action => 'mute' } ] };
+    my $alarm = {
+        MonitorId => 12,
+        Name      => 'TestMon',
+        EventId   => 202,
+        Cause     => 'Motion',
+        Start     => { Cause => 'detected:car' },
+        End       => { Cause => '' },
+    };
+    my ($allowed, $obj) = isAllowedInRules($alarm, 'end');
+    is($allowed, 0, 'end phase: empty end cause falls back to start cause -> blocked');
+}
+
 # ===== Monitor 4: 7:00 pm - 7:00 am window crosses midnight =====
 {
     for my $case (

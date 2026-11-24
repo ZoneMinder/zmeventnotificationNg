@@ -420,4 +420,30 @@ subtest 'end notification when the event has no Notes in the DB' => sub {
         'end cause falls back to the start cause' );
 };
 
+subtest 'rules: end notification is judged by the end cause' => sub {
+    # A mute rule must look at the cause the end notification carries
+    # (End->Cause, "detected:car" here), not the start hook's detection.
+    set_hooks();
+    $push_config{enabled} = 0;
+
+    local $ZmEventNotification::Config::es_rules{notifications}{monitors}{5} = {
+        rules => [
+            { time_format => '%H:%M', from => '00:00', to => '23:59',
+              daysofweek => 'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
+              cause_has => 'car', action => 'mute' },
+        ] };
+    run_event();
+    is_deeply([ map { $_->[0] } @sent ], ['event_start'],
+        'end cause car matches mute rule -> end not sent');
+
+    $ZmEventNotification::Config::es_rules{notifications}{monitors}{5}{rules} = [
+        { time_format => '%H:%M', from => '00:00', to => '23:59',
+          daysofweek => 'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
+          cause_has => 'person', action => 'mute' },
+    ];
+    run_event();
+    is_deeply([ map { $_->[0] } @sent ], ['event_end'],
+        'start-only cause match does not mute the end notification');
+};
+
 done_testing();
