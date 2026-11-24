@@ -127,6 +127,38 @@ class TestMonitorOverrides:
         assert g.config["show_percent"] == "no"
         assert g.config["import_zm_zones"] == "yes"
 
+    def test_empty_push_section_reads_as_empty(self, tmp_path, ctx):
+        """`push:` with nothing under it loads as None; the hook reads it with .get()."""
+        cfg = {
+            "general": _minimal_general(),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+            "push": None,
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "1"}, ctx)
+
+        assert g.config["push"] == {}
+
+    def test_unquoted_yes_no_in_push_read_as_yes_no(self, tmp_path, ctx):
+        """Unquoted yes/no in the push section load as booleans; push compares against 'yes'."""
+        cfg = {
+            "general": _minimal_general(),
+            "ml": {
+                "ml_sequence": {"general": {"model_sequence": "object"}},
+                "stream_sequence": {"resize": 800},
+            },
+            "push": {"enabled": True, "include_picture": False, "android_ttl": 60},
+        }
+        cfg_path = _make_config_file(tmp_path, cfg)
+        process_config({"config": cfg_path, "monitorid": "1"}, ctx)
+
+        assert g.config["push"]["enabled"] == "yes"
+        assert g.config["push"]["include_picture"] == "no"
+        assert g.config["push"]["android_ttl"] == 60
+
     def test_zone_without_coords_records_pattern_for_join(self, tmp_path, ctx):
         """A zone with patterns but no coords is kept for the ZM join, not dropped. Ref: #48"""
         cfg = {
