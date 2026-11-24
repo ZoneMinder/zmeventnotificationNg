@@ -494,9 +494,13 @@ sub sendOverFCMV1 {
 
   my $json = encode_json($message_v2);
   my $djson = maskPassword($json);
+  if ( defined $obj->{token} && length $obj->{token} ) {
+    my $token  = $obj->{token};
+    my $masked = '...' . substr( $token, -10 );
+    $djson =~ s/\Q$token\E/$masked/g;
+  }
 
-  main::Debug(1, "fcmv1: Final JSON using FCMV1 being sent is: $djson to token: ..."
-      . substr( $obj->{token}, -6 ));
+  main::Debug(1, "fcmv1: Final JSON using FCMV1 being sent is: $djson");
   my $req = HTTP::Request->new('POST', $uri);
   $req->header(
     'Content-Type'  => 'application/json',

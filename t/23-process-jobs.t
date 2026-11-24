@@ -66,6 +66,24 @@ subtest 'fcm_notification: badge and invocations updated' => sub {
     is( $active_connections[1]{badge}, 0, 'other token untouched' );
 };
 
+subtest 'fcm_notification: badge update log masks the token' => sub {
+    my $token  = 'tokA_0123456789abcdefghij';
+    my $suffix = substr( $token, -10 );
+    @active_connections = ( { id => 'f1', token => $token, badge => 3, invocations => { count => 7, at => 4 } } );
+    my @debug;
+    {
+        no warnings 'redefine';
+        local *main::Debug = sub { push @debug, $_[1] };
+        feed("fcm_notification--TYPE--$token--SPLIT--4--SPLIT--8--SPLIT--4");
+    }
+    my ($badge_log) = grep { /update badge/ } @debug;
+    my $log = join "\n", @debug;
+    is( $active_connections[0]{badge}, 4, 'badge applied' );
+    ok( defined $badge_log, 'badge job log line emitted' );
+    like( $badge_log, qr/\Q$suffix\E/, 'badge log carries the token suffix' );
+    unlike( $log, qr/\Q$token\E/, 'badge job log does not carry the full token' );
+};
+
 subtest 'fcm_notification: start and end push of one event count once' => sub {
     # The fork sends one fcm_notification per push. Start and end of the
     # same event both carry the fork-time badge+1 / count+1, so the parent
