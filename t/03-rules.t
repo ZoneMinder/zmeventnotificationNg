@@ -139,6 +139,25 @@ sub make_alarm {
     }
 }
 
+# ===== Monitor 5: overnight window on Mon,Tue,Wed belongs to the day it starts =====
+# 9:30 pm - 1 am on Mon,Tue,Wed covers Mon night to early Tue, Tue night to
+# early Wed and Wed night to early Thu. June 2026: 14 Sun, 15 Mon ... 18 Thu.
+{
+    for my $case (
+        [ 17, 22, 0,  0, 'Wed 10 pm, in Wednesday\'s window' ],
+        [ 18, 0,  30, 0, 'Thu 12:30 am, still in Wednesday\'s window' ],
+        [ 17, 0,  30, 0, 'Wed 12:30 am, in Tuesday\'s window' ],
+        [ 15, 0,  30, 1, 'Mon 12:30 am, in Sunday\'s window, which is not listed' ],
+        [ 18, 22, 0,  1, 'Thu 10 pm, Thursday is not listed' ],
+    ) {
+        my ($day, $h, $m, $want_allowed, $label) = @$case;
+        local $FAKE_TIME = timelocal(0, $m, $h, $day, 5, 2026);
+        my ($allowed) = isAllowedInRules(make_alarm(mid => 5, cause => 'detected:person'));
+        is($allowed, $want_allowed, "monitor 5 overnight days, $label: "
+            . ($want_allowed ? 'allowed' : 'muted'));
+    }
+}
+
 # ===== A malformed rule is skipped, it does not die =====
 {
     my $good = { time_format => '%H:%M', from => '00:00', to => '23:59',

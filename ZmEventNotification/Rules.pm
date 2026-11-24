@@ -122,15 +122,21 @@ sub isAllowedInRules {
       next;
     }
 
-    main::Debug(2, "rules:(eid: $eid)  seeing if now:"
-        . $now->wdayname
+    # daysofweek names the day a window starts on, so the part of an
+    # overnight window after midnight belongs to the day before.
+    my $day = $now->wdayname;
+    if ( $from > $to && $t <= $to ) {
+      $day = ( qw(Sun Mon Tue Wed Thu Fri Sat) )[ ( $now->day_of_week + 6 ) % 7 ];
+    }
+    main::Debug(2, "rules:(eid: $eid)  seeing if window day:"
+        . $day
         . " is part of:"
         . $rule_ref->{daysofweek});
     if ( exists($rule_ref->{daysofweek})
-      && ( index( $rule_ref->{daysofweek}, $now->wdayname ) == -1 ) )
+      && ( index( $rule_ref->{daysofweek}, $day ) == -1 ) )
     {
       main::Debug(1, "rules: (eid: $eid) Skipping this rule as:"
-          . $t->wdayname
+          . $day
           . ' does not match '
           . $rule_ref->{daysofweek});
       next;
