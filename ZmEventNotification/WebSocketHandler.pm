@@ -448,6 +448,23 @@ sub processIncomingMessage {
   #-----------------------------------------------------------------------------------
   elsif ($json_string->{event} eq 'control') {
     if ( $data->{type} eq 'filter' ) {
+      # filter changes the connection's monitor list and writes the token
+      # file, so it needs a connection that has authenticated. version stays
+      # open: clients use it as a keepalive.
+      if ( $auth_config{enabled} ) {
+        my $obj = getObjectForConn($conn);
+        if ( !$obj || $obj->{state} != VALID_CONNECTION ) {
+          my $str = encode_json(
+            { event  => 'control',
+              type   => 'filter',
+              status => 'Fail',
+              reason => 'NOAUTH'
+            }
+          );
+          _safe_send($conn, $str);
+          return;
+        }
+      }
       if ( !exists( $data->{monlist} ) ) {
         my $str = encode_json(
           { event  => 'control',
