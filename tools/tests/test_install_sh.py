@@ -257,6 +257,18 @@ def test_migrated_secrets_not_world_readable(sandbox):
     assert "ZM_USER: me" in open(cfg(sandbox, "secrets.yml")).read()
 
 
+def test_upgraded_secrets_not_world_readable(sandbox):
+    """An existing secrets.yml from an older install (0644) ends up 0640 like a fresh one."""
+    write_es_configs(sandbox, sandbox["env"]["TARGET_CONFIG"])
+    os.chmod(cfg(sandbox, "secrets.yml"), 0o644)
+    r = run(sandbox, "umask 022; PY_SUDO=''; install_es_config")
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = os.stat(cfg(sandbox, "secrets.yml"))
+    assert stat.S_IMODE(st.st_mode) == 0o640
+    assert st.st_uid == os.getuid()  # WEB_OWNER in the sandbox
+    assert "ZM_USER: me" in open(cfg(sandbox, "secrets.yml")).read()
+
+
 # ── install_hook ────────────────────────────────────────────────────────
 
 HOOK_ENV = dict(INSTALL_OPENCV="no", DOWNLOAD_MODELS="no")

@@ -795,6 +795,9 @@ install_es_config() {
         echo "Upgrading existing secrets with any new keys..."
         "${PYTHON}" tools/config_upgrade_yaml.py -c "${TARGET_CONFIG}/secrets.yml" -e secrets.example.yml &&
             print_success "secrets upgraded" || print_warning "secrets upgrade failed"
+        # secrets.yml from older installs is 0644; give it the owner and mode a fresh install gets
+        chown "${WEB_OWNER}:${WEB_GROUP}" "${TARGET_CONFIG}/secrets.yml"
+        chmod 640 "${TARGET_CONFIG}/secrets.yml"
     fi
 
     # Fix stale secrets.ini reference in config if secrets.yml exists
