@@ -193,7 +193,7 @@ sub validateAuth {
     return 1 unless $auth_config{enabled};
 
     return 0 if ( $u eq '' || $p eq '' );
-    my $sql = 'SELECT `Password` FROM `Users` WHERE `Username`=?';
+    my $sql = 'SELECT `Password` FROM `Users` WHERE `Username`=? AND `Enabled`=1';
     my $sth = $main::dbh->prepare_cached($sql)
       or main::Fatal( "Can't prepare '$sql': " . $main::dbh->errstr() );
     my $res = $sth->execute($u)
