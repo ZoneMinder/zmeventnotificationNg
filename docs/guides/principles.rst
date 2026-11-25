@@ -251,6 +251,9 @@ A few things to keep in mind:
   minute. End a window at ``6:59 pm`` to avoid the overlap.
 - A window where ``to`` is earlier than ``from`` (``5 pm`` to ``7 am``) crosses
   midnight and covers both the evening and the early morning.
+- ``daysofweek`` names the day a window starts on. With ``9:30 pm`` to ``1 am``
+  on ``Mon,Tue,Wed``, Thursday ``12:30 am`` is still in Wednesday's window, and
+  Monday ``12:30 am`` is in Sunday's, which is not listed.
 - A monitor that has no entry in the rules file always notifies. To silence a
   monitor completely, give it a ``mute`` rule from ``12:00 am`` to ``11:59 pm``.
 - If ``es_rules.yml`` fails to parse, the ES loads no rules and every monitor

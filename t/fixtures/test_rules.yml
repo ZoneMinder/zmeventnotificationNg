@@ -34,3 +34,12 @@ notifications:
           to: "7:00 am"
           cause_has: person
           action: critical_notify
+
+    5:
+      rules:
+        - time_format: "%I:%M %p"
+          from: "9:30 pm"
+          to: "1 am"
+          daysofweek: "Mon,Tue,Wed"
+          cause_has: person
+          action: mute
