@@ -61,6 +61,7 @@ BEGIN {
 # Mock database for auth
 our $mock_db_password;
 our $mock_db_user_exists = 1;
+our $mock_db_user_enabled = 1;
 our $dbh;
 
 BEGIN {
@@ -78,7 +79,12 @@ BEGIN {
     sub execute { 1 }
     sub finish { 1 }
     sub fetchrow_hashref {
+        my $self = shift;
         return undef unless $main::mock_db_user_exists;
+        # Honour the SQL the code actually sends: a query that filters on
+        # Enabled = 1 must not see a disabled user's row.
+        return undef if !$main::mock_db_user_enabled
+            && $self->{sql} =~ /`Enabled`\s*=\s*1/i;
         return { Password => $main::mock_db_password };
     }
 }
@@ -95,6 +101,7 @@ sub reset_state {
     @load_esconfig_calls = ();
     @restart_es_calls = ();
     @main::active_connections = ();
+    $mock_db_user_enabled = 1;
     %main::monitors = (
         1 => { Id => 1, Name => 'Front' },
         2 => { Id => 2, Name => 'Back' },
@@ -178,6 +185,25 @@ subtest 'validateAuth - user not found' => sub {
 
     is(validateAuth('unknown', 'pass', 'normal'), 0, 'Returns 0 for unknown user');
     $mock_db_user_exists = 1;
+};
+
+subtest 'validateAuth - disabled user rejected' => sub {
+    reset_state();
+    local $auth_config{enabled} = 1;
+    local $mock_db_password = '$2a$10$abcdefghijklmnopqrstuv';
+
+    no warnings 'redefine';
+    local *main::try_use = sub { 1 };
+    # bcrypt returns the settings string when the password matches
+    local *Crypt::Eksblowfish::Bcrypt::bcrypt = sub { $_[1] };
+
+    $mock_db_user_enabled = 0;
+    is(validateAuth('disabled', 'correctpw', 'normal'), 0,
+        'disabled user refused with the correct password');
+
+    $mock_db_user_enabled = 1;
+    is(validateAuth('enabled', 'correctpw', 'normal'), 1,
+        'enabled user with the correct password accepted');
 };
 
 subtest 'validateAuth - escontrol category' => sub {
