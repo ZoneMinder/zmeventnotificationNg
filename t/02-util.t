@@ -140,4 +140,18 @@ ZmEventNotification::Util->import(':all');
     is(getInterval('10,20,30', '1,2,3', 9), undef, 'getInterval: missing mid returns undef');
 }
 
+# ===== uniq logs a bad pushstate with the token masked =====
+{
+    my $token = 'uniq_token_0123456789abcdefghij';
+    my @debug;
+    {
+        no warnings 'redefine';
+        local *main::Debug = sub { push @debug, $_[1] };
+        uniq("$token:1,2:0,0:android:bogus");
+    }
+    my $log = join "\n", @debug;
+    like($log, qr/\Q...@{[ substr($token, -10) ]}\E/, 'uniq: bad pushstate log carries the token suffix');
+    unlike($log, qr/\Q$token\E/, 'uniq: bad pushstate log does not carry the full token');
+}
+
 done_testing();

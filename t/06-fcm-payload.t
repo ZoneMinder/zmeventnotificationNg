@@ -736,4 +736,45 @@ $fcm_config{log_message_id} = 'NONE';
     is($body->{message}{data}{profile}, 'Night', 'direct v1 ios: message.data.profile injected');
 }
 
+# ===== FCM send path logs the token masked, the request carries it whole =====
+{
+    @captured_requests = ();
+    $pipe_output = '';
+    local $fcm_config{service_account_file}       = undef;
+    local $fcm_config{v1_key}                     = 'test-proxy-key';
+    local $fcm_config{v1_url}                     = 'https://proxy.example.com/push';
+    local $fcm_config{date_format}                = '%H:%M';
+    local $fcm_config{android_priority}           = 'high';
+    local $fcm_config{replace_push_messages}      = 0;
+    local $fcm_config{log_raw_message}            = 0;
+    local $fcm_config{include_profile_in_push}    = 'no';
+    my $token = 'proxy_token_0123456789abcdefghij';
+    my $obj = {
+        token       => $token,
+        platform    => 'android',
+        badge       => 0,
+        invocations => { count => 0, at => (localtime)[4] },
+        state       => INVALID_CONNECTION,
+        appversion  => '2.0',
+    };
+    local $notify_config{tag_alarm_event_id} = 0;
+    local $notify_config{picture_url} = undef;
+    local $notify_config{include_picture} = 0;
+
+    my @debug;
+    {
+        no warnings 'redefine';
+        local *main::Debug = sub { push @debug, $_[1] };
+        sendOverFCMV1({ %$alarm_base }, $obj, 'event_start', 0);
+    }
+
+    my $log    = join "\n", @debug;
+    my $suffix = substr($token, -10);
+    like($log, qr/Final JSON using FCMV1 being sent is: .*\Q...$suffix\E/,
+        'FCM send path log carries the masked token');
+    unlike($log, qr/\Q$token\E/, 'FCM send path log does not contain the full token');
+    is(decode_json($captured_requests[-1]->{content})->{token}, $token,
+        'FCM request still carries the full token');
+}
+
 done_testing();
