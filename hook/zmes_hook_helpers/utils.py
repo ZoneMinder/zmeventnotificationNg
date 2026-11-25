@@ -419,7 +419,13 @@ def process_config(args, ctx):
                     g.logger.Info('Config key "{}" in [ml] is not recognized — ignoring'.format(k))
 
         # Handle [push] section as nested dict
-        g.config['push'] = _resolve_secret(yml.get('push', {}))
+        # An empty `push:` loads as None, and unquoted yes/no as booleans; the
+        # push code reads it with .get() and compares flags against 'yes'.
+        push = _resolve_secret(yml.get('push') or {})
+        g.config['push'] = {
+            k: ('yes' if v else 'no') if isinstance(v, bool) else v
+            for k, v in push.items()
+        } if isinstance(push, dict) else {}
 
         # SSL settings
         if g.config['allow_self_signed'] == 'yes':
