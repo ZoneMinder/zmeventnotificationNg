@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.38] - 2026-11-25
+
+### Bug Fixes
+
+- read an empty or unquoted push section the way the hook expects refs [#91](https://github.com/ZoneMinder/zmeventnotificationNg/issues/91) ([dd5ffcf](https://github.com/ZoneMinder/zmeventnotificationNg/commit/dd5ffcf205f380ab50b0f5a859abdd38a7cd5c77))
+- give an upgraded secrets.yml the owner and mode of a fresh install refs [#93](https://github.com/ZoneMinder/zmeventnotificationNg/issues/93) ([390949a](https://github.com/ZoneMinder/zmeventnotificationNg/commit/390949af34c7e1c782413678ac5ed7e09e6fcd1a))
+- read unquoted yes/no as yes/no in the hook's string settings refs [#89](https://github.com/ZoneMinder/zmeventnotificationNg/issues/89) ([e7ea2de](https://github.com/ZoneMinder/zmeventnotificationNg/commit/e7ea2dea661df99cf2a3d410f1d1dca63f33397f))
+- mask the token in the uniq pushstate log and drop the counter to 0 refs [#87](https://github.com/ZoneMinder/zmeventnotificationNg/issues/87) ([1f459ca](https://github.com/ZoneMinder/zmeventnotificationNg/commit/1f459ca5bfecb6af53686769aa5c84ad93cd7f5e))
+- mask FCM tokens in the send, job and disconnect logs refs [#87](https://github.com/ZoneMinder/zmeventnotificationNg/issues/87) ([6ae2d02](https://github.com/ZoneMinder/zmeventnotificationNg/commit/6ae2d029d9a0abf59a4944c1fba49e32ac6628af))
+- refuse control filter from a connection that has not authenticated refs [#85](https://github.com/ZoneMinder/zmeventnotificationNg/issues/85) ([d21ecea](https://github.com/ZoneMinder/zmeventnotificationNg/commit/d21eceae9b95510d0fae80451b0254d0fc724226))
+- refuse ES logins from disabled ZoneMinder users refs [#83](https://github.com/ZoneMinder/zmeventnotificationNg/issues/83) ([4a6d42e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4a6d42ecc5b504f959a7e44ac4962a9509a13489))
+- judge the event end notification by the end cause in es_rules refs [#81](https://github.com/ZoneMinder/zmeventnotificationNg/issues/81) ([54e966d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/54e966d5ec4148c93ea00cf1899473f62a62653b))
+- match an overnight rule's daysofweek against the day its window starts refs [#79](https://github.com/ZoneMinder/zmeventnotificationNg/issues/79) ([b1de648](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b1de648655c8ad721e7eb20540051704afcffddb))
+
+### Miscellaneous
+
+- bump version to v7.0.38 ([36266be](https://github.com/ZoneMinder/zmeventnotificationNg/commit/36266beefbd4289cd66bbcd6aee1925210087a06))
+
 ## [7.0.37] - 2026-11-19
 
 ### Bug Fixes
@@ -15,6 +33,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- update CHANGELOG for v7.0.37 ([53de110](https://github.com/ZoneMinder/zmeventnotificationNg/commit/53de110edbd000022a1341a938466add5a199c12))
 - point the e2e prerequisites at pyzm's .env.zm_e2e ([493a484](https://github.com/ZoneMinder/zmeventnotificationNg/commit/493a48452af14118cc366b88c7ae3662b4a63bf2))
 - list git as an install prerequisite ([7081540](https://github.com/ZoneMinder/zmeventnotificationNg/commit/708154089677bef21e072b7ab0f75c66372214db))
 
