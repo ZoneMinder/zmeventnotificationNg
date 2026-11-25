@@ -189,7 +189,8 @@ Perl test reference
    * - ``t/15-websocket-handler.t``
      - WebSocket message handling and **``validateAuth`` password comparison**
        (bcrypt ``$2b$``/``$2y$`` normalization, MySQL ``password41``, ``-ZM-``
-       guard), malformed-message rejection, push requires auth, escontrol
+       guard), malformed-message rejection, push and control filter require auth,
+       escontrol
        login without a configured password, per-connection matching by
        object identity (reverse-proxy ip:port reuse)
    * - ``t/16-fcm-auth.t``

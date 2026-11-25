@@ -818,6 +818,45 @@ subtest 'processIncomingMessage - push commands need an authenticated connection
     is($response->{reason}, 'NOAUTH', 'reason NOAUTH');
 };
 
+subtest 'processIncomingMessage - control filter needs an authenticated connection when auth is on' => sub {
+    reset_state();
+    local $fcm_config{enabled} = 1;
+    local $auth_config{enabled} = 1;
+    my $mock_conn = MockConn->new('192.168.1.1', 12345);
+    @main::active_connections = (
+        { conn => $mock_conn, state => PENDING_AUTH, type => WEB, token => '',
+          monlist => '1', intlist => '0', platform => 'android', pushstate => 'enabled',
+          appversion => '2.0', invocations => { count => 0, at => 0 } },
+    );
+
+    processIncomingMessage($mock_conn, encode_json({ event => 'control',
+        data => { type => 'filter', monlist => '1,2', intlist => '0,0' } }));
+
+    my $response = decode_json($mock_conn->{sent}[0] // '{}');
+    is($response->{event}, 'control', 'control reply');
+    is($response->{status}, 'Fail', 'rejected');
+    is($response->{reason}, 'NOAUTH', 'reason NOAUTH');
+    is($main::active_connections[0]{monlist}, '1', 'monlist untouched');
+    is($main::active_connections[0]{intlist}, '0', 'intlist untouched');
+    is(scalar @save_fcm_tokens_calls, 0, 'no token written');
+
+    # version stays open before auth: clients use it as a keepalive
+    processIncomingMessage($mock_conn, encode_json({ event => 'control',
+        data => { type => 'version' } }));
+    my $version = decode_json($mock_conn->{sent}[1] // '{}');
+    is($version->{type}, 'version', 'version answered before auth');
+    is($version->{status}, 'Success', 'version reply is a success');
+
+    # an authenticated connection still applies the filter
+    $main::active_connections[0]{state} = VALID_CONNECTION;
+    processIncomingMessage($mock_conn, encode_json({ event => 'control',
+        data => { type => 'filter', monlist => '1,2', intlist => '0,0' } }));
+
+    is($main::active_connections[0]{monlist}, '1,2', 'valid connection monlist updated');
+    is($main::active_connections[0]{intlist}, '0,0', 'valid connection intlist updated');
+    is(scalar @save_fcm_tokens_calls, 1, 'valid connection token saved once');
+};
+
 # Behind a reverse proxy every client has the proxy's IP, and a new socket can
 # reuse the source port of a closed one whose entry is still kept (token set,
 # INVALID_CONNECTION). Messages must only act on their own connection.
