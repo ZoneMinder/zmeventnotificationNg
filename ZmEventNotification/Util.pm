@@ -37,7 +37,7 @@ sub uniq {
       rsplit( qr/:/, $_, 5 );    #split (":",$_);
     next if $token eq '';
     if ( ( $pushstate ne 'enabled' ) && ( $pushstate ne 'disabled' ) ) {
-      main::Debug(2, "huh? uniq read $token,$monlist,$intlist,$platform, $pushstate => forcing state to enabled");
+      main::Debug(2, "huh? uniq read ..." . substr( $token, -10 ) . ",$monlist,$intlist,$platform, $pushstate => forcing state to enabled");
       $pushstate = 'enabled';
     }
 

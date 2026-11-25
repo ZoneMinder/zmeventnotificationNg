@@ -368,12 +368,12 @@ sub processIncomingMessage {
             || ( $_->{conn} != $conn )
             )
           {
-            my $existing_token = substr( $_->{token}, -10 );
-            my $new_token = substr( $data->{token}, -10 );
+            my $existing_suffix = substr( $_->{token}, -10 );
+            my $new_suffix = substr( $data->{token}, -10 );
             my $existing_conn = $_->{conn} ? $_->{conn}->ip().':'.$_->{conn}->port() : 'undefined';
             my $new_conn = $conn ? $conn->ip().':'.$conn->port() : 'undefined';
 
-            main::Debug(2, "JOB: new token matched existing token: ($new_token <==> $existing_token) but connection did not ($new_conn <==> $existing_conn)");
+            main::Debug(2, "JOB: new token matched existing token: ($new_suffix <==> $existing_suffix) but connection did not ($new_conn <==> $existing_conn)");
             main::Debug(1, 'JOB: Duplicate token found: marking ...' . substr( $_->{token}, -10 ) . ' to be deleted');
 
             $_->{state} = PENDING_DELETE;
@@ -408,12 +408,12 @@ sub processIncomingMessage {
           && ( $_->{conn} == $conn )
           && ( $_->{token} ne $data->{token} ) )
         {
-          my $existing_token = substr( $_->{token}, -10 );
-          my $new_token = substr( $data->{token}, -10 );
+          my $existing_suffix = substr( $_->{token}, -10 );
+          my $new_suffix = substr( $data->{token}, -10 );
           my $existing_conn = $_->{conn} ? $_->{conn}->ip().':'.$_->{conn}->port() : 'undefined';
           my $new_conn = $conn ? $conn->ip().':'.$conn->port() : 'undefined';
 
-          main::Debug(2, "JOB: connection matched ($new_conn <==> $existing_conn) but token did not ($new_token <==> $existing_token). first registration?");
+          main::Debug(2, "JOB: connection matched ($new_conn <==> $existing_conn) but token did not ($new_suffix <==> $existing_suffix). first registration?");
 
           $_->{type}     = FCM;
           $_->{token}    = $data->{token};
