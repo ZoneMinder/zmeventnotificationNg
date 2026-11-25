@@ -274,6 +274,11 @@ Which models should I use?
 
 - For face recognition, use ``face_model: cnn`` for more accuracy and ``face_model: hog`` for better speed
 
+- Leave ``max_size`` off the face model. It downscales the frame before dlib
+  runs, so on a 2560px camera ``max_size: 800`` shrinks a 100px face to about
+  30px, too small to detect. The object model can keep its own ``max_size``;
+  the setting is per model.
+
 
 .. _detection_sequence:
 

@@ -205,7 +205,9 @@ ml:
           face_recog_dist_threshold: 0.6
           face_num_jitters: 1
           face_upsample_times: 1
-          max_size: 800
+          # No max_size here on purpose: downscaling a high-res frame shrinks
+          # faces below what dlib can find. Add one only if face detection is
+          # too slow, and expect fewer faces.
 
     alpr:
       general:

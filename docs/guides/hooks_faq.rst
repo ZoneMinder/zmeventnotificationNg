@@ -205,7 +205,9 @@ I'm having issues with accuracy of Face Recognition
    -  If it says "no faces loaded" that means your known images don't
       have recognizable faces
    -  If it says "no faces found" that means your alarmed image doesn't
-      have a face that is recognizable
+      have a face that is recognizable. Check that the face model has no
+      ``max_size`` - it shrinks the frame, and the faces with it, before
+      detection.
    -  Read comments about ``num_jitters``, ``model``, ``upsample_times``
       in ``objectconfig.yml``
 
