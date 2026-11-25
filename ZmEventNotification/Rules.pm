@@ -27,17 +27,23 @@ sub isAllowedInRules {
     return ( $RULE_ERROR_RESULT, {} );
   }
   my $alarm = shift;
+  my $phase = shift // '';
   my $id    = $alarm->{MonitorId};
   my $name  = $alarm->{Name};
-  my $cause = $alarm->{Start}->{Cause} // '';
+  my $start_cause = $alarm->{Start}->{Cause} // '';
+  my $end_cause   = $alarm->{End} ? ( $alarm->{End}->{Cause} // '' ) : '';
+  my $top_cause   = $alarm->{Cause} // '';
 
-  if (index($cause, 'detected:') == -1) {
-    my $end_cause = $alarm->{End}->{Cause} // '';
-    my $top_cause = $alarm->{Cause} // '';
-    if (index($end_cause, 'detected:') != -1) {
-      $cause = $end_cause;
-    } elsif (index($top_cause, 'detected:') != -1)  {
-      $cause = $top_cause;
+  # An end notification carries the end hook's cause, so judge it by that one;
+  # fall back in the same order the start path always has.
+  my @causes = $phase eq 'end'
+    ? ( $end_cause, $start_cause, $top_cause )
+    : ( $start_cause, $end_cause, $top_cause );
+  my $cause = $causes[0];
+  foreach my $candidate (@causes) {
+    if (index($candidate, 'detected:') != -1) {
+      $cause = $candidate;
+      last;
     }
   }
 

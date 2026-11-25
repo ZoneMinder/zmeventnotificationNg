@@ -667,7 +667,7 @@ sub processNewAlarmsInFork {
     }
     elsif ( ($alarm->{End}->{State} // '') eq 'ready' ) {
 
-      my ( $rulesAllowed, $rulesObject ) = isAllowedInRules($alarm);
+      my ( $rulesAllowed, $rulesObject ) = isAllowedInRules($alarm, 'end');
 
       my $end_skip = _end_notify_skip_reason(
         $hooks_config{event_end_notify_if_start_success}, $startHookResult, $rulesAllowed);
