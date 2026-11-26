@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## [7.0.39] - 2026-11-26
+
+### Documentation
+
+- drop max_size from the face model example ([a9c5ff9](https://github.com/ZoneMinder/zmeventnotificationNg/commit/a9c5ff945aa1a7b723b1a05b9274c7955abf1348))
+
+### Miscellaneous
+
+- bump version to v7.0.39 ([cc11c96](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cc11c961462db3fbd7e16bd00aa1c10751e46cf3))
+
 ## [7.0.38] - 2026-11-25
 
 ### Bug Fixes
@@ -16,6 +26,10 @@ All notable changes to this project will be documented in this file.
 - refuse ES logins from disabled ZoneMinder users refs [#83](https://github.com/ZoneMinder/zmeventnotificationNg/issues/83) ([4a6d42e](https://github.com/ZoneMinder/zmeventnotificationNg/commit/4a6d42ecc5b504f959a7e44ac4962a9509a13489))
 - judge the event end notification by the end cause in es_rules refs [#81](https://github.com/ZoneMinder/zmeventnotificationNg/issues/81) ([54e966d](https://github.com/ZoneMinder/zmeventnotificationNg/commit/54e966d5ec4148c93ea00cf1899473f62a62653b))
 - match an overnight rule's daysofweek against the day its window starts refs [#79](https://github.com/ZoneMinder/zmeventnotificationNg/issues/79) ([b1de648](https://github.com/ZoneMinder/zmeventnotificationNg/commit/b1de648655c8ad721e7eb20540051704afcffddb))
+
+### Documentation
+
+- update CHANGELOG for v7.0.38 ([cba0d9c](https://github.com/ZoneMinder/zmeventnotificationNg/commit/cba0d9ce9c8ad8c9ac9a42f779c3cf3d43cbc2a1))
 
 ### Miscellaneous
 
