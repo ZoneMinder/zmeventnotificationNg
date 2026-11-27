@@ -19,8 +19,13 @@ import time
 
 try:
     import yaml
+    from ruamel.yaml import YAML
+    from ruamel.yaml.constructor import RoundTripConstructor
+    from ruamel.yaml.representer import RoundTripRepresenter
+    from ruamel.yaml.resolver import VersionedResolver
 except ImportError:
-    print("PyYAML is required: pip3 install pyyaml", file=sys.stderr)
+    print("PyYAML and ruamel.yaml are required: pip3 install pyyaml ruamel.yaml",
+          file=sys.stderr)
     sys.exit(1)
 
 
@@ -48,53 +53,48 @@ class RawScalar(str):
         return (RawScalar, (str(self), self.tag, self.style))
 
 
-class RawLoader(yaml.SafeLoader):
-    pass
+class Resolver11(VersionedResolver):
+    """Resolve plain scalars the way PyYAML (YAML 1.1) does, so a scalar
+    that needs an explicit tag for the hook (!!str yes) keeps it."""
+
+    def __init__(self, version=None, loader=None):
+        super().__init__(version=(1, 1), loader=loader)
 
 
-class RawDumper(yaml.SafeDumper):
+class RawConstructor(RoundTripConstructor):
+    def check_mapping_key(self, node, key_node, mapping, key, value):
+        # PyYAML (hook) and YAML::XS (ES) both keep the last of duplicate
+        # keys; ruamel would keep the first, so drop the earlier one.
+        if key in mapping:
+            print("Duplicate key '{}' at line {}: keeping this last one, as the "
+                  "hook and the ES do".format(key, key_node.start_mark.line + 1),
+                  file=sys.stderr)
+            del mapping[key]
+        return super().check_mapping_key(node, key_node, mapping, key, value)
+
+
+class RawRepresenter(RoundTripRepresenter):
     pass
 
 
 for _tag in ('str', 'int', 'float', 'bool', 'null', 'timestamp'):
-    RawLoader.add_constructor('tag:yaml.org,2002:' + _tag,
-                              lambda loader, node: RawScalar(node.value, node.tag, node.style))
-RawDumper.add_representer(
+    RawConstructor.add_constructor('tag:yaml.org,2002:' + _tag,
+                                   lambda c, node: RawScalar(node.value, node.tag, node.style))
+RawRepresenter.add_representer(
     RawScalar,
-    lambda dumper, data: dumper.represent_scalar(data.tag, str(data), style=data.style))
+    lambda r, data: r.represent_scalar(data.tag, str(data), style=data.style))
 
 
-class RawSeq(list):
-    """A sequence with an unknown tag, kept so it is written back as-is."""
-
-
-class RawMap(dict):
-    """A mapping with an unknown tag, kept so it is written back as-is."""
-
-
-def _construct_unknown(loader, node):
-    """Unknown tags (e.g. an unquoted 'user: !ZM_USER') are kept verbatim.
-
-    YAML::XS ignores such tags; safe_load rejects the file. Writing the tag
-    back unchanged keeps what each reader sees.
-    """
-    if isinstance(node, yaml.ScalarNode):
-        return RawScalar(node.value, node.tag, node.style)
-    if isinstance(node, yaml.SequenceNode):
-        obj = RawSeq(loader.construct_sequence(node, deep=True))
-    else:
-        obj = RawMap(loader.construct_mapping(node, deep=True))
-    obj.tag, obj.flow_style = node.tag, node.flow_style
-    return obj
-
-
-RawLoader.add_constructor(None, _construct_unknown)
-RawDumper.add_representer(
-    RawSeq,
-    lambda dumper, data: dumper.represent_sequence(data.tag, data, flow_style=data.flow_style))
-RawDumper.add_representer(
-    RawMap,
-    lambda dumper, data: dumper.represent_mapping(data.tag, data, flow_style=data.flow_style))
+def round_trip_yaml():
+    """A loader/dumper that keeps comments (on ruamel's CommentedMap and
+    CommentedSeq), unknown tags such as an unquoted !ZM_USER, and every
+    scalar's source text."""
+    y = YAML()
+    y.Resolver = Resolver11
+    y.Constructor = RawConstructor
+    y.Representer = RawRepresenter
+    y.width = 4096  # never re-wrap a long line the user wrote
+    return y
 
 
 def deep_merge(base, override):
@@ -205,10 +205,11 @@ def main():
                         help='Section within managed defaults file to use (e.g. zmeventnotification, objectconfig)')
     args = parser.parse_args()
 
+    rt = round_trip_yaml()
     with open(args.example) as f:
-        example = yaml.load(f, Loader=RawLoader)
+        example = rt.load(f)
     with open(args.config) as f:
-        user = yaml.load(f, Loader=RawLoader)
+        user = rt.load(f)
 
     if not example:
         print("Example file is empty or invalid YAML", file=sys.stderr)
@@ -262,7 +263,7 @@ def main():
 
     out_path = args.output or args.config
     if out_path == args.config:
-        # The rewrite drops comments; keep the original next to it.
+        # Keep the original next to the rewrite, in case it goes wrong.
         backup = '{}.{}.bak'.format(args.config, time.strftime('%Y%m%d-%H%M%S'))
         shutil.copy2(args.config, backup)
         # never more readable than the original; secrets.yml from older
@@ -270,8 +271,7 @@ def main():
         os.chmod(backup, os.stat(args.config).st_mode & 0o770)
         print("Backup of original config: {}".format(backup))
     with open(out_path, 'w') as f:
-        yaml.dump(user, f, Dumper=RawDumper, default_flow_style=False,
-                  sort_keys=False, allow_unicode=True)
+        rt.dump(user, f)
 
     print("\nUpdated config written to: {}".format(out_path))
 

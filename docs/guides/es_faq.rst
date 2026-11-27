@@ -115,7 +115,7 @@ STEP 2: stop the current ES
 STEP 3: Make a backup of your config files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before you execute the next step you may want to create a backup of your existing ``zmeventnotification.yml``, ``objectconfig.yml``, and ``secrets.yml`` config files. The install script will attempt to upgrade existing configs by merging new keys. When it rewrites a config it first saves a copy as ``<file>.<YYYYmmdd-HHMMSS>.bak`` (comments are only kept in that copy), but it is always good to make your own backup first.
+Before you execute the next step you may want to create a backup of your existing ``zmeventnotification.yml``, ``objectconfig.yml``, and ``secrets.yml`` config files. The install script will attempt to upgrade existing configs by merging new keys. It keeps your comments, and when it rewrites a config it first saves a copy as ``<file>.<YYYYmmdd-HHMMSS>.bak``, but it is always good to make your own backup first.
 
 
 STEP 4: Execute the install script

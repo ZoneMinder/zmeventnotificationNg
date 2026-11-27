@@ -58,7 +58,7 @@ jobs:
           liburi-perl libwww-perl libio-socket-ssl-perl
           libcrypt-openssl-rsa-perl libnet-mqtt-simple-perl
       - name: Install Python packages the tests load
-        run: pip install pytest pyyaml numpy opencv-python-headless configupdater "./_pyzm[ml]"
+        run: pip install pytest pyyaml ruamel.yaml numpy opencv-python-headless configupdater "./_pyzm[ml]"
       # ZM_E2E_REQUIRE=1 makes the pyzm contract test fail instead of skip
       # when pyzm cannot be imported. e2e tests stay deselected by `make gate`.
       - name: make gate (perl, hook, tools, instruction gate, ratchet)
@@ -86,7 +86,7 @@ jobs:
           liburi-perl libwww-perl libio-socket-ssl-perl
           libcrypt-openssl-rsa-perl libnet-mqtt-simple-perl
       - name: Install Python packages the tests load
-        run: pip install pytest pyyaml numpy opencv-python-headless configupdater "./_pyzm[ml]"
+        run: pip install pytest pyyaml ruamel.yaml numpy opencv-python-headless configupdater "./_pyzm[ml]"
       # P2 by machine: the tests this range changed must fail on the code the
       # range replaces. A push that creates a branch has no before commit.
       - name: Changed tests go red on the pre-change code

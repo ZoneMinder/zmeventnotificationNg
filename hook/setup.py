@@ -18,7 +18,7 @@ LICENSE = 'GPL'
 INSTALL_REQUIRES = [
     'numpy', 'requests', 'imutils',
     'pyzm[ml]>=2.5.9', 'scikit-learn',
-    'PyYAML', 'configupdater'
+    'PyYAML', 'ruamel.yaml', 'configupdater'
 ]
 
 here = os.path.abspath(os.path.dirname(__file__))
