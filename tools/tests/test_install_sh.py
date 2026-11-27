@@ -337,6 +337,39 @@ def test_config_tools_run_from_venv_path_with_space(sandbox):
     assert "fcm:" in open(cfg(sandbox, "zmeventnotification.yml")).read()
 
 
+@pytest.mark.parametrize("func", ["install_es_config", "install_hook_config"])
+def test_config_install_gets_ruamel_before_upgrading(sandbox, func):
+    """Refs #95: config_upgrade_yaml.py needs ruamel.yaml, so pip installs it first."""
+    log = sandbox["tmp"] / "calls.log"
+    vbin = sandbox["tmp"] / "vbin"
+    vbin.mkdir()
+    (vbin / "pip").write_text('#!/bin/sh\necho "pip $*" >> "{}"\n'.format(log))
+    (vbin / "python").write_text(
+        '#!/bin/sh\necho "python $*" >> "{}"\nexec python3 "$@"\n'.format(log))
+    for f in ("pip", "python"):
+        (vbin / f).chmod(0o755)
+    target = sandbox["env"]["TARGET_CONFIG"]
+    write_es_configs(sandbox, target)
+    shutil.copy(os.path.join(REPO, "hook", "objectconfig.example.yml"),
+                cfg(sandbox, "objectconfig.yml"))
+    r = run(sandbox, "PY_SUDO=''; " + func, PYTHON=str(vbin / "python"),
+            PIP=str(vbin / "pip"), **HOOK_ENV)
+    assert r.returncode == 0, r.stdout + r.stderr
+    calls = log.read_text().splitlines()
+    installs = [i for i, c in enumerate(calls) if c.startswith("pip install") and "ruamel.yaml" in c]
+    upgrades = [i for i, c in enumerate(calls) if "config_upgrade_yaml.py" in c]
+    assert installs and upgrades, calls
+    assert installs[0] < upgrades[0], calls
+
+
+def test_hook_package_declares_ruamel():
+    import ast
+    tree = ast.parse(open(os.path.join(REPO, "hook", "setup.py")).read())
+    reqs = next(ast.literal_eval(n.value) for n in tree.body
+                if isinstance(n, ast.Assign) and n.targets[0].id == "INSTALL_REQUIRES")
+    assert "ruamel.yaml" in reqs
+
+
 def test_symlinked_configs_edited_through_the_link(sandbox):
     # e.g. configs kept in a git repo or on a mounted volume and linked in.
     target = sandbox["env"]["TARGET_CONFIG"]

@@ -223,7 +223,7 @@ class TestMainCharacterization:
 
 class TestMainBugs:
     def test_in_place_rewrite_keeps_backup_of_original(self, tmp_path, monkeypatch):
-        # The rewrite drops comments, so the original must be kept.
+        # The original is kept in case the rewrite goes wrong.
         text = "# my precious comment\na: 1\n"
         _run_upgrade(tmp_path, monkeypatch, text, "a: 1\nb: 2\n")
         backups = list(tmp_path.glob("user.yml.*.bak"))
@@ -327,3 +327,55 @@ class TestMainUnknownTags:
         after = raw(text)
         assert after["secrets"].pop("NEW") == "y"
         assert after == raw(self.USER)
+
+
+class TestMainKeepsComments:
+    """Refs #95: an upgrade that adds keys must not wipe the user's comments."""
+
+    USER = ("# my header\n"
+            "general:\n"
+            "  # why port 9000\n"
+            "  port: 9000  # inline note\n"
+            "monitors:\n"
+            "  1:  # FrontDoor\n"
+            "    wait: 0\n")
+
+    def test_user_comments_survive_upgrade(self, tmp_path, monkeypatch):
+        import yaml
+        user = _run_upgrade(tmp_path, monkeypatch, self.USER,
+                            "general:\n  port: 1\n  new_key: added\n")
+        text = user.read_text()
+        for c in ("# my header", "# why port 9000", "# inline note", "# FrontDoor"):
+            assert c in text, c
+        after = yaml.safe_load(text)
+        assert after["general"].pop("new_key") == "added"
+        assert after == yaml.safe_load(self.USER)
+
+    def test_real_objectconfig_keeps_every_comment(self, tmp_path, monkeypatch):
+        import re
+        repo = os.path.join(os.path.dirname(__file__), "..", "..")
+        example = open(os.path.join(repo, "hook", "objectconfig.example.yml")).read()
+        user_text, n = re.subn(r"(?m)^  show_percent:.*\n", "", example)
+        assert n == 1
+        user = _run_upgrade(tmp_path, monkeypatch, user_text, example)
+        text = user.read_text()
+        assert re.search(r"(?m)^  show_percent:", text)  # the upgrade did rewrite it
+        comment = re.compile(r"(?:^|\s)(#.*)$")
+        wanted = [m.group(1).strip() for line in user_text.splitlines()
+                  if (m := comment.search(line))]
+        missing = [c for c in wanted if c not in text]
+        assert not missing, missing[:5]
+
+    def test_duplicate_key_keeps_the_last_value(self, tmp_path, monkeypatch, capsys):
+        # A real es_rules.yml had monitor 999 twice. PyYAML and the ES's YAML::XS
+        # both use the last one, so the rewrite must keep that one.
+        import yaml
+        user_text = ("notifications:\n  monitors:\n"
+                     "    999:\n      rules: first  # dead copy\n"
+                     "    999:\n      rules: last\n")
+        user = _run_upgrade(tmp_path, monkeypatch, user_text,
+                            "notifications:\n  new_key: added\n")
+        after = yaml.safe_load(user.read_text())
+        assert after["notifications"].pop("new_key") == "added"
+        assert after == yaml.safe_load(user_text)
+        assert "999" in capsys.readouterr().err

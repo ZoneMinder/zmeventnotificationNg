@@ -750,9 +750,14 @@ rewrite_etc_zm_paths() {
 }
 
 # move ES config files
+# PyYAML for the config migration tools; ruamel.yaml lets config_upgrade_yaml.py
+# keep the user's comments when it rewrites a config (#95).
+install_config_tool_deps() {
+    run_dimmed ${PY_SUDO} "${PIP}" install pyyaml ruamel.yaml ${PIP_COMPAT}
+}
+
 install_es_config() {
-    # Ensure pyyaml is installed for config migration/upgrade scripts
-    run_dimmed ${PY_SUDO} "${PIP}" install pyyaml ${PIP_COMPAT}
+    install_config_tool_deps
 
     # Auto-migrate from INI to YAML if needed
     if [ -f "${TARGET_CONFIG}/zmeventnotification.ini" ] && [ ! -f "${TARGET_CONFIG}/zmeventnotification.yml" ]; then
@@ -849,6 +854,8 @@ with open('${TARGET_CONFIG}/es_rules.yml', 'w') as f:
 install_hook_config() {
     # Download models if needed (uses download_if_needed, so existing files are skipped)
     download_models
+
+    install_config_tool_deps
 
     # Auto-migrate from INI to YAML if needed
     if [ -f "${TARGET_CONFIG}/objectconfig.ini" ] && [ ! -f "${TARGET_CONFIG}/objectconfig.yml" ]; then
